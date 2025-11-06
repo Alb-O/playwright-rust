@@ -377,20 +377,24 @@ We chose **Option 2 (JSON-RPC to Playwright Server)** because it is the **only o
 
 - [x] Research all three official implementations (Python, Java, .NET) - **Completed 2025-11-05**
 - [x] Research driver bundling strategy across all bindings - **Completed 2025-11-05**
-- [ ] Implement Phase 1 (Server launch, transport, connection)
+- [x] Implement Phase 1: Slice 1 (Server launch) - **Completed 2025-11-05**
+- [x] Implement Phase 1: Slice 2 (Transport layer) - **Completed 2025-11-05**
+- [x] Implement Phase 1: Slice 3 (Connection layer) - **Completed 2025-11-06**
+- [ ] Implement Phase 1: Slice 4 (Object factory)
+- [ ] Implement Phase 1: Slice 5 (Entry point)
 - [ ] Benchmark IPC performance vs. direct CDP (if concerns arise)
 - [ ] Test cross-browser compatibility (Chromium, Firefox, WebKit)
 - [ ] Verify API matches playwright-python exactly
 
 ### Success Criteria
 
-- Can launch Playwright server from Rust
-- Can send/receive JSON-RPC messages over stdio
-- Can correlate requests/responses with message IDs
-- Can create protocol objects (Browser, Page, etc.)
-- Latency overhead <5ms per operation
-- API matches playwright-python for implemented features
-- Tests pass on macOS, Linux, Windows
+- [x] Can launch Playwright server from Rust
+- [x] Can send/receive JSON-RPC messages over stdio
+- [x] Can correlate requests/responses with message IDs
+- [ ] Can create protocol objects (Browser, Page, etc.) - In progress (Slice 4)
+- [ ] Latency overhead <5ms per operation - To be measured
+- [ ] API matches playwright-python for implemented features
+- [x] Tests pass on macOS, Ubuntu, and Windows (CI validated)
 
 ### Benchmark Needed?
 
@@ -441,10 +445,28 @@ Phase 1 implementation (see [phase1-protocol-foundation.md](../implementation-pl
    - `tokio::sync::mpsc` channel for message dispatch
    - Match Python's 32KB chunk size for large messages
 
-3. **Connection Layer** (`src/connection.rs`)
+3. **Connection Layer** (`src/connection.rs`) - ✅ Complete (2025-11-06)
    - JSON-RPC client with request/response correlation
-   - Message ID generation and callback management
-   - Event dispatch to protocol objects
+   - Message ID generation and callback management (`AtomicU32`)
+   - Request/response correlation using `tokio::sync::oneshot` channels
+   - Event dispatch to protocol objects (logs for now, full dispatch in Slice 4)
+   - Protocol message types: `Request`, `Response`, `Event`, `Message`
+   - Error propagation: `TimeoutError`, `TargetClosedError`, generic `ProtocolError`
+   - 9 unit tests + 2 integration tests (all passing)
+
+   **Connection Implementation Details (2025-11-06):**
+
+   All official bindings use similar patterns:
+   - **Sequential request IDs** for correlation (starting from 0)
+   - **Callback storage** using HashMap keyed by ID
+   - **oneshot channels** (or equivalent) for async response completion
+   - **Untagged enum** to distinguish responses (with ID) from events (without ID)
+
+   **Rust approach**: Generic `Connection<W, R>` for testability
+   - `AtomicU32` for thread-safe ID generation
+   - `Arc<tokio::sync::Mutex<HashMap>>` for async-safe callback storage
+   - `#[serde(untagged)]` enum for automatic message discrimination
+   - Connection spawns transport loop internally (clean API)
 
 4. **Object Factory** (`src/object_factory.rs`)
    - Create typed objects from protocol messages

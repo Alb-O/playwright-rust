@@ -37,8 +37,12 @@ pub enum Error {
     Json(#[from] serde_json::Error),
 
     /// Timeout waiting for operation
-    #[error("Operation timed out")]
-    Timeout,
+    #[error("Timeout: {0}")]
+    Timeout(String),
+
+    /// Target was closed (browser, context, or page)
+    #[error("Target closed: {0}")]
+    TargetClosed(String),
 
     /// Unknown protocol object type
     #[error("Unknown protocol object type: {0}")]
