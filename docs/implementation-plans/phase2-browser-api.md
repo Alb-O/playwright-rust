@@ -1,6 +1,6 @@
 # Phase 2: Browser API - Implementation Plan
 
-**Status:** 🚀 In Progress (Slice 2/7 Complete)
+**Status:** 🚀 In Progress (Slice 3/7 Complete)
 
 **Feature:** Browser launching, contexts, and page lifecycle
 
@@ -12,7 +12,7 @@
 
 **Approach:** Vertical slicing with TDD (Red → Green → Refactor), following Phase 1 pattern
 
-**Progress:** 2/7 slices complete (29%)
+**Progress:** 3/7 slices complete (43%)
 
 ---
 
@@ -221,37 +221,49 @@ fn test_launch_options_normalize_ignore_default_args()
 
 ---
 
-### Slice 3: BrowserType::launch() ⏸️
+### Slice 3: BrowserType::launch() ✅
 
 **Goal:** Implement browser launching with real server integration
 
 **Tasks:**
-- [ ] Add `launch()` method to BrowserType
-- [ ] Add `launch_with_options()` method
-- [ ] Handle launch RPC via Channel
-- [ ] Parse response and retrieve Browser from registry
-- [ ] Integration test with real browser launch
+- [x] Add `launch()` method to BrowserType
+- [x] Add `launch_with_options()` method
+- [x] Handle launch RPC via Channel
+- [x] Parse response and retrieve Browser from registry
+- [x] Integration test with real browser launch
 
 **Files:**
-- Modify: `crates/playwright-core/src/protocol/browser_type.rs`
+- Modified: `crates/playwright-core/src/protocol/browser_type.rs`
 - New: `crates/playwright-core/tests/browser_launch_integration.rs`
 
 **Tests:**
 ```rust
 #[tokio::test]
-async fn test_launch_chromium()
+async fn test_launch_chromium() // ✅ Passing
 #[tokio::test]
-async fn test_launch_with_headless_option()
+async fn test_launch_with_headless_option() // ✅ Passing
 #[tokio::test]
-async fn test_launch_all_three_browsers()
+async fn test_launch_all_three_browsers() // ✅ Passing
 ```
 
 **Definition of Done:**
-- Can launch Chromium with default options
-- Can launch with custom options
-- Can launch Firefox and WebKit
-- Browser object accessible after launch
-- Integration tests pass with real browsers
+- ✅ Can launch Chromium with default options
+- ✅ Can launch with custom options
+- ✅ Can launch Firefox and WebKit
+- ✅ Browser object accessible after launch
+- ✅ Integration tests pass with real browsers
+
+**Key Implementation Details:**
+- Used `Channel::send()` for "launch" RPC call
+- `LaunchOptions::normalize()` converts options to protocol format
+- Response contains `{ browser: { guid: "..." } }`
+- Retrieved Browser from connection registry via `get_object()`
+- Downcast Arc<dyn ChannelOwner> to Browser using `as_any()`
+
+**Gotchas Discovered:**
+- ⚠️ Browser versions must match Playwright server version
+- Server 1.49.0 requires: `npx playwright@1.49.0 install`
+- Documented in README.md to prevent "Executable doesn't exist" errors
 
 ---
 
@@ -392,7 +404,8 @@ async fn test_page_url_initially_blank()
 2. ✅ Break into vertical slices (completed)
 3. ✅ Complete Slice 1: Browser Object Foundation
 4. ✅ Complete Slice 2: Launch Options API
-5. Start Slice 3: BrowserType::launch()
+5. ✅ Complete Slice 3: BrowserType::launch()
+6. Start Slice 4: Browser::close()
 
 ---
 
@@ -400,3 +413,4 @@ async fn test_page_url_initially_blank()
 **Last Updated:** 2025-11-07
 **Slice 1 Completed:** 2025-11-07
 **Slice 2 Completed:** 2025-11-07
+**Slice 3 Completed:** 2025-11-07

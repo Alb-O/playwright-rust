@@ -137,30 +137,38 @@ async fn test_connection_detects_server_crash_on_send() {
     // closes the stdout pipe. This is tested separately in the transport layer.
 }
 
-/// Test concurrent requests (deferred to Phase 2)
+/// Test concurrent requests (deferred to Phase 2 Slice 5+)
 ///
 /// This test will verify that multiple concurrent requests can be sent
 /// and responses are correctly correlated, even when they arrive out of order.
 ///
-/// Deferred to Phase 2 because it requires:
-/// - Multiple protocol objects to send requests to (Browser, Page, etc.)
-/// - Complex message sequences beyond initialization
+/// Deferred to Phase 2 Slice 5+ because it requires:
+/// - Multiple protocol objects to send requests to (Browser, Context, Page)
+/// - Complex message sequences (launch → new_context → new_page)
+/// - Concurrent operations on different objects
 #[tokio::test]
-#[ignore] // TODO: Deferred to Phase 2 - requires browser launching
+#[ignore] // TODO: Implement in Phase 2 Slice 6+ when we have Browser, Context, and Page objects
 async fn test_concurrent_requests_with_server() {
-    // Will implement in Phase 2 when we have browser launching and multiple objects
+    // Will implement when we have:
+    // - Browser::new_context() (Slice 5)
+    // - BrowserContext::new_page() (Slice 6)
+    // - Multiple concurrent operations
 }
 
-/// Test error handling with invalid requests (deferred to Phase 2)
+/// Test error handling with invalid requests (deferred to Phase 2 Slice 4+)
 ///
 /// This test will verify that protocol errors from the server are properly
 /// converted to Rust errors and propagated correctly.
 ///
-/// Deferred to Phase 2 because it requires:
-/// - Valid object GUIDs from browser/page objects
+/// Deferred to Phase 2 Slice 4+ because it requires:
+/// - Valid Browser object GUID (available in Slice 3) ✅
+/// - Methods to call with invalid params (e.g., Browser::close() in Slice 4)
 /// - Intentionally invalid requests to trigger protocol errors
 #[tokio::test]
-#[ignore] // TODO: Deferred to Phase 2 - requires browser objects
+#[ignore] // TODO: Implement in Phase 2 Slice 4+ when Browser::close() and error scenarios exist
 async fn test_error_response_from_server() {
-    // Will implement in Phase 2 when we have browser launching
+    // Will implement when we have Browser::close() to test error scenarios:
+    // - Call close() twice (should error on second call)
+    // - Invalid GUIDs
+    // - Invalid method parameters
 }

@@ -11,14 +11,13 @@ use playwright_core::protocol::Playwright;
 
 /// Test that a Browser object is created when the server sends a Browser __create__ message
 ///
-/// This will pass once:
-/// - Browser is added to object_factory.rs
-/// - Browser::new() parses initializer correctly
-/// - BrowserType::launch() is implemented (Slice 3)
+/// Verifies the complete flow:
+/// - Browser is added to object_factory.rs ✅
+/// - Browser::new() parses initializer correctly ✅
+/// - BrowserType::launch() is implemented (Slice 3) ✅
 ///
-/// For now, we just verify the object factory knows about Browser type.
+/// This test verifies the end-to-end Browser creation flow.
 #[tokio::test]
-#[ignore] // Will be enabled in Slice 3 when launch() is implemented
 async fn test_browser_object_creation_via_launch() {
     // Initialize Playwright
     let playwright = Playwright::launch()
@@ -26,7 +25,7 @@ async fn test_browser_object_creation_via_launch() {
         .expect("Failed to launch Playwright");
 
     // Get chromium browser type
-    let _chromium = playwright.chromium();
+    let chromium = playwright.chromium();
 
     // Launch browser - this will:
     // 1. Send "launch" RPC to server
@@ -36,18 +35,21 @@ async fn test_browser_object_creation_via_launch() {
     // 5. Browser added to connection registry
     // 6. launch() returns Browser reference
 
-    // TODO: Uncomment when launch() is implemented in Slice 3
-    // let browser = chromium.launch().await.expect("Failed to launch browser");
-    //
-    // // Verify Browser object fields
-    // assert_eq!(browser.name(), "chromium");
-    // assert!(!browser.version().is_empty());
-    // println!("✅ Browser created: {} version {}", browser.name(), browser.version());
-    //
-    // // Cleanup
+    let browser = chromium.launch().await.expect("Failed to launch browser");
+
+    // Verify Browser object fields
+    assert_eq!(browser.name(), "chromium");
+    assert!(!browser.version().is_empty());
+    println!(
+        "✅ Browser created: {} version {}",
+        browser.name(),
+        browser.version()
+    );
+
+    // Cleanup (TODO: Slice 4 - Browser::close())
     // browser.close().await.expect("Failed to close browser");
 
-    println!("✅ Slice 1 complete: Browser object registered in factory");
+    println!("✅ Slice 3 complete: Browser can be launched and created");
 }
 
 /// Test that Browser object has correct structure

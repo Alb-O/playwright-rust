@@ -16,8 +16,7 @@ use std::sync::Arc;
 ///
 /// # Example
 ///
-/// ```ignore
-/// // TODO: Change to `no_run` in Slice 3 when launch() is implemented
+/// ```no_run
 /// use playwright_core::protocol::Playwright;
 ///
 /// #[tokio::main]
@@ -30,8 +29,8 @@ use std::sync::Arc;
 ///
 ///     println!("Browser: {} version {}", browser.name(), browser.version());
 ///
-///     // Close browser
-///     browser.close().await?;
+///     // Close browser (TODO: Slice 4)
+///     // browser.close().await?;
 ///
 ///     Ok(())
 /// }
@@ -103,8 +102,7 @@ impl Browser {
     ///
     /// # Example
     ///
-    /// ```ignore
-    /// // TODO: Change to `no_run` in Slice 3 when launch() is implemented
+    /// ```no_run
     /// # use playwright_core::protocol::Playwright;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -122,8 +120,7 @@ impl Browser {
     ///
     /// # Example
     ///
-    /// ```ignore
-    /// // TODO: Change to `no_run` in Slice 3 when launch() is implemented
+    /// ```no_run
     /// # use playwright_core::protocol::Playwright;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -139,9 +136,10 @@ impl Browser {
 
     /// Returns the channel for sending protocol messages
     ///
-    /// TODO: Remove #[allow(dead_code)] in Slice 4 when Browser::close() is implemented
+    /// Used internally for sending RPC calls to the browser.
+    /// TODO: Make public in Slice 4 when Browser::close() is implemented
     #[allow(dead_code)]
-    fn channel(&self) -> &Channel {
+    pub(crate) fn channel(&self) -> &Channel {
         self.base.channel()
     }
 }

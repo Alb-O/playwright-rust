@@ -108,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Project Status
 
-**Current Phase:** 🚀 Phase 2 in Progress (Slice 2/7 Complete)
+**Current Phase:** 🚀 Phase 2 in Progress (Slice 3/7 Complete)
 
 ### Phase 1: Protocol Foundation (✅ Complete!)
 - [x] **Slice 1:** Server management (download, launch, lifecycle)
@@ -119,16 +119,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 **Result:** JSON-RPC communication working, Playwright server integration complete. See [Phase 1 Technical Summary](docs/technical/phase1-technical-summary.md).
 
-### Phase 2: Browser API (🚀 In Progress - 2/7 Slices Complete)
+### Phase 2: Browser API (🚀 In Progress - 3/7 Slices Complete)
 - [x] **Slice 1:** Browser object foundation (protocol object, ChannelOwner, object factory)
 - [x] **Slice 2:** Launch options API (LaunchOptions struct, builder pattern, normalization)
-- [ ] **Slice 3:** BrowserType::launch() (RPC implementation, integration tests)
+- [x] **Slice 3:** BrowserType::launch() (RPC implementation, integration tests) ✅
 - [ ] **Slice 4:** Browser::close() (graceful shutdown)
 - [ ] **Slice 5:** BrowserContext object (contexts, isolation)
 - [ ] **Slice 6:** Page object (page creation, basic methods)
 - [ ] **Slice 7:** Documentation and examples
 
 **Goal:** Enable browser launching and page lifecycle management. See [Phase 2 Implementation Plan](docs/implementation-plans/phase2-browser-api.md).
+
+**Latest:** Can now launch browsers! All three browsers (Chromium, Firefox, WebKit) can be launched with the `BrowserType::launch()` API.
 
 ### Upcoming Phases
 - [ ] **Phase 3:** Page Interactions (navigation, locators, actions)
@@ -153,7 +155,7 @@ tokio = { version = "1", features = ["full"] }
 ### Prerequisites
 
 - Rust 1.70+
-- Node.js 18+ (for Playwright server)
+- Node.js 18+ (for Playwright server and browser installation)
 - tokio async runtime
 
 ### Building from Source
@@ -169,29 +171,57 @@ pre-commit install
 
 # Build
 cargo build
-
-# Run tests
-cargo test
-
-# Run examples (requires PLAYWRIGHT_DRIVER_PATH)
-PLAYWRIGHT_DRIVER_PATH=./drivers/playwright-1.49.0-mac-arm64 \
-    cargo run --package playwright --example basic
 ```
 
-### Testing
+### Installing Browsers
+
+**⚠️ IMPORTANT:** Browser versions must match the Playwright server version!
+
+The Playwright server bundled in `drivers/` is version **1.49.0**. You must install matching browsers:
 
 ```bash
-# Unit tests
-cargo test --lib
+# Install browsers matching Playwright 1.49.0
+npx playwright@1.49.0 install chromium firefox webkit
+```
 
-# Integration tests
+**Why this matters:**
+- Playwright server 1.49.0 expects specific browser builds (e.g., chromium build 1148)
+- If you run `npx playwright install` without version, you'll get the latest browsers
+- Mismatched versions will cause "Executable doesn't exist" errors during tests
+
+**Verify installation:**
+```bash
+# Browsers are cached in:
+# macOS: ~/Library/Caches/ms-playwright/
+# Linux: ~/.cache/ms-playwright/
+# Windows: %USERPROFILE%\AppData\Local\ms-playwright\
+
+ls ~/Library/Caches/ms-playwright/
+# Should show: chromium-1148, chromium_headless_shell-1148, firefox-1466, webkit-2104
+```
+
+### Running Tests
+
+```bash
+# All tests
+cargo test
+
+# Integration tests only (requires browsers)
 cargo test --test '*'
 
-# Run specific test
-cargo test test_browser_launch
+# Specific test
+cargo test test_launch_chromium
 
 # With logging
 RUST_LOG=debug cargo test
+```
+
+### Running Examples
+
+```bash
+# Set driver path and run example
+PLAYWRIGHT_DRIVER_PATH=./drivers/playwright-1.49.0-mac-arm64 \
+    cargo run --package playwright --example basic
 ```
 
 ## API Design Philosophy

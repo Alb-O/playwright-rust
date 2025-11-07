@@ -7,10 +7,13 @@
 // - Python: playwright-python/playwright/_impl/_browser_type.py
 // - Protocol: protocol.yml (BrowserType interface)
 
+use crate::api::LaunchOptions;
 use crate::channel::Channel;
 use crate::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use crate::connection::ConnectionLike;
 use crate::error::Result;
+use crate::protocol::Browser;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::any::Any;
 use std::sync::Arc;
@@ -103,7 +106,112 @@ impl BrowserType {
         &self.executable_path
     }
 
-    // TODO: Phase 2 - Add launch() method for launching browsers
+    /// Launches a browser instance with default options.
+    ///
+    /// This is equivalent to calling `launch_with_options(LaunchOptions::default())`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::protocol::Playwright;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let playwright = Playwright::launch().await?;
+    /// let chromium = playwright.chromium();
+    ///
+    /// // Launch browser with default options
+    /// let browser = chromium.launch().await?;
+    ///
+    /// println!("Launched {} version {}", browser.name(), browser.version());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Browser executable not found
+    /// - Launch timeout (default 30s)
+    /// - Browser process fails to start
+    ///
+    /// See: <https://playwright.dev/docs/api/class-browsertype#browser-type-launch>
+    pub async fn launch(&self) -> Result<Browser> {
+        self.launch_with_options(LaunchOptions::default()).await
+    }
+
+    /// Launches a browser instance with custom options.
+    ///
+    /// # Arguments
+    ///
+    /// * `options` - Launch options (headless, args, etc.)
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::protocol::Playwright;
+    /// # use playwright_core::api::LaunchOptions;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let playwright = Playwright::launch().await?;
+    /// let chromium = playwright.chromium();
+    ///
+    /// // Launch with custom options
+    /// let options = LaunchOptions::default()
+    ///     .headless(true)
+    ///     .slow_mo(100.0)
+    ///     .args(vec!["--no-sandbox".to_string()]);
+    ///
+    /// let browser = chromium.launch_with_options(options).await?;
+    ///
+    /// println!("Launched {} version {}", browser.name(), browser.version());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Browser executable not found
+    /// - Launch timeout
+    /// - Invalid options
+    /// - Browser process fails to start
+    ///
+    /// See: <https://playwright.dev/docs/api/class-browsertype#browser-type-launch>
+    pub async fn launch_with_options(&self, options: LaunchOptions) -> Result<Browser> {
+        // Normalize options for protocol transmission
+        let params = options.normalize();
+
+        // Send launch RPC to server
+        let response: LaunchResponse = self.base.channel().send("launch", params).await?;
+
+        // Get browser object from registry
+        let browser_arc = self.connection().get_object(&response.browser.guid).await?;
+
+        // Downcast to Browser
+        let browser = browser_arc
+            .as_any()
+            .downcast_ref::<Browser>()
+            .ok_or_else(|| {
+                crate::error::Error::ProtocolError(format!(
+                    "Expected Browser object, got {}",
+                    browser_arc.type_name()
+                ))
+            })?;
+
+        Ok(browser.clone())
+    }
+}
+
+/// Response from BrowserType.launch() protocol call
+#[derive(Debug, Deserialize, Serialize)]
+struct LaunchResponse {
+    browser: BrowserRef,
+}
+
+/// Reference to a Browser object in the protocol
+#[derive(Debug, Deserialize, Serialize)]
+struct BrowserRef {
+    guid: String,
 }
 
 impl ChannelOwner for BrowserType {

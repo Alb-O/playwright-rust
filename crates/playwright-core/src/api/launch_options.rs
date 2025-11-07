@@ -238,9 +238,6 @@ impl LaunchOptions {
     /// 2. Convert bool ignoreDefaultArgs to ignoreAllDefaultArgs
     ///
     /// This matches the behavior of playwright-python's parameter normalization.
-    ///
-    /// TODO: Remove #[allow(dead_code)] in Slice 3 when BrowserType::launch() is implemented
-    #[allow(dead_code)]
     pub(crate) fn normalize(self) -> Value {
         let mut value = serde_json::to_value(&self).unwrap();
 

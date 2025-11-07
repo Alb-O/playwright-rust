@@ -16,10 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # Windows temporarily disabled - tests hang due to stdio pipe cleanup issue
-        # Will be fixed in Phase 2 with proper lifecycle management
-        # See: docs/implementation-plans/phase2-browser-api.md (Deferred: Windows Testing)
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         rust: [stable]
 
     steps:
@@ -70,6 +67,7 @@ jobs:
       run: cargo test --verbose --workspace
 
     - name: Run examples
+      if: matrix.os != 'windows-latest'
       run: cargo run --package playwright --example basic
 
     - name: Generate documentation
