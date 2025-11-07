@@ -86,22 +86,45 @@ This project uses **test-driven development (TDD)** and **incremental delivery**
 
 ### Planning and Documentation Structure
 
-1. **Architecture Decision Records** (`docs/adr/####-*.md`)
+**Documentation Hierarchy** (Just-In-Time Philosophy):
+
+1. **README.md** - Project landing page for GitHub visitors
+   - **Purpose**: First impression, quick start
+   - **Content**: Vision, working example (current code ONLY), what works now, installation
+   - **Update**: When phase completes or installation changes
+   - **Keep brief**: < 250 lines, no future API previews, link to roadmap for details
+
+2. **docs/roadmap.md** - Strategic vision and timeline
+   - **Purpose**: Long-term direction, milestone planning
+   - **Content**: High-level phase overview (1 paragraph each), milestones, API preview for FUTURE phases only
+   - **Update**: When phase completes (mark complete), when planning new phase (add high-level scope)
+   - **Keep strategic**: No slice details, no file lists, focus on what's coming
+
+3. **docs/implementation-plans/phaseN-*.md** - Detailed work tracking
+   - **Purpose**: Day-to-day development, historical record
+   - **Content**: Slice-by-slice tasks, files modified, tests added, implementation gotchas, technical decisions
+   - **Create**: Just-in-time when starting the phase (not before)
+   - **Update**: Daily during active development
+   - **After complete**: Becomes historical reference, rarely updated
+
+4. **Architecture Decision Records** (`docs/adr/####-*.md`)
    - Document significant architectural decisions
    - Compare options with trade-off analysis
    - Record rationale for Playwright compatibility choices
    - Use template: `docs/templates/TEMPLATE_ADR.md`
 
-2. **Implementation Plans** (`docs/implementation-plans/*.md`)
-   - Break work into incremental, testable phases
-   - Track progress with checklists
-   - Include "Definition of Done" for each phase
-   - Use template: `docs/templates/TEMPLATE_IMPLEMENTATION_PLAN.md`
-
-3. **API Documentation** (Rust docs)
+5. **API Documentation** (Rust docs)
    - Every public API has rustdoc with examples
    - Match Playwright's documentation style
    - Include links to official Playwright docs
+
+**Just-In-Time Principles:**
+- ✅ README shows only what works TODAY
+- ✅ Roadmap shows high-level vision for next 1-2 phases
+- ✅ Implementation plans created ONLY when starting that phase
+- ❌ Don't duplicate slice lists across docs
+- ❌ Don't create Phase 4 plan while working on Phase 2
+- ❌ Don't show future APIs in README examples
 
 ### Working on Features
 

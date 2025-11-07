@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 /// Page represents a web page within a browser context.
 ///
-/// A Page is created when you call [`BrowserContext::new_page()`] or [`Browser::new_page()`].
+/// A Page is created when you call `BrowserContext::new_page()` or `Browser::new_page()`.
 /// Each page is an isolated tab/window within its parent context.
 ///
 /// Initially, pages are navigated to "about:blank". Use navigation methods

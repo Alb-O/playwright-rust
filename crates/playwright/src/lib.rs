@@ -9,8 +9,22 @@
 //
 // #[tokio::main]
 // async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//     // Launch Playwright
 //     let playwright = Playwright::launch().await?;
-//     println!("Playwright launched successfully!");
+//
+//     // Launch a browser
+//     let browser = playwright.chromium().launch().await?;
+//
+//     // Create a page
+//     let page = browser.new_page().await?;
+//
+//     // Page starts at about:blank
+//     assert_eq!(page.url(), "about:blank");
+//
+//     // Cleanup
+//     page.close().await?;
+//     browser.close().await?;
+//
 //     Ok(())
 // }
 // ```
@@ -18,5 +32,8 @@
 // Re-export core types
 pub use playwright_core::error::{Error, Result};
 
-// Re-export Playwright main entry point
-pub use playwright_core::protocol::Playwright;
+// Re-export Playwright main entry point and browser API
+pub use playwright_core::protocol::{Browser, BrowserContext, BrowserType, Page, Playwright};
+
+// Re-export API types
+pub use playwright_core::api::LaunchOptions;

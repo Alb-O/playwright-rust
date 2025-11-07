@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 /// Browser represents a browser instance.
 ///
-/// A Browser is created when you call [`BrowserType::launch()`]. It provides methods
+/// A Browser is created when you call `BrowserType::launch()`. It provides methods
 /// to create browser contexts and pages.
 ///
 /// # Example

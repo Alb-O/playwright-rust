@@ -43,101 +43,44 @@ This means:
 
 ## Quick Example
 
-### Phase 1: Protocol Foundation (✅ Complete!)
-
 ```rust
 use playwright::Playwright;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Launch Playwright and access browser types
+    // Launch Playwright
     let playwright = Playwright::launch().await?;
 
-    println!("Chromium: {}", playwright.chromium().executable_path());
-    println!("Firefox: {}", playwright.firefox().executable_path());
-    println!("WebKit: {}", playwright.webkit().executable_path());
+    // Launch a browser
+    let browser = playwright.chromium().launch().await?;
 
-    Ok(())
-}
-```
-
-### Target API (Phase 2+)
-
-> **Note:** Browser launching, page interactions, and assertions will be implemented in future phases.
-
-```rust
-use playwright::Playwright;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let playwright = Playwright::launch().await?;
-
-    // Launch browser (Phase 2 - coming soon)
-    let browser = playwright
-        .chromium()
-        .launch()
-        .headless(true)
-        .await?;
-
-    // Create page
+    // Create a page
     let page = browser.new_page().await?;
 
-    // Navigate and interact
-    page.goto("https://playwright.dev").await?;
-
-    // Use Playwright-style locators (Phase 3)
-    let title = page.locator("h1").text_content().await?;
-    println!("Title: {}", title);
-
-    // Playwright assertions (Phase 4)
-    playwright::expect(page.locator(".hero__title"))
-        .to_be_visible()
-        .await?;
-
-    // Take screenshot
-    page.screenshot()
-        .path("screenshot.png")
-        .await?;
+    // Page starts at about:blank
+    println!("Page URL: {}", page.url());
 
     // Cleanup
+    page.close().await?;
     browser.close().await?;
 
     Ok(())
 }
 ```
 
+> **Note:** Navigation (`page.goto()`), element interaction, and assertions are coming in Phase 3+.
+> See [examples/](crates/playwright/examples/) for more complete demos.
+
 ## Project Status
 
-**Current Phase:** 🚀 Phase 2 in Progress (Slice 6/7 Complete)
+**What works now:**
+- ✅ Launch browsers (Chromium, Firefox, WebKit)
+- ✅ Create browser contexts and pages
+- ✅ Proper lifecycle management and cleanup
 
-### Phase 1: Protocol Foundation (✅ Complete!)
-- [x] **Slice 1:** Server management (download, launch, lifecycle)
-- [x] **Slice 2:** Transport layer (stdio, length-prefixed messages)
-- [x] **Slice 3:** Connection layer (JSON-RPC request/response correlation)
-- [x] **Slice 4:** Object factory and channel owners
-- [x] **Slice 5:** Entry point (`Playwright::launch()` and initialization flow)
+**Coming next:** Navigation (`page.goto()`), locators, page interactions
 
-**Result:** JSON-RPC communication working, Playwright server integration complete. See [Phase 1 Technical Summary](docs/technical/phase1-technical-summary.md).
-
-### Phase 2: Browser API (🚀 In Progress - 6/7 Slices Complete)
-- [x] **Slice 1:** Browser object foundation (protocol object, ChannelOwner, object factory)
-- [x] **Slice 2:** Launch options API (LaunchOptions struct, builder pattern, normalization)
-- [x] **Slice 3:** BrowserType::launch() (RPC implementation, integration tests) ✅
-- [x] **Slice 4:** Browser::close() (graceful shutdown) ✅
-- [x] **Slice 5:** BrowserContext object (Browser::new_context(), BrowserContext::close()) ✅
-- [x] **Slice 6:** Page object (BrowserContext::new_page(), Browser::new_page(), Page::close()) ✅
-- [ ] **Slice 7:** Documentation and examples
-
-**Goal:** Enable browser launching and page lifecycle management. See [Phase 2 Implementation Plan](docs/implementation-plans/phase2-browser-api.md).
-
-**Latest:** Page support! Can now create pages within contexts. Complete browser → context → page hierarchy working.
-
-### Upcoming Phases
-- [ ] **Phase 3:** Page Interactions (navigation, locators, actions)
-- [ ] **Phase 4:** Advanced Features (assertions, network interception, mobile)
-- [ ] **Phase 5:** Production Hardening (comprehensive testing, docs, polish)
-
-See [Development Roadmap](docs/roadmap.md) for detailed phase descriptions.
+See [Development Roadmap](docs/roadmap.md) for the complete vision and timeline.
 
 ## Installation
 
@@ -265,15 +208,9 @@ This project aims for **production-quality** Rust bindings matching Playwright's
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
-## Roadmap to Broad Adoption
+## Roadmap
 
-1. ✅ **Phase 1:** Protocol Foundation (complete!)
-2. 🚀 **Phase 2:** Browser API - in progress (2/7 slices)
-3. **Phase 3:** Page Interactions (navigation, locators, actions)
-4. **Phase 4:** Advanced Features (assertions, network, mobile)
-5. **Phase 5:** Production Hardening (testing, docs, polish)
-
-See [Phase 2 Implementation Plan](docs/implementation-plans/phase2-browser-api.md) for current progress and [Development Roadmap](docs/roadmap.md) for overall timeline.
+See [Development Roadmap](docs/roadmap.md) for the complete vision and timeline.
 
 ## License
 

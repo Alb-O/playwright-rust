@@ -8,6 +8,7 @@
 //! Note: Full protocol request/response testing will be implemented in Slice 4
 //! (Object Factory) when we can handle the initialization sequence and send requests.
 
+use playwright_core::protocol::Playwright;
 use playwright_core::{Connection, PlaywrightServer};
 use std::sync::Arc;
 use tokio::time::Duration;
@@ -142,31 +143,93 @@ async fn test_connection_detects_server_crash_on_send() {
 /// This test will verify that multiple concurrent requests can be sent
 /// and responses are correctly correlated, even when they arrive out of order.
 ///
-/// Deferred to Phase 2 Slice 5+ because it requires:
-/// - Multiple protocol objects to send requests to (Browser, Context, Page)
-/// - Complex message sequences (launch → new_context → new_page)
-/// - Concurrent operations on different objects
+/// Test concurrent requests to different protocol objects
+///
+/// This test verifies that concurrent requests to different objects
+/// (Browser, Context, Page) are properly correlated when responses arrive.
 #[tokio::test]
-#[ignore] // TODO: Implement in Phase 2 Slice 6+ when we have Browser, Context, and Page objects
 async fn test_concurrent_requests_with_server() {
-    // Will implement when we have:
-    // - Browser::new_context() (Slice 5)
-    // - BrowserContext::new_page() (Slice 6)
-    // - Multiple concurrent operations
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+
+    let chromium = playwright.chromium();
+    let browser = chromium.launch().await.expect("Failed to launch browser");
+
+    // Create two contexts concurrently
+    let context1_fut = browser.new_context();
+    let context2_fut = browser.new_context();
+    let (context1, context2) = tokio::join!(context1_fut, context2_fut);
+
+    let context1 = context1.expect("Failed to create context 1");
+    let context2 = context2.expect("Failed to create context 2");
+
+    // Create pages concurrently across different contexts
+    let page1_fut = context1.new_page();
+    let page2_fut = context1.new_page();
+    let page3_fut = context2.new_page();
+    let (page1, page2, page3) = tokio::join!(page1_fut, page2_fut, page3_fut);
+
+    let page1 = page1.expect("Failed to create page 1");
+    let page2 = page2.expect("Failed to create page 2");
+    let page3 = page3.expect("Failed to create page 3");
+
+    // Verify all pages are at about:blank
+    assert_eq!(page1.url(), "about:blank");
+    assert_eq!(page2.url(), "about:blank");
+    assert_eq!(page3.url(), "about:blank");
+
+    // Close everything concurrently
+    let page1_close = page1.close();
+    let page2_close = page2.close();
+    let page3_close = page3.close();
+    let context1_close = context1.close();
+    let context2_close = context2.close();
+
+    let (r1, r2, r3, r4, r5) = tokio::join!(
+        page1_close,
+        page2_close,
+        page3_close,
+        context1_close,
+        context2_close
+    );
+
+    // Verify all closes succeeded
+    r1.expect("Failed to close page 1");
+    r2.expect("Failed to close page 2");
+    r3.expect("Failed to close page 3");
+    r4.expect("Failed to close context 1");
+    r5.expect("Failed to close context 2");
+
+    browser.close().await.expect("Failed to close browser");
 }
 
 /// Test error handling with invalid requests
 ///
 /// This test verifies that protocol errors from the server are properly
 /// converted to Rust errors and propagated correctly.
-///
-/// Can now be implemented because we have:
-/// - Valid Browser object GUID (Slice 3) ✅
-/// - Browser::close() method (Slice 4) ✅
-/// - Can test error scenarios like double-close
 #[tokio::test]
-#[ignore] // TODO: Implement when we have time for comprehensive error testing
 async fn test_error_response_from_server() {
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+
+    let chromium = playwright.chromium();
+    let browser = chromium.launch().await.expect("Failed to launch browser");
+
+    // Close the browser
+    browser.close().await.expect("Failed to close browser");
+
+    // Try to close again - should result in an error from the server
+    let result = browser.close().await;
+
+    // The server should return an error for trying to close an already-closed browser
+    assert!(
+        result.is_err(),
+        "Expected error when closing already-closed browser"
+    );
+
+    // Verify the error message contains relevant information
     // Test scenarios to implement:
     // - Call browser.close() twice (should error on second call)
     // - Invalid GUIDs
