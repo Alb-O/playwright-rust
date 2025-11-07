@@ -5,6 +5,8 @@
 use crate::channel::Channel;
 use crate::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use crate::error::Result;
+use crate::protocol::BrowserContext;
+use serde::Deserialize;
 use serde_json::Value;
 use std::any::Any;
 use std::sync::Arc;
@@ -139,6 +141,75 @@ impl Browser {
     /// Used internally for sending RPC calls to the browser.
     fn channel(&self) -> &Channel {
         self.base.channel()
+    }
+
+    /// Creates a new browser context.
+    ///
+    /// A browser context is an isolated session within the browser instance,
+    /// similar to an incognito profile. Each context has its own cookies,
+    /// cache, and local storage.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::protocol::Playwright;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let playwright = Playwright::launch().await?;
+    /// let browser = playwright.chromium().launch().await?;
+    ///
+    /// // Create an isolated context
+    /// let context = browser.new_context().await?;
+    ///
+    /// // Do work with context...
+    ///
+    /// // Cleanup
+    /// context.close().await?;
+    /// browser.close().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Browser has been closed
+    /// - Communication with browser process fails
+    ///
+    /// See: <https://playwright.dev/docs/api/class-browser#browser-new-context>
+    pub async fn new_context(&self) -> Result<BrowserContext> {
+        // Response contains the GUID of the created BrowserContext
+        #[derive(Deserialize)]
+        struct NewContextResponse {
+            context: GuidRef,
+        }
+
+        #[derive(Deserialize)]
+        struct GuidRef {
+            guid: String,
+        }
+
+        // Send newContext RPC to server with empty options for now
+        let response: NewContextResponse = self
+            .channel()
+            .send("newContext", serde_json::json!({}))
+            .await?;
+
+        // Retrieve the BrowserContext object from the connection registry
+        let context_arc = self.connection().get_object(&response.context.guid).await?;
+
+        // Downcast to BrowserContext
+        let context = context_arc
+            .as_any()
+            .downcast_ref::<BrowserContext>()
+            .ok_or_else(|| {
+                crate::error::Error::ProtocolError(format!(
+                    "Expected BrowserContext object, got {}",
+                    context_arc.type_name()
+                ))
+            })?;
+
+        Ok(context.clone())
     }
 
     /// Closes the browser and all of its pages (if any were opened).

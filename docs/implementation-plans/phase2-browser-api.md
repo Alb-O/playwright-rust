@@ -1,6 +1,6 @@
 # Phase 2: Browser API - Implementation Plan
 
-**Status:** 🚀 In Progress (Slice 4/7 Complete)
+**Status:** 🚀 In Progress (Slice 5/7 Complete)
 
 **Feature:** Browser launching, contexts, and page lifecycle
 
@@ -12,7 +12,7 @@
 
 **Approach:** Vertical slicing with TDD (Red → Green → Refactor), following Phase 1 pattern
 
-**Progress:** 4/7 slices complete (57%)
+**Progress:** 5/7 slices complete (71%)
 
 ---
 
@@ -46,16 +46,22 @@ Phase 2 builds on Phase 1's protocol foundation to implement browser launching a
    - Priority: Low (current approach works correctly)
 
 2. **Windows Testing**
-   - Current: Verified on macOS and Linux only. Windows CI disabled (tests hang).
-   - Issue: Tests hang on Windows after 60+ seconds in `playwright_launch.rs` tests
-   - Root cause: Likely stdio pipe cleanup issue on Windows (process doesn't terminate cleanly)
-   - Goal: Fix stdio pipe handling on Windows and implement proper cleanup
-   - **When to re-enable Windows CI**: After implementing explicit Drop for Playwright/Connection that:
-     - Sends close protocol messages to server
-     - Waits for graceful shutdown
-     - Properly closes stdio pipes on Windows
-     - Kills child process if graceful shutdown fails
-   - Priority: High (blocking Windows support)
+   - Current: Verified on macOS and Linux. Windows CI runs unit tests only (integration tests hang).
+   - Issue: Integration tests hang on Windows after 60+ seconds when launching browsers
+   - Root cause: Stdio pipe cleanup issue - Playwright server process doesn't terminate cleanly on Windows
+   - Progress: ✅ Browser::close() implemented (Slice 4), but still hangs on Windows
+   - Goal: Fix stdio pipe handling and implement proper cleanup
+   - **When to re-enable full Windows CI**: After implementing explicit Drop for Playwright/Connection that:
+     - Sends close/disconnect protocol messages to server
+     - Waits for graceful server shutdown
+     - Properly closes stdio pipes on Windows (different from Unix)
+     - Kills child process if graceful shutdown times out
+   - **Possible solutions**:
+     1. Implement Drop for Playwright that calls a blocking cleanup method
+     2. Add explicit `Playwright::disconnect()` method (like playwright-python)
+     3. Better stdio pipe handling on Windows (tokio::process differences)
+   - Priority: High (blocking full Windows support)
+   - **Workaround**: CI runs `cargo test --lib` on Windows (unit tests only)
 
 3. **Error Message Improvements**
    - Current: Functional but terse error messages
@@ -144,11 +150,12 @@ Phase 2 is strictly about **object lifecycle** - creating and closing Browser/Co
 
 ## Success Criteria
 
-- [ ] Can launch all three browsers (Chromium, Firefox, WebKit)
-- [ ] Can create browser contexts
+- [x] Can launch all three browsers (Chromium, Firefox, WebKit)
+- [x] Can create browser contexts
 - [ ] Can create pages
-- [ ] Can close browsers/contexts/pages gracefully
-- [ ] All tests passing with real browsers
+- [x] Can close browsers gracefully
+- [x] All tests passing with real browsers (macOS, Linux)
+- [ ] Full Windows CI support (integration tests) - **Deferred: requires Playwright cleanup**
 - [ ] Documentation complete
 - [ ] Example code works
 
@@ -318,37 +325,48 @@ async fn test_close_multiple_browsers() // ✅ Passing
 
 ---
 
-### Slice 5: BrowserContext Object ⏸️
+### Slice 5: BrowserContext Object ✅
 
 **Goal:** Create BrowserContext protocol object
 
 **Tasks:**
-- [ ] Create `protocol/browser_context.rs`
-- [ ] Implement ChannelOwner for BrowserContext
-- [ ] Add to object factory
-- [ ] Create ContextOptions struct
-- [ ] Implement `Browser::new_context()`
-- [ ] Integration test
+- [x] Create `protocol/browser_context.rs`
+- [x] Implement ChannelOwner for BrowserContext
+- [x] Add to object factory
+- [x] Implement `Browser::new_context()`
+- [x] Integration test
 
 **Files:**
 - New: `crates/playwright-core/src/protocol/browser_context.rs`
-- New: `crates/playwright-core/src/api/context_options.rs`
-- Modify: `crates/playwright-core/src/protocol/browser.rs`
-- Modify: `crates/playwright-core/src/object_factory.rs`
+- Modified: `crates/playwright-core/src/protocol/browser.rs`
+- Modified: `crates/playwright-core/src/protocol/mod.rs`
+- Modified: `crates/playwright-core/src/object_factory.rs`
+- New: `crates/playwright-core/tests/browser_context_integration.rs`
 
 **Tests:**
 ```rust
 #[tokio::test]
-async fn test_new_context()
+async fn test_new_context() // ✅ Passing
 #[tokio::test]
-async fn test_new_context_with_options()
+async fn test_multiple_contexts() // ✅ Passing
 ```
 
 **Definition of Done:**
-- BrowserContext object exists
-- Can create context from browser
-- Context options work
-- Tests pass
+- ✅ BrowserContext object exists
+- ✅ Can create context from browser
+- ✅ Can create multiple contexts
+- ✅ Can close contexts
+- ✅ Tests pass
+
+**Key Implementation Details:**
+- Used `Channel::send()` for "newContext" RPC call
+- Response contains `{ context: { guid: "..." } }`
+- Retrieved BrowserContext from connection registry via `get_object()`
+- Downcast Arc<dyn ChannelOwner> to BrowserContext using `as_any()`
+- Started with minimal options (empty JSON) - full ContextOptions deferred to later slice if needed
+- BrowserContext implements `close()` method for cleanup
+
+**Note:** Full ContextOptions API (viewport, user agent, etc.) was deferred. Phase 2 focuses on basic object lifecycle. Context configuration options can be added in a future slice or phase if needed.
 
 ---
 
@@ -401,6 +419,7 @@ async fn test_page_url_initially_blank()
 - [ ] Update README with Phase 2 features
 - [ ] Run full test suite
 - [ ] Update Phase 2 status to Complete
+- [ ] **TODO: Fix Windows CI support** - Implement proper Playwright cleanup (see "Deferred from Phase 1" section)
 
 **Files:**
 - Modify: `crates/playwright/src/lib.rs`
@@ -415,8 +434,9 @@ async fn test_page_url_initially_blank()
 **Definition of Done:**
 - All APIs documented
 - Example demonstrates browser lifecycle
-- All tests pass
+- All tests pass (macOS, Linux)
 - Phase 2 marked complete
+- **Note:** Windows integration tests deferred (tracked in Success Criteria)
 
 ---
 
@@ -428,7 +448,8 @@ async fn test_page_url_initially_blank()
 4. ✅ Complete Slice 2: Launch Options API
 5. ✅ Complete Slice 3: BrowserType::launch()
 6. ✅ Complete Slice 4: Browser::close()
-7. Start Slice 5: BrowserContext Object
+7. ✅ Complete Slice 5: BrowserContext Object
+8. Start Slice 6: Page Object
 
 ---
 
@@ -438,3 +459,4 @@ async fn test_page_url_initially_blank()
 **Slice 2 Completed:** 2025-11-07
 **Slice 3 Completed:** 2025-11-07
 **Slice 4 Completed:** 2025-11-07
+**Slice 5 Completed:** 2025-11-07

@@ -14,7 +14,7 @@
 
 use crate::channel_owner::{ChannelOwner, ParentOrConnection};
 use crate::error::{Error, Result};
-use crate::protocol::{Browser, BrowserType, Playwright};
+use crate::protocol::{Browser, BrowserContext, BrowserType, Playwright};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -116,8 +116,26 @@ pub async fn create_object(
             Arc::new(Browser::new(parent_owner, type_name, guid, initializer)?)
         }
 
+        "BrowserContext" => {
+            // BrowserContext has Browser as parent
+            let parent_owner = match parent {
+                ParentOrConnection::Parent(p) => p,
+                ParentOrConnection::Connection(_) => {
+                    return Err(Error::ProtocolError(
+                        "BrowserContext must have Browser as parent".to_string(),
+                    ))
+                }
+            };
+
+            Arc::new(BrowserContext::new(
+                parent_owner,
+                type_name,
+                guid,
+                initializer,
+            )?)
+        }
+
         // TODO: Add more types as they are implemented in future phases:
-        // "BrowserContext" => Arc::new(BrowserContext::new(parent_owner, type_name, guid, initializer)?),
         // "Page" => Arc::new(Page::new(parent_owner, type_name, guid, initializer)?),
         // "Frame" => Arc::new(Frame::new(parent_owner, type_name, guid, initializer)?),
         // ... etc
