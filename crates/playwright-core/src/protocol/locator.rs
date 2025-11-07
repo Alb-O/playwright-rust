@@ -146,6 +146,48 @@ impl Locator {
     pub async fn is_editable(&self) -> Result<bool> {
         self.frame.locator_is_editable(&self.selector).await
     }
+
+    // Action methods
+
+    /// Clicks the element.
+    ///
+    /// See: <https://playwright.dev/docs/api/class-locator#locator-click>
+    pub async fn click(&self, _options: Option<()>) -> Result<()> {
+        self.frame.locator_click(&self.selector).await
+    }
+
+    /// Double clicks the element.
+    ///
+    /// See: <https://playwright.dev/docs/api/class-locator#locator-dblclick>
+    pub async fn dblclick(&self, _options: Option<()>) -> Result<()> {
+        self.frame.locator_dblclick(&self.selector).await
+    }
+
+    /// Fills the element with text.
+    ///
+    /// See: <https://playwright.dev/docs/api/class-locator#locator-fill>
+    pub async fn fill(&self, text: &str, _options: Option<()>) -> Result<()> {
+        self.frame.locator_fill(&self.selector, text).await
+    }
+
+    /// Clears the element's value.
+    ///
+    /// See: <https://playwright.dev/docs/api/class-locator#locator-clear>
+    pub async fn clear(&self, _options: Option<()>) -> Result<()> {
+        self.frame.locator_clear(&self.selector).await
+    }
+
+    /// Presses a key on the element.
+    ///
+    /// See: <https://playwright.dev/docs/api/class-locator#locator-press>
+    pub async fn press(&self, key: &str, _options: Option<()>) -> Result<()> {
+        self.frame.locator_press(&self.selector, key).await
+    }
+
+    // TODO: Implement input_value() method to read input/textarea values
+    // This is needed to properly test fill(), clear(), and press() actions
+    // Should be implemented in Phase 3 Slice 4 (Form Interactions)
+    // See: https://playwright.dev/docs/api/class-locator#locator-input-value
 }
 
 impl std::fmt::Debug for Locator {

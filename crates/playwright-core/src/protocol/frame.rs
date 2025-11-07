@@ -365,6 +365,80 @@ impl Frame {
 
         Ok(response.value)
     }
+
+    // Action delegate methods
+
+    /// Clicks the element matching the selector.
+    pub(crate) async fn locator_click(&self, selector: &str) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "click",
+                serde_json::json!({
+                    "selector": selector,
+                    "strict": true
+                }),
+            )
+            .await
+    }
+
+    /// Double clicks the element matching the selector.
+    pub(crate) async fn locator_dblclick(&self, selector: &str) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "dblclick",
+                serde_json::json!({
+                    "selector": selector,
+                    "strict": true
+                }),
+            )
+            .await
+    }
+
+    /// Fills the element with text.
+    pub(crate) async fn locator_fill(&self, selector: &str, text: &str) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "fill",
+                serde_json::json!({
+                    "selector": selector,
+                    "value": text,
+                    "strict": true
+                }),
+            )
+            .await
+    }
+
+    /// Clears the element's value.
+    pub(crate) async fn locator_clear(&self, selector: &str) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "fill",
+                serde_json::json!({
+                    "selector": selector,
+                    "value": "",
+                    "strict": true
+                }),
+            )
+            .await
+    }
+
+    /// Presses a key on the element.
+    pub(crate) async fn locator_press(&self, selector: &str, key: &str) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "press",
+                serde_json::json!({
+                    "selector": selector,
+                    "key": key,
+                    "strict": true
+                }),
+            )
+            .await
+    }
+
+    // TODO: Implement locator_input_value() delegate method
+    // This Frame delegate is needed to support Locator::input_value()
+    // Should send "inputValue" message to Frame with selector
 }
 
 impl ChannelOwner for Frame {

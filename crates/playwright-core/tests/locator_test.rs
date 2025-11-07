@@ -8,10 +8,14 @@
 // - Query methods (count, text_content, inner_text, inner_html, get_attribute)
 // - State queries (is_visible, is_enabled, is_checked, is_editable)
 
+mod test_server;
+
 use playwright_core::protocol::Playwright;
+use test_server::TestServer;
 
 #[tokio::test]
 async fn test_locator_creation() {
+    let server = TestServer::start().await;
     let playwright = Playwright::launch()
         .await
         .expect("Failed to launch Playwright");
@@ -22,7 +26,7 @@ async fn test_locator_creation() {
         .expect("Failed to launch browser");
     let page = browser.new_page().await.expect("Failed to create page");
 
-    page.goto("https://example.com", None)
+    page.goto(&format!("{}/locator.html", server.url()), None)
         .await
         .expect("Failed to navigate");
 
@@ -33,10 +37,12 @@ async fn test_locator_creation() {
     assert_eq!(heading.selector(), "h1");
 
     browser.close().await.expect("Failed to close browser");
+    server.shutdown();
 }
 
 #[tokio::test]
 async fn test_locator_count() {
+    let server = TestServer::start().await;
     let playwright = Playwright::launch()
         .await
         .expect("Failed to launch Playwright");
@@ -47,7 +53,7 @@ async fn test_locator_count() {
         .expect("Failed to launch browser");
     let page = browser.new_page().await.expect("Failed to create page");
 
-    page.goto("https://example.com", None)
+    page.goto(&format!("{}/locator.html", server.url()), None)
         .await
         .expect("Failed to navigate");
 
@@ -55,14 +61,16 @@ async fn test_locator_count() {
     let paragraphs = page.locator("p").await;
     let count = paragraphs.count().await.expect("Failed to get count");
 
-    // example.com has at least 1 paragraph
-    assert!(count >= 1);
+    // locator.html has exactly 3 paragraphs
+    assert_eq!(count, 3);
 
     browser.close().await.expect("Failed to close browser");
+    server.shutdown();
 }
 
 #[tokio::test]
 async fn test_locator_text_content() {
+    let server = TestServer::start().await;
     let playwright = Playwright::launch()
         .await
         .expect("Failed to launch Playwright");
@@ -73,7 +81,7 @@ async fn test_locator_text_content() {
         .expect("Failed to launch browser");
     let page = browser.new_page().await.expect("Failed to create page");
 
-    page.goto("https://example.com", None)
+    page.goto(&format!("{}/locator.html", server.url()), None)
         .await
         .expect("Failed to navigate");
 
@@ -84,15 +92,15 @@ async fn test_locator_text_content() {
         .await
         .expect("Failed to get text content");
 
-    // example.com has "Example Domain" heading
-    assert!(text.is_some());
-    assert!(text.unwrap().contains("Example Domain"));
+    assert_eq!(text, Some("Test Page".to_string()));
 
     browser.close().await.expect("Failed to close browser");
+    server.shutdown();
 }
 
 #[tokio::test]
 async fn test_locator_chaining_first() {
+    let server = TestServer::start().await;
     let playwright = Playwright::launch()
         .await
         .expect("Failed to launch Playwright");
@@ -103,7 +111,7 @@ async fn test_locator_chaining_first() {
         .expect("Failed to launch browser");
     let page = browser.new_page().await.expect("Failed to create page");
 
-    page.goto("https://example.com", None)
+    page.goto(&format!("{}/locator.html", server.url()), None)
         .await
         .expect("Failed to navigate");
 
@@ -117,13 +125,15 @@ async fn test_locator_chaining_first() {
         .text_content()
         .await
         .expect("Failed to get text content");
-    assert!(text.is_some());
+    assert_eq!(text, Some("First paragraph".to_string()));
 
     browser.close().await.expect("Failed to close browser");
+    server.shutdown();
 }
 
 #[tokio::test]
 async fn test_locator_chaining_last() {
+    let server = TestServer::start().await;
     let playwright = Playwright::launch()
         .await
         .expect("Failed to launch Playwright");
@@ -134,7 +144,7 @@ async fn test_locator_chaining_last() {
         .expect("Failed to launch browser");
     let page = browser.new_page().await.expect("Failed to create page");
 
-    page.goto("https://example.com", None)
+    page.goto(&format!("{}/locator.html", server.url()), None)
         .await
         .expect("Failed to navigate");
 
@@ -144,11 +154,19 @@ async fn test_locator_chaining_last() {
 
     assert_eq!(last.selector(), "p >> nth=-1");
 
+    let text = last
+        .text_content()
+        .await
+        .expect("Failed to get text content");
+    assert_eq!(text, Some("Third paragraph".to_string()));
+
     browser.close().await.expect("Failed to close browser");
+    server.shutdown();
 }
 
 #[tokio::test]
 async fn test_locator_chaining_nth() {
+    let server = TestServer::start().await;
     let playwright = Playwright::launch()
         .await
         .expect("Failed to launch Playwright");
@@ -159,7 +177,7 @@ async fn test_locator_chaining_nth() {
         .expect("Failed to launch browser");
     let page = browser.new_page().await.expect("Failed to create page");
 
-    page.goto("https://example.com", None)
+    page.goto(&format!("{}/locator.html", server.url()), None)
         .await
         .expect("Failed to navigate");
 
@@ -169,11 +187,19 @@ async fn test_locator_chaining_nth() {
 
     assert_eq!(second.selector(), "p >> nth=1");
 
+    let text = second
+        .text_content()
+        .await
+        .expect("Failed to get text content");
+    assert_eq!(text, Some("Second paragraph".to_string()));
+
     browser.close().await.expect("Failed to close browser");
+    server.shutdown();
 }
 
 #[tokio::test]
 async fn test_locator_nested() {
+    let server = TestServer::start().await;
     let playwright = Playwright::launch()
         .await
         .expect("Failed to launch Playwright");
@@ -184,21 +210,29 @@ async fn test_locator_nested() {
         .expect("Failed to launch browser");
     let page = browser.new_page().await.expect("Failed to create page");
 
-    page.goto("https://example.com", None)
+    page.goto(&format!("{}/locator.html", server.url()), None)
         .await
         .expect("Failed to navigate");
 
     // Test: Nested locators
-    let body = page.locator("body").await;
-    let heading = body.locator("h1");
+    let container = page.locator(".container").await;
+    let nested = container.locator("#nested");
 
-    assert_eq!(heading.selector(), "body >> h1");
+    assert_eq!(nested.selector(), ".container >> #nested");
+
+    let text = nested
+        .text_content()
+        .await
+        .expect("Failed to get text content");
+    assert_eq!(text, Some("Nested element".to_string()));
 
     browser.close().await.expect("Failed to close browser");
+    server.shutdown();
 }
 
 #[tokio::test]
 async fn test_locator_inner_text() {
+    let server = TestServer::start().await;
     let playwright = Playwright::launch()
         .await
         .expect("Failed to launch Playwright");
@@ -209,7 +243,7 @@ async fn test_locator_inner_text() {
         .expect("Failed to launch browser");
     let page = browser.new_page().await.expect("Failed to create page");
 
-    page.goto("https://example.com", None)
+    page.goto(&format!("{}/locator.html", server.url()), None)
         .await
         .expect("Failed to navigate");
 
@@ -220,13 +254,15 @@ async fn test_locator_inner_text() {
         .await
         .expect("Failed to get inner text");
 
-    assert!(text.contains("Example Domain"));
+    assert_eq!(text, "Test Page");
 
     browser.close().await.expect("Failed to close browser");
+    server.shutdown();
 }
 
 #[tokio::test]
 async fn test_locator_is_visible() {
+    let server = TestServer::start().await;
     let playwright = Playwright::launch()
         .await
         .expect("Failed to launch Playwright");
@@ -237,7 +273,7 @@ async fn test_locator_is_visible() {
         .expect("Failed to launch browser");
     let page = browser.new_page().await.expect("Failed to create page");
 
-    page.goto("https://example.com", None)
+    page.goto(&format!("{}/locator.html", server.url()), None)
         .await
         .expect("Failed to navigate");
 
@@ -250,13 +286,24 @@ async fn test_locator_is_visible() {
 
     assert!(visible);
 
+    // Test: Hidden element should not be visible
+    let hidden = page.locator("#hidden").await;
+    let hidden_visible = hidden
+        .is_visible()
+        .await
+        .expect("Failed to check visibility");
+
+    assert!(!hidden_visible);
+
     browser.close().await.expect("Failed to close browser");
+    server.shutdown();
 }
 
 // Cross-browser tests
 
 #[tokio::test]
 async fn test_locator_firefox() {
+    let server = TestServer::start().await;
     let playwright = Playwright::launch()
         .await
         .expect("Failed to launch Playwright");
@@ -267,7 +314,7 @@ async fn test_locator_firefox() {
         .expect("Failed to launch Firefox");
     let page = browser.new_page().await.expect("Failed to create page");
 
-    page.goto("https://example.com", None)
+    page.goto(&format!("{}/locator.html", server.url()), None)
         .await
         .expect("Failed to navigate");
 
@@ -278,14 +325,15 @@ async fn test_locator_firefox() {
         .await
         .expect("Failed to get text content");
 
-    assert!(text.is_some());
-    assert!(text.unwrap().contains("Example Domain"));
+    assert_eq!(text, Some("Test Page".to_string()));
 
     browser.close().await.expect("Failed to close browser");
+    server.shutdown();
 }
 
 #[tokio::test]
 async fn test_locator_webkit() {
+    let server = TestServer::start().await;
     let playwright = Playwright::launch()
         .await
         .expect("Failed to launch Playwright");
@@ -296,7 +344,7 @@ async fn test_locator_webkit() {
         .expect("Failed to launch WebKit");
     let page = browser.new_page().await.expect("Failed to create page");
 
-    page.goto("https://example.com", None)
+    page.goto(&format!("{}/locator.html", server.url()), None)
         .await
         .expect("Failed to navigate");
 
@@ -310,4 +358,5 @@ async fn test_locator_webkit() {
     assert!(visible);
 
     browser.close().await.expect("Failed to close browser");
+    server.shutdown();
 }

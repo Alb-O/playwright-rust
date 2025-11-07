@@ -72,6 +72,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let visible = heading.is_visible().await?;
     println!("Heading visible: {}", visible);
 
+    // Interact with elements
+    heading.click(None).await?;
+    heading.dblclick(None).await?;
+
     // Cleanup
     page.close().await?;
     browser.close().await?;
@@ -80,8 +84,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-> **Note:** Element actions (click, fill, type) and assertions are coming soon.
-> See [Development Roadmap](docs/roadmap.md) for details.
+> **Note:** See [examples/](crates/playwright/examples/) for more usage examples.
+> Check [Development Roadmap](docs/roadmap.md) for upcoming features.
 
 ## Project Status
 
@@ -94,9 +98,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ Query methods (`count()`, `text_content()`, `inner_text()`, etc.)
 - ✅ State queries (`is_visible()`, `is_enabled()`, `is_checked()`, etc.)
 - ✅ Locator chaining (`first()`, `last()`, `nth()`, nested locators)
+- ✅ Element actions (`click()`, `dblclick()`, `fill()`, `clear()`, `press()`)
 - ✅ Proper lifecycle management and cleanup
 
-**Coming next:** Element actions (click, fill, type), screenshots, assertions
+**Coming next:** Screenshots, waiting methods, assertions
 
 See [Development Roadmap](docs/roadmap.md) for the complete vision and timeline.
 

@@ -3,11 +3,10 @@
 // These tests verify that page navigation works correctly.
 // Following TDD approach: Write tests first, then implement.
 //
-// TODO: Replace live internet URLs with local test server
-// - Currently using example.com and rust-lang.org (fragile, requires network)
-// - Should use Playwright's built-in test server or localhost HTTP server
-// - Consider data: URLs for simple cases
-// - See https://playwright.dev/docs/test-webserver for approach
+// TODO: Refactor to use test_server.rs instead of external URLs
+// Currently using example.com and rust-lang.org (fragile, requires network)
+// Should use local test server with custom HTML for deterministic testing
+// See locator_test.rs for refactored example using test_server
 
 use playwright_core::protocol::{GotoOptions, Playwright, WaitUntil};
 use std::time::Duration;
