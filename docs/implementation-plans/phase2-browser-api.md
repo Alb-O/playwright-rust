@@ -1,6 +1,6 @@
 # Phase 2: Browser API - Implementation Plan
 
-**Status:** 📋 Planning
+**Status:** 🚀 In Progress (Slice 1/7 Complete)
 
 **Feature:** Browser launching, contexts, and page lifecycle
 
@@ -10,7 +10,9 @@
 - [ADR-0001: Protocol Architecture](../adr/0001-protocol-architecture.md)
 - [ADR-0002: Initialization Flow](../adr/0002-initialization-flow.md)
 
-**Approach:** TBD - Will follow Phase 1's vertical slicing approach
+**Approach:** Vertical slicing with TDD (Red → Green → Refactor), following Phase 1 pattern
+
+**Progress:** 1/7 slices complete (14%)
 
 ---
 
@@ -44,9 +46,16 @@ Phase 2 builds on Phase 1's protocol foundation to implement browser launching a
    - Priority: Low (current approach works correctly)
 
 2. **Windows Testing**
-   - Current: Verified on macOS and Linux only
-   - Goal: Test driver download, stdio pipes, and full functionality on Windows
-   - Priority: Medium
+   - Current: Verified on macOS and Linux only. Windows CI disabled (tests hang).
+   - Issue: Tests hang on Windows after 60+ seconds in `playwright_launch.rs` tests
+   - Root cause: Likely stdio pipe cleanup issue on Windows (process doesn't terminate cleanly)
+   - Goal: Fix stdio pipe handling on Windows and implement proper cleanup
+   - **When to re-enable Windows CI**: After implementing explicit Drop for Playwright/Connection that:
+     - Sends close protocol messages to server
+     - Waits for graceful shutdown
+     - Properly closes stdio pipes on Windows
+     - Kills child process if graceful shutdown fails
+   - Priority: High (blocking Windows support)
 
 3. **Error Message Improvements**
    - Current: Functional but terse error messages
@@ -143,14 +152,249 @@ Phase 2 is strictly about **object lifecycle** - creating and closing Browser/Co
 - [ ] Documentation complete
 - [ ] Example code works
 
+## Implementation Slices
+
+### Slice 1: Browser Object Foundation ✅
+
+**Goal:** Create Browser protocol object that can be instantiated from server messages
+
+**Tasks:**
+- [x] Create `protocol/browser.rs` with Browser struct
+- [x] Implement ChannelOwner trait for Browser
+- [x] Add Browser to object factory type dispatch
+- [x] Parse initializer (version, name fields)
+- [x] Integration test (compile-time verification)
+
+**Files:**
+- New: `crates/playwright-core/src/protocol/browser.rs`
+- Modify: `crates/playwright-core/src/object_factory.rs`
+- Modify: `crates/playwright-core/src/protocol/mod.rs`
+- New: `crates/playwright-core/tests/browser_creation.rs`
+
+**Tests:**
+```rust
+#[test]
+fn test_browser_type_exists() {
+    // Verifies Browser implements ChannelOwner
+    // Passes: ✅
+}
+```
+
+**Definition of Done:**
+- ✅ Browser struct exists
+- ✅ Can be created from `__create__` message
+- ✅ Registered in object factory
+- ✅ Compile-time test passes
+
+---
+
+### Slice 2: Launch Options API ⏸️
+
+**Goal:** Create LaunchOptions with builder pattern and normalization
+
+**Tasks:**
+- [ ] Create `api/launch_options.rs` with full option set
+- [ ] Implement builder pattern methods
+- [ ] Implement normalize() for protocol compatibility
+- [ ] Unit tests for builder and normalization
+
+**Files:**
+- New: `crates/playwright-core/src/api/launch_options.rs`
+- New: `crates/playwright-core/src/api/mod.rs`
+- Modify: `crates/playwright-core/src/lib.rs`
+
+**Tests:**
+```rust
+#[test]
+fn test_launch_options_builder()
+#[test]
+fn test_launch_options_normalize_env()
+#[test]
+fn test_launch_options_normalize_ignore_default_args()
+```
+
+**Definition of Done:**
+- LaunchOptions has all 17+ fields
+- Builder pattern works
+- Normalization matches protocol format
+- Unit tests pass
+
+---
+
+### Slice 3: BrowserType::launch() ⏸️
+
+**Goal:** Implement browser launching with real server integration
+
+**Tasks:**
+- [ ] Add `launch()` method to BrowserType
+- [ ] Add `launch_with_options()` method
+- [ ] Handle launch RPC via Channel
+- [ ] Parse response and retrieve Browser from registry
+- [ ] Integration test with real browser launch
+
+**Files:**
+- Modify: `crates/playwright-core/src/protocol/browser_type.rs`
+- New: `crates/playwright-core/tests/browser_launch_integration.rs`
+
+**Tests:**
+```rust
+#[tokio::test]
+async fn test_launch_chromium()
+#[tokio::test]
+async fn test_launch_with_headless_option()
+#[tokio::test]
+async fn test_launch_all_three_browsers()
+```
+
+**Definition of Done:**
+- Can launch Chromium with default options
+- Can launch with custom options
+- Can launch Firefox and WebKit
+- Browser object accessible after launch
+- Integration tests pass with real browsers
+
+---
+
+### Slice 4: Browser::close() ⏸️
+
+**Goal:** Implement graceful browser shutdown
+
+**Tasks:**
+- [ ] Add `close()` method to Browser
+- [ ] Send "close" RPC to server
+- [ ] Handle server cleanup response
+- [ ] Test close with real browser
+
+**Files:**
+- Modify: `crates/playwright-core/src/protocol/browser.rs`
+- Modify: `crates/playwright-core/tests/browser_launch_integration.rs`
+
+**Tests:**
+```rust
+#[tokio::test]
+async fn test_browser_close()
+#[tokio::test]
+async fn test_close_cleans_up_resources()
+```
+
+**Definition of Done:**
+- Can close browser gracefully
+- Server process terminates
+- Tests verify cleanup works
+
+---
+
+### Slice 5: BrowserContext Object ⏸️
+
+**Goal:** Create BrowserContext protocol object
+
+**Tasks:**
+- [ ] Create `protocol/browser_context.rs`
+- [ ] Implement ChannelOwner for BrowserContext
+- [ ] Add to object factory
+- [ ] Create ContextOptions struct
+- [ ] Implement `Browser::new_context()`
+- [ ] Integration test
+
+**Files:**
+- New: `crates/playwright-core/src/protocol/browser_context.rs`
+- New: `crates/playwright-core/src/api/context_options.rs`
+- Modify: `crates/playwright-core/src/protocol/browser.rs`
+- Modify: `crates/playwright-core/src/object_factory.rs`
+
+**Tests:**
+```rust
+#[tokio::test]
+async fn test_new_context()
+#[tokio::test]
+async fn test_new_context_with_options()
+```
+
+**Definition of Done:**
+- BrowserContext object exists
+- Can create context from browser
+- Context options work
+- Tests pass
+
+---
+
+### Slice 6: Page Object ⏸️
+
+**Goal:** Create Page protocol object with basic methods
+
+**Tasks:**
+- [ ] Create `protocol/page.rs`
+- [ ] Implement ChannelOwner for Page
+- [ ] Add to object factory
+- [ ] Implement `BrowserContext::new_page()`
+- [ ] Implement `Browser::new_page()` (convenience)
+- [ ] Add basic page methods: `url()`, `is_closed()`
+- [ ] Integration test
+
+**Files:**
+- New: `crates/playwright-core/src/protocol/page.rs`
+- Modify: `crates/playwright-core/src/protocol/browser_context.rs`
+- Modify: `crates/playwright-core/src/protocol/browser.rs`
+- Modify: `crates/playwright-core/src/object_factory.rs`
+
+**Tests:**
+```rust
+#[tokio::test]
+async fn test_new_page()
+#[tokio::test]
+async fn test_browser_new_page_convenience()
+#[tokio::test]
+async fn test_page_url_initially_blank()
+```
+
+**Definition of Done:**
+- Page object exists
+- Can create page from context
+- Can create page from browser (convenience)
+- Basic page methods work
+- Tests pass
+
+---
+
+### Slice 7: Cleanup and Documentation ⏸️
+
+**Goal:** Finalize Phase 2 with docs and examples
+
+**Tasks:**
+- [ ] Update public API exports in `playwright` crate
+- [ ] Write rustdoc for all public APIs
+- [ ] Create example: `examples/browser_lifecycle.rs`
+- [ ] Update README with Phase 2 features
+- [ ] Run full test suite
+- [ ] Update Phase 2 status to Complete
+
+**Files:**
+- Modify: `crates/playwright/src/lib.rs`
+- New: `crates/playwright/examples/browser_lifecycle.rs`
+- Modify: `README.md`
+
+**Tests:**
+- All existing tests still pass
+- New example runs successfully
+- Doc tests compile
+
+**Definition of Done:**
+- All APIs documented
+- Example demonstrates browser lifecycle
+- All tests pass
+- Phase 2 marked complete
+
+---
+
 ## Next Steps
 
-1. Review Phase 1 learnings
-2. Research browser launch in official bindings
-3. Create detailed vertical slices
-4. Write first failing test (TDD)
+1. ✅ Research browser launch protocol (completed)
+2. ✅ Break into vertical slices (completed)
+3. ✅ Complete Slice 1: Browser Object Foundation
+4. Start Slice 2: Launch Options API
 
 ---
 
 **Created:** 2025-11-06
-**Last Updated:** 2025-11-06
+**Last Updated:** 2025-11-07
+**Slice 1 Completed:** 2025-11-07

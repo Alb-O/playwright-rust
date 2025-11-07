@@ -146,7 +146,7 @@ async fn test_connection_detects_server_crash_on_send() {
 /// - Multiple protocol objects to send requests to (Browser, Page, etc.)
 /// - Complex message sequences beyond initialization
 #[tokio::test]
-#[ignore] // Deferred to Phase 2 - requires browser launching
+#[ignore] // TODO: Deferred to Phase 2 - requires browser launching
 async fn test_concurrent_requests_with_server() {
     // Will implement in Phase 2 when we have browser launching and multiple objects
 }
@@ -160,7 +160,7 @@ async fn test_concurrent_requests_with_server() {
 /// - Valid object GUIDs from browser/page objects
 /// - Intentionally invalid requests to trigger protocol errors
 #[tokio::test]
-#[ignore] // Deferred to Phase 2 - requires browser objects
+#[ignore] // TODO: Deferred to Phase 2 - requires browser objects
 async fn test_error_response_from_server() {
     // Will implement in Phase 2 when we have browser launching
 }

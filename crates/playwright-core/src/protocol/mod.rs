@@ -11,10 +11,12 @@
 // - Objects are created by the object factory when server sends __create__ messages
 // - Objects communicate with the server via their Channel
 
+pub mod browser;
 pub mod browser_type;
 pub mod playwright;
 pub mod root;
 
+pub use browser::Browser;
 pub use browser_type::BrowserType;
 pub use playwright::Playwright;
 pub use root::Root;
