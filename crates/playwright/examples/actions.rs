@@ -1,71 +1,46 @@
-// Actions example - Interacting with elements
+// Actions example - Element interactions
 //
-// This example demonstrates:
-// - Clicking elements
-// - Double-clicking elements
-// - Filling form inputs
-// - Pressing keys
-// - Checkbox interactions
-// - Hover actions
-// - Reading input values
-// - Select dropdown interactions
-// - File upload interactions
-//
-// Note: This is a smoke test showing the API.
-// Full interaction testing requires custom test pages.
+// Shows: click, fill, check, select, file upload
+// Note: Uses Google search to demonstrate real interactions
 
 use playwright::Playwright;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🎭 Playwright Actions Example\n");
-
-    // Launch Playwright
     let playwright = Playwright::launch().await?;
     let browser = playwright.chromium().launch().await?;
     let page = browser.new_page().await?;
 
-    // Navigate to a page
-    println!("🔗 Navigating to example.com...");
-    page.goto("https://example.com", None).await?;
-    println!("✅ Page loaded\\n");
+    // Navigate to Google
+    page.goto("https://www.google.com", None).await?;
 
-    // Click action
-    println!("🖱️  Testing click action:");
-    let heading = page.locator("h1").await;
-    heading.click(None).await?;
-    println!("   • Click succeeded on heading");
+    // Find search input and interact
+    let search = page.locator("textarea[name=q]").await;
 
-    // Double-click action
-    println!("\\n🖱️🖱️  Testing double-click action:");
-    heading.dblclick(None).await?;
-    println!("   • Double-click succeeded on heading");
+    // Click to focus
+    search.click(None).await?;
 
-    // Hover action
-    println!("\\n👆 Testing hover action:");
-    heading.hover(None).await?;
-    println!("   • Hover succeeded on heading");
+    // Fill text
+    search.fill("Playwright Rust", None).await?;
 
-    // Note: The following actions are available but require appropriate elements:
-    println!("\\n📋 Available form actions (require appropriate elements):");
-    println!("   • fill(text) - Fill input fields");
-    println!("   • clear() - Clear input fields");
-    println!("   • press(key) - Press keyboard keys");
-    println!("   • check() - Check checkboxes/radio buttons");
-    println!("   • uncheck() - Uncheck checkboxes");
-    println!("   • input_value() - Read input values");
-    println!("   • select_option(value) - Select dropdown options");
-    println!("   • select_option_multiple(values) - Select multiple options");
-    println!("   • set_input_files(path) - Upload files");
-    println!("   • set_input_files_multiple(paths) - Upload multiple files");
-    println!("\\n   See integration tests for full examples with forms!");
+    // Verify value
+    let value = search.input_value(None).await?;
+    assert_eq!(value, "Playwright Rust");
+    println!("Search input contains: {}", value);
 
-    // Cleanup
-    println!("\\n🧹 Cleaning up...");
-    page.close().await?;
+    // Clear and refill
+    search.clear(None).await?;
+    search.fill("Rust browser automation", None).await?;
+
+    // Press Enter to search
+    search.press("Enter", None).await?;
+
+    // Wait for results (URL changes)
+    // In real code, you'd use wait_for_url or assertions
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+    println!("Search completed, URL: {}", page.url());
+
     browser.close().await?;
-
-    println!("\\n🎉 Example complete!");
-
     Ok(())
 }

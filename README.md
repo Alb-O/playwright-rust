@@ -98,6 +98,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file_path = std::path::PathBuf::from("./test.txt");
     file_input.set_input_files(&file_path, None).await?;
 
+    // Low-level keyboard control
+    let keyboard = page.keyboard();
+    keyboard.type_text("Hello World", None).await?;
+    keyboard.press("Enter", None).await?;
+
+    // Low-level mouse control
+    let mouse = page.mouse();
+    mouse.move_to(100, 200, None).await?;
+    mouse.click(100, 200, None).await?;
+
     // Cleanup
     page.close().await?;
     browser.close().await?;
@@ -126,6 +136,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ Input value reading (`input_value()`)
 - ✅ Select interactions (`select_option()`, multiple selections)
 - ✅ File uploads (`set_input_files()`, multiple files)
+- ✅ Low-level keyboard control (`keyboard.down()`, `up()`, `press()`, `type_text()`, `insert_text()`)
+- ✅ Low-level mouse control (`mouse.move_to()`, `click()`, `dblclick()`, `down()`, `up()`, `wheel()`)
 - ✅ Proper lifecycle management and cleanup
 
 **Coming next:** Screenshots, waiting methods, assertions

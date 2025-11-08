@@ -1,73 +1,49 @@
-// Browser lifecycle example
+// Browser lifecycle example - Launch browsers, manage contexts
 //
-// This example demonstrates Phase 2 functionality:
-// - Launching browsers
-// - Creating contexts and pages
-// - Proper cleanup/teardown
-//
-// Note: Navigation and interaction will be implemented in Phase 3.
+// Shows: Multiple browser types, contexts, pages, proper cleanup order
 
 use playwright::Playwright;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing for debug output
-    tracing_subscriber::fmt::init();
-
-    println!("🚀 Launching Playwright...");
-
-    // Launch Playwright (connects to Playwright server)
     let playwright = Playwright::launch().await?;
 
-    println!("✅ Playwright launched successfully!\n");
+    // Launch different browser types
+    let chromium = playwright.chromium().launch().await?;
+    let firefox = playwright.firefox().launch().await?;
+    let webkit = playwright.webkit().launch().await?;
 
-    // Launch Chromium browser
-    println!("🌐 Launching Chromium...");
-    let browser = playwright.chromium().launch().await?;
-    println!(
-        "✅ Browser launched: {} version {}\n",
-        browser.name(),
-        browser.version()
-    );
+    println!("Launched browsers:");
+    println!("  Chromium: {} {}", chromium.name(), chromium.version());
+    println!("  Firefox: {} {}", firefox.name(), firefox.version());
+    println!("  WebKit: {} {}", webkit.name(), webkit.version());
 
-    // Create a browser context (isolated session)
-    println!("📦 Creating browser context...");
-    let context = browser.new_context().await?;
-    println!("✅ Context created\n");
+    // Create isolated browser contexts (like incognito windows)
+    let context1 = chromium.new_context().await?;
+    let context2 = chromium.new_context().await?;
 
-    // Create pages in the context
-    println!("📄 Creating pages...");
-    let page1 = context.new_page().await?;
-    println!("   • Page 1 created (URL: {})", page1.url());
+    // Each context can have multiple pages
+    let page1 = context1.new_page().await?;
+    let page2 = context2.new_page().await?;
 
-    let page2 = context.new_page().await?;
-    println!("   • Page 2 created (URL: {})\n", page2.url());
+    // Navigate to different sites in each context
+    page1.goto("https://example.com", None).await?;
+    page2.goto("https://www.rust-lang.org", None).await?;
 
-    // Alternatively, use browser.new_page() for convenience
-    println!("📄 Creating page via browser.new_page() convenience method...");
-    let page3 = browser.new_page().await?;
-    println!("   • Page 3 created (URL: {})\n", page3.url());
+    println!("\nNavigated pages:");
+    println!("  Context 1: {}", page1.url());
+    println!("  Context 2: {}", page2.url());
 
-    // Cleanup (in reverse order of creation)
-    println!("🧹 Cleaning up...");
-
-    page3.close().await?;
-    println!("   • Page 3 closed");
-
-    page2.close().await?;
-    println!("   • Page 2 closed");
-
+    // Cleanup order: pages → contexts → browsers
     page1.close().await?;
-    println!("   • Page 1 closed");
+    page2.close().await?;
+    context1.close().await?;
+    context2.close().await?;
+    chromium.close().await?;
+    firefox.close().await?;
+    webkit.close().await?;
 
-    context.close().await?;
-    println!("   • Context closed");
-
-    browser.close().await?;
-    println!("   • Browser closed");
-
-    println!("\n🎉 Phase 2 complete! Browser lifecycle management working.");
-    println!("   (Navigation and interaction coming in Phase 3)");
+    println!("\nAll browsers closed");
 
     Ok(())
 }

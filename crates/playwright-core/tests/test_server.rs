@@ -32,7 +32,8 @@ impl TestServer {
             .route("/checkbox.html", get(checkbox_page))
             .route("/hover.html", get(hover_page))
             .route("/select.html", get(select_page))
-            .route("/upload.html", get(upload_page));
+            .route("/upload.html", get(upload_page))
+            .route("/keyboard_mouse.html", get(keyboard_mouse_page));
 
         // Bind to port 0 to get any available port
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
@@ -306,6 +307,53 @@ async fn upload_page() -> Response<Body> {
     document.getElementById('multi-file').addEventListener('change', (e) => {
       const files = Array.from(e.target.files).map(f => f.name).join(', ');
       document.getElementById('file-info').textContent = 'Multiple: ' + files;
+    });
+  </script>
+</body>
+</html>"#,
+        ))
+        .unwrap()
+}
+
+async fn keyboard_mouse_page() -> Response<Body> {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "text/html")
+        .body(Body::from(
+            r#"<!DOCTYPE html>
+<html>
+<head><title>Keyboard and Mouse Test</title></head>
+<body>
+  <h1>Keyboard and Mouse Testing</h1>
+
+  <input type="text" id="keyboard-input" placeholder="Type here" />
+  <div id="keyboard-result"></div>
+
+  <div id="clickable" style="width: 300px; height: 300px; background-color: lightblue; margin-top: 20px;">
+    Click or double-click me
+  </div>
+  <div id="mouse-result"></div>
+  <div id="mouse-coords"></div>
+
+  <script>
+    // Keyboard event handlers
+    document.getElementById('keyboard-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('keyboard-result').textContent = 'Enter pressed';
+      }
+    });
+
+    // Mouse event handlers
+    document.getElementById('clickable').addEventListener('click', (e) => {
+      document.getElementById('mouse-result').textContent = 'Clicked';
+    });
+
+    document.getElementById('clickable').addEventListener('dblclick', (e) => {
+      document.getElementById('mouse-result').textContent = 'Double-clicked';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      document.getElementById('mouse-coords').textContent = `Mouse: (${e.clientX}, ${e.clientY})`;
     });
   </script>
 </body>

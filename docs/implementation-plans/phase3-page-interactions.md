@@ -1,6 +1,6 @@
 # Phase 3: Page Interactions
 
-**Status:** In Progress - Slices 1-5 COMPLETE ✅
+**Status:** In Progress - Slices 1-6 COMPLETE ✅
 
 **Goal:** Implement core page interactions (navigation, locators, actions) matching playwright-python API.
 
@@ -527,77 +527,107 @@ Following Phase 2's successful vertical slicing approach, Phase 3 is divided int
 
 **Why Sixth:** Lower-level APIs for complex interactions. Less common than locator actions.
 
+**Status:** ✅ **COMPLETE**
+
+**Implementation Notes:**
+- Keyboard and Mouse are NOT ChannelOwners - lightweight wrappers holding Page reference
+- All keyboard/mouse messages sent through Page channel (not Frame channel)
+- dblclick uses mouseClick with clickCount=2 (not a separate protocol message)
+- Keyboard methods: down, up, press, type_text, insert_text
+- Mouse methods: move_to, click, dblclick, down, up, wheel
+- Options support deferred - all methods accept Option<()> for now
+- Created keyboard_mouse.html in test_server with input, clickable div, event handlers
+- Created keyboard_mouse_test.rs with 11 comprehensive tests
+- Cross-browser testing: All tests pass on Chromium, Firefox, WebKit
+- Protocol messages: keyboardDown, keyboardUp, keyboardPress, keyboardType, keyboardInsertText
+- Protocol messages: mouseMove, mouseClick, mouseDown, mouseUp, mouseWheel
+
 **Tasks:**
-- [ ] Implement Keyboard struct
+- [x] Implement Keyboard struct
   - Accessed via `page.keyboard()`
-  - Methods: down, up, press, type, insert_text
-- [ ] Implement `keyboard.down(key)`
+  - Methods: down, up, press, type_text, insert_text
+  - Delegates to Page protocol methods
+- [x] Implement `keyboard.down(key)`
   - Protocol: "keyboardDown" message
   - Hold key until up() called
-- [ ] Implement `keyboard.up(key)`
+- [x] Implement `keyboard.up(key)`
   - Protocol: "keyboardUp" message
   - Release previously pressed key
-- [ ] Implement `keyboard.press(key, options)`
-  - Options: delay (between down/up)
-  - Protocol: calls keyboardDown then keyboardUp
-  - Support modifier keys: "Control+A", "Shift+End"
-- [ ] Implement `keyboard.type(text, options)`
-  - Options: delay (between keystrokes)
+- [x] Implement `keyboard.press(key, options)`
+  - Options: deferred (Option<()>)
+  - Protocol: "keyboardPress" message
+  - Tested with Enter key, Shift+KeyA
+- [x] Implement `keyboard.type_text(text, options)`
+  - Options: deferred (Option<()>)
   - Protocol: "keyboardType" message
   - Types text character by character
-  - Does not press special keys
-- [ ] Implement `keyboard.insert_text(text)`
+- [x] Implement `keyboard.insert_text(text)`
   - Protocol: "keyboardInsertText" message
   - Insert text without key events (paste-like)
-- [ ] Implement Mouse struct
+- [x] Implement Mouse struct
   - Accessed via `page.mouse()`
-  - Methods: move, click, dblclick, down, up, wheel
-- [ ] Implement `mouse.move(x, y, options)`
-  - Options: steps (intermediate move events)
+  - Methods: move_to, click, dblclick, down, up, wheel
+  - Delegates to Page protocol methods
+- [x] Implement `mouse.move_to(x, y, options)`
+  - Options: deferred (Option<()>)
   - Protocol: "mouseMove" message
   - Coordinates in CSS pixels relative to viewport
-- [ ] Implement `mouse.click(x, y, options)`
-  - Options: button, click_count, delay
+- [x] Implement `mouse.click(x, y, options)`
+  - Options: deferred (Option<()>)
   - Protocol: "mouseClick" message
   - Click at absolute coordinates
-- [ ] Implement `mouse.dblclick(x, y, options)`
-  - Similar to click with click_count=2
-- [ ] Implement `mouse.down(options)` and `mouse.up(options)`
-  - Options: button, click_count
+- [x] Implement `mouse.dblclick(x, y, options)`
+  - Options: deferred (Option<()>)
+  - Protocol: "mouseClick" with clickCount=2
+- [x] Implement `mouse.down(options)` and `mouse.up(options)`
+  - Options: deferred (Option<()>)
   - Protocol: "mouseDown", "mouseUp"
   - For drag and drop interactions
-- [ ] Implement `mouse.wheel(delta_x, delta_y)`
+- [x] Implement `mouse.wheel(delta_x, delta_y)`
   - Protocol: "mouseWheel" message
   - Scroll by pixel delta
-- [ ] Tests
-  - Test keyboard.press sends key events
-  - Test keyboard.type types text
-  - Test keyboard.down/up for key hold
-  - Test keyboard modifiers (Control+A selects all)
+- [x] Tests
+  - Test keyboard.type_text types text
+  - Test keyboard.press sends key events (Enter)
+  - Test keyboard.down/up for key hold (Shift+KeyA)
   - Test keyboard.insert_text (no key events)
-  - Test mouse.move moves cursor
+  - Test mouse.move_to moves cursor
   - Test mouse.click at coordinates
-  - Test mouse.down/up for drag
+  - Test mouse.dblclick at coordinates
+  - Test mouse.down/up for drag simulation
   - Test mouse.wheel for scrolling
-  - Cross-browser tests
+  - Cross-browser tests (Firefox, WebKit)
+
+**Deferred to Future Slices:**
+- Options implementation (KeyboardOptions, MouseOptions with builder pattern)
+- Modifier key parsing for keyboard.press (e.g., "Control+A")
+- Mouse button options (left, middle, right)
+- Mouse steps option for smooth movement
+- Delay option for keyboard typing
 
 **Files Created:**
-- `crates/playwright/src/api/keyboard.rs` - Keyboard struct and methods
-- `crates/playwright/src/api/mouse.rs` - Mouse struct and methods
-- `tests/keyboard_test.rs` - Keyboard integration tests
-- `tests/mouse_test.rs` - Mouse integration tests
+- `crates/playwright-core/src/protocol/keyboard.rs` - Keyboard struct with 5 methods
+- `crates/playwright-core/src/protocol/mouse.rs` - Mouse struct with 6 methods
+- `crates/playwright-core/tests/keyboard_mouse_test.rs` - 11 comprehensive tests
 
 **Files Modified:**
-- `crates/playwright/src/api/page.rs` - Add keyboard() and mouse() methods
-- `crates/playwright/src/api/options.rs` - Add keyboard/mouse option structs
+- `crates/playwright-core/src/protocol/mod.rs` - Exported Keyboard and Mouse
+- `crates/playwright-core/src/protocol/page.rs` - Added keyboard() and mouse() accessors, 11 internal protocol methods
+- `crates/playwright-core/tests/test_server.rs` - Added keyboard_mouse.html page
 
 **Acceptance Criteria:**
-- Keyboard methods successfully send key events
-- Modifiers work correctly (Control+A, Shift+End)
-- Type method types text character by character
-- Mouse methods successfully control cursor
-- Mouse coordinates work correctly
-- All tests pass cross-browser
+- ✅ Keyboard methods successfully send key events
+- ✅ keyboard.type_text types text into inputs
+- ✅ keyboard.press sends single key events
+- ✅ keyboard.down/up allows key combinations (Shift+A)
+- ✅ keyboard.insert_text inserts without key events
+- ✅ Mouse methods successfully control cursor
+- ✅ mouse.click clicks at absolute coordinates
+- ✅ mouse.dblclick double-clicks at coordinates
+- ✅ mouse.move_to moves cursor (coordinates tracked)
+- ✅ mouse.down/up allows drag simulation
+- ✅ mouse.wheel scrolls page
+- ✅ All tests pass cross-browser (Chromium, Firefox, WebKit)
 
 ### Slice 7: Screenshots and Documentation
 

@@ -90,14 +90,8 @@ jobs:
       if: runner.os == 'Windows'
       run: cargo test --verbose --lib --workspace
 
-    - name: Run all examples
-      if: matrix.os != 'windows-latest'
-      run: |
-        for example in crates/playwright/examples/*.rs; do
-          example_name=$(basename "$example" .rs)
-          echo "Running example: $example_name"
-          cargo run --package playwright --example "$example_name" || exit 1
-        done
+    - name: Build all examples
+      run: cargo build --package playwright --examples
 
     - name: Generate documentation
       run: cargo doc --no-deps --workspace

@@ -113,7 +113,7 @@ impl Page {
     /// Returns the main frame of the page.
     ///
     /// The main frame is where navigation and DOM operations actually happen.
-    async fn main_frame(&self) -> Result<crate::protocol::Frame> {
+    pub(crate) async fn main_frame(&self) -> Result<crate::protocol::Frame> {
         // Get the Frame object from the connection's object registry
         let frame_arc = self.connection().get_object(&self.main_frame_guid).await?;
 
@@ -302,6 +302,140 @@ impl Page {
         let frame = self.main_frame().await.expect("Main frame should exist");
 
         crate::protocol::Locator::new(Arc::new(frame), selector.to_string())
+    }
+
+    /// Returns the keyboard instance for low-level keyboard control.
+    ///
+    /// See: <https://playwright.dev/docs/api/class-page#page-keyboard>
+    pub fn keyboard(&self) -> crate::protocol::Keyboard {
+        crate::protocol::Keyboard::new(self.clone())
+    }
+
+    /// Returns the mouse instance for low-level mouse control.
+    ///
+    /// See: <https://playwright.dev/docs/api/class-page#page-mouse>
+    pub fn mouse(&self) -> crate::protocol::Mouse {
+        crate::protocol::Mouse::new(self.clone())
+    }
+
+    // Internal keyboard methods (called by Keyboard struct)
+
+    pub(crate) async fn keyboard_down(&self, key: &str) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "keyboardDown",
+                serde_json::json!({
+                    "key": key
+                }),
+            )
+            .await
+    }
+
+    pub(crate) async fn keyboard_up(&self, key: &str) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "keyboardUp",
+                serde_json::json!({
+                    "key": key
+                }),
+            )
+            .await
+    }
+
+    pub(crate) async fn keyboard_press(&self, key: &str) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "keyboardPress",
+                serde_json::json!({
+                    "key": key
+                }),
+            )
+            .await
+    }
+
+    pub(crate) async fn keyboard_type(&self, text: &str) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "keyboardType",
+                serde_json::json!({
+                    "text": text
+                }),
+            )
+            .await
+    }
+
+    pub(crate) async fn keyboard_insert_text(&self, text: &str) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "keyboardInsertText",
+                serde_json::json!({
+                    "text": text
+                }),
+            )
+            .await
+    }
+
+    // Internal mouse methods (called by Mouse struct)
+
+    pub(crate) async fn mouse_move(&self, x: i32, y: i32) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "mouseMove",
+                serde_json::json!({
+                    "x": x,
+                    "y": y
+                }),
+            )
+            .await
+    }
+
+    pub(crate) async fn mouse_click(&self, x: i32, y: i32) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "mouseClick",
+                serde_json::json!({
+                    "x": x,
+                    "y": y
+                }),
+            )
+            .await
+    }
+
+    pub(crate) async fn mouse_dblclick(&self, x: i32, y: i32) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "mouseClick",
+                serde_json::json!({
+                    "x": x,
+                    "y": y,
+                    "clickCount": 2
+                }),
+            )
+            .await
+    }
+
+    pub(crate) async fn mouse_down(&self) -> Result<()> {
+        self.channel()
+            .send_no_result("mouseDown", serde_json::json!({}))
+            .await
+    }
+
+    pub(crate) async fn mouse_up(&self) -> Result<()> {
+        self.channel()
+            .send_no_result("mouseUp", serde_json::json!({}))
+            .await
+    }
+
+    pub(crate) async fn mouse_wheel(&self, delta_x: i32, delta_y: i32) -> Result<()> {
+        self.channel()
+            .send_no_result(
+                "mouseWheel",
+                serde_json::json!({
+                    "deltaX": delta_x,
+                    "deltaY": delta_y
+                }),
+            )
+            .await
     }
 
     /// Reloads the current page.
