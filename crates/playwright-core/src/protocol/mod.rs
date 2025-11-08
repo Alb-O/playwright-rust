@@ -27,6 +27,7 @@ pub mod request;
 pub mod response;
 pub mod root;
 pub mod screenshot;
+pub mod select_option;
 
 pub use action_options::{
     CheckOptions, FillOptions, HoverOptions, KeyboardOptions, MouseOptions, PressOptions,
@@ -47,3 +48,4 @@ pub use request::Request;
 pub use response::ResponseObject;
 pub use root::Root;
 pub use screenshot::{ScreenshotClip, ScreenshotOptions, ScreenshotType};
+pub use select_option::SelectOption;

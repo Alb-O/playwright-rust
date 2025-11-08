@@ -118,14 +118,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build();
     button.hover(Some(hover_opts)).await?;
 
-    // Select dropdown options
-    use playwright_core::protocol::SelectOptions;
+    // Select dropdown options - by value (default)
+    use playwright_core::protocol::{SelectOption, SelectOptions};
     let select = page.locator("select#colors").await;
     let select_opts = SelectOptions::builder().force(true).build();
     select.select_option("blue", Some(select_opts)).await?;
 
-    // Multiple select
+    // Select by label (visible text)
+    select.select_option(SelectOption::Label("Blue".to_string()), None).await?;
+
+    // Select by index (0-based)
+    select.select_option(SelectOption::Index(2), None).await?;
+
+    // Multiple select with mixed types
     select.select_option_multiple(&["red", "green"], None).await?;
+    select.select_option_multiple(&[
+        SelectOption::Value("red".to_string()),
+        SelectOption::Label("Green".to_string()),
+    ], None).await?;
 
     // File upload
     let file_input = page.locator("input[type=file]").await;

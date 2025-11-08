@@ -11,7 +11,7 @@
 
 mod test_server;
 
-use playwright_core::protocol::Playwright;
+use playwright_core::protocol::{Playwright, SelectOption};
 use std::fs;
 use std::io::Write;
 use test_server::TestServer;
@@ -47,6 +47,97 @@ async fn test_select_option_by_value() {
 }
 
 #[tokio::test]
+async fn test_select_option_by_label() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .chromium()
+        .launch()
+        .await
+        .expect("Failed to launch browser");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    page.goto(&format!("{}/select.html", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    // Test: Select option by label
+    let select = page.locator("#single-select").await;
+    let selected = select
+        .select_option(SelectOption::Label("Banana".to_string()), None)
+        .await
+        .expect("Failed to select option by label");
+
+    assert_eq!(selected, vec!["banana"]);
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+#[tokio::test]
+async fn test_select_option_by_index() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .chromium()
+        .launch()
+        .await
+        .expect("Failed to launch browser");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    page.goto(&format!("{}/select.html", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    // Test: Select option by index (0-based, index 2 = "Cherry")
+    let select = page.locator("#single-select").await;
+    let selected = select
+        .select_option(SelectOption::Index(3), None)
+        .await
+        .expect("Failed to select option by index");
+
+    assert_eq!(selected, vec!["cherry"]);
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+#[tokio::test]
+async fn test_select_option_without_value_attribute() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .chromium()
+        .launch()
+        .await
+        .expect("Failed to launch browser");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    page.goto(&format!("{}/select.html", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    // Test: Select option by index when options have no value attribute
+    let select = page.locator("#select-by-index").await;
+    let selected = select
+        .select_option(SelectOption::Index(1), None)
+        .await
+        .expect("Failed to select by index");
+
+    // When no value attribute, the text content becomes the value
+    assert_eq!(selected, vec!["Second"]);
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+#[tokio::test]
 async fn test_select_multiple_options() {
     let server = TestServer::start().await;
     let playwright = Playwright::launch()
@@ -69,6 +160,40 @@ async fn test_select_multiple_options() {
         .select_option_multiple(&["red", "blue"], None)
         .await
         .expect("Failed to select multiple options");
+
+    assert_eq!(selected, vec!["red", "blue"]);
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+#[tokio::test]
+async fn test_select_multiple_options_mixed_types() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .chromium()
+        .launch()
+        .await
+        .expect("Failed to launch browser");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    page.goto(&format!("{}/select.html", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    // Test: Select multiple options using SelectOption variants
+    let select = page.locator("#multi-select").await;
+    let options = vec![
+        SelectOption::Value("red".to_string()),
+        SelectOption::Label("Blue".to_string()),
+    ];
+    let selected = select
+        .select_option_multiple(&options, None)
+        .await
+        .expect("Failed to select multiple options with mixed types");
 
     assert_eq!(selected, vec!["red", "blue"]);
 
@@ -242,6 +367,66 @@ async fn test_select_option_firefox() {
         .expect("Failed to select option");
 
     assert_eq!(selected, vec!["cherry"]);
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+#[tokio::test]
+async fn test_select_option_by_label_firefox() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .firefox()
+        .launch()
+        .await
+        .expect("Failed to launch Firefox");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    page.goto(&format!("{}/select.html", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    // Test: Select by label in Firefox
+    let select = page.locator("#single-select").await;
+    let selected = select
+        .select_option(SelectOption::Label("Apple".to_string()), None)
+        .await
+        .expect("Failed to select option by label in Firefox");
+
+    assert_eq!(selected, vec!["apple"]);
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+#[tokio::test]
+async fn test_select_option_by_index_webkit() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .webkit()
+        .launch()
+        .await
+        .expect("Failed to launch WebKit");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    page.goto(&format!("{}/select.html", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    // Test: Select by index in WebKit
+    let select = page.locator("#single-select").await;
+    let selected = select
+        .select_option(SelectOption::Index(2), None)
+        .await
+        .expect("Failed to select option by index in WebKit");
+
+    assert_eq!(selected, vec!["banana"]);
 
     browser.close().await.expect("Failed to close browser");
     server.shutdown();

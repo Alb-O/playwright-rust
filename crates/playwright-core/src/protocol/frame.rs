@@ -722,7 +722,7 @@ impl Frame {
     pub(crate) async fn locator_select_option(
         &self,
         selector: &str,
-        value: &str,
+        value: crate::protocol::SelectOption,
         options: Option<crate::protocol::SelectOptions>,
     ) -> Result<Vec<String>> {
         #[derive(Deserialize)]
@@ -733,7 +733,7 @@ impl Frame {
         let mut params = serde_json::json!({
             "selector": selector,
             "strict": true,
-            "options": [{"value": value}]
+            "options": [value.to_json()]
         });
 
         if let Some(opts) = options {
@@ -753,7 +753,7 @@ impl Frame {
     pub(crate) async fn locator_select_option_multiple(
         &self,
         selector: &str,
-        values: &[&str],
+        values: Vec<crate::protocol::SelectOption>,
         options: Option<crate::protocol::SelectOptions>,
     ) -> Result<Vec<String>> {
         #[derive(Deserialize)]
@@ -761,10 +761,7 @@ impl Frame {
             values: Vec<String>,
         }
 
-        let values_array: Vec<_> = values
-            .iter()
-            .map(|v| serde_json::json!({"value": v}))
-            .collect();
+        let values_array: Vec<_> = values.iter().map(|v| v.to_json()).collect();
 
         let mut params = serde_json::json!({
             "selector": selector,

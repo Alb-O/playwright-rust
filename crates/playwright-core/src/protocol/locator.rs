@@ -228,14 +228,37 @@ impl Locator {
     ///
     /// Returns an array of option values that have been successfully selected.
     ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::protocol::{Playwright, SelectOption};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// let select = page.locator("select").await;
+    ///
+    /// // Select by value (backward compatible)
+    /// select.select_option("option1", None).await?;
+    ///
+    /// // Select by label
+    /// select.select_option(SelectOption::Label("First Option".to_string()), None).await?;
+    ///
+    /// // Select by index
+    /// select.select_option(SelectOption::Index(0), None).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// See: <https://playwright.dev/docs/api/class-locator#locator-select-option>
     pub async fn select_option(
         &self,
-        value: &str,
+        value: impl Into<crate::protocol::SelectOption>,
         options: Option<crate::protocol::SelectOptions>,
     ) -> Result<Vec<String>> {
         self.frame
-            .locator_select_option(&self.selector, value, options)
+            .locator_select_option(&self.selector, value.into(), options)
             .await
     }
 
@@ -243,14 +266,42 @@ impl Locator {
     ///
     /// Returns an array of option values that have been successfully selected.
     ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::protocol::{Playwright, SelectOption};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// let select = page.locator("select").await;
+    ///
+    /// // Select multiple by value (backward compatible)
+    /// select.select_option_multiple(&["red", "blue"], None).await?;
+    ///
+    /// // Select multiple using SelectOption
+    /// select.select_option_multiple(
+    ///     &[
+    ///         SelectOption::Label("Red".to_string()),
+    ///         SelectOption::Label("Blue".to_string()),
+    ///     ],
+    ///     None
+    /// ).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// See: <https://playwright.dev/docs/api/class-locator#locator-select-option>
     pub async fn select_option_multiple(
         &self,
-        values: &[&str],
+        values: &[impl Into<crate::protocol::SelectOption> + Clone],
         options: Option<crate::protocol::SelectOptions>,
     ) -> Result<Vec<String>> {
+        let select_options: Vec<crate::protocol::SelectOption> =
+            values.iter().map(|v| v.clone().into()).collect();
         self.frame
-            .locator_select_option_multiple(&self.selector, values, options)
+            .locator_select_option_multiple(&self.selector, select_options, options)
             .await
     }
 

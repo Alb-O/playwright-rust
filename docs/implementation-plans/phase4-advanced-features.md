@@ -475,18 +475,53 @@ Phase 4 follows the same TDD and vertical slicing approach as Phase 3.
 
 ---
 
-### Slice 6: SelectOption Variants
+### Slice 6: SelectOption Variants ✅
+
+**Status:** Complete (2025-11-08)
 
 **Goal:** Support selection by value, label, or index (not just value).
 
-**Why Sixth:** Medium-priority enhancement for select_option.
+**Why Sixth:** Medium-priority enhancement for select_option. Currently only supports value-based selection.
 
 **Tasks:**
-- [ ] Create SelectOption enum (Value, Label, Index)
-- [ ] Update select_option() to accept SelectOption
-- [ ] Update select_option_multiple() similarly
-- [ ] Protocol serialization for each variant
-- [ ] Tests for label and index selection
+- [x] Create SelectOption enum (Value, Label, Index)
+- [x] Implement to_json() for protocol serialization
+- [x] Implement From<&str> and From<String> for backward compatibility
+- [x] Update select_option() to accept `impl Into<SelectOption>`
+- [x] Update select_option_multiple() to accept SelectOption variants
+- [x] Update frame.rs to use SelectOption.to_json() in protocol messages
+- [x] Unit tests for SelectOption serialization
+- [x] Integration tests for label selection
+- [x] Integration tests for index selection
+- [x] Test selection without value attribute (index-based)
+- [x] Test mixed SelectOption types in multiple selection
+- [x] Cross-browser tests (Chromium, Firefox, WebKit)
+
+**Files Created:**
+- `crates/playwright-core/src/protocol/select_option.rs`
+
+**Files Modified:**
+- `crates/playwright-core/src/protocol/mod.rs` (added SelectOption export)
+- `crates/playwright-core/src/protocol/locator.rs` (updated select methods)
+- `crates/playwright-core/src/protocol/frame.rs` (updated protocol serialization)
+- `crates/playwright-core/tests/select_upload_test.rs` (added comprehensive tests)
+
+**Implementation Notes:**
+- SelectOption enum has three variants: Value(String), Label(String), Index(usize)
+- Each variant serializes to appropriate JSON-RPC format: `{"value": "..."}`, `{"label": "..."}`, `{"index": N}`
+- Backward compatibility maintained via From trait - existing string usage converts to SelectOption::Value
+- Generic method signatures use `impl Into<SelectOption>` pattern for ergonomic API
+- All tests passing across Chromium, Firefox, and WebKit
+
+**Acceptance Criteria:** ✅ All Met
+- ✅ SelectOption enum with Value, Label, Index variants created
+- ✅ Proper JSON-RPC serialization for each variant
+- ✅ Backward compatibility with existing string-based API
+- ✅ All integration tests pass including cross-browser
+- ✅ Can select by label (e.g., "Banana" selects value="banana")
+- ✅ Can select by index (0-based indexing)
+- ✅ Can select options without value attribute using index
+- ✅ Can mix SelectOption types in multiple selection
 
 ---
 
