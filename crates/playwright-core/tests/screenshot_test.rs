@@ -107,9 +107,10 @@ async fn test_page_screenshot_full_page() {
         .expect("Failed to navigate");
 
     // Test: Full page screenshot (captures beyond viewport)
-    // TODO: Need ScreenshotOptions with full_page field
+    use playwright_core::protocol::ScreenshotOptions;
+    let options = ScreenshotOptions::builder().full_page(true).build();
     let bytes = page
-        .screenshot(None)
+        .screenshot(Some(options))
         .await
         .expect("Failed to take full page screenshot");
 

@@ -21,3 +21,8 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Example output files
+example-screenshot.png
+*.example.png
+*.example.jpeg

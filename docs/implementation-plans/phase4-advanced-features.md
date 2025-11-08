@@ -231,7 +231,7 @@ Phase 4 will be considered complete when:
 
 - [x] ElementHandle protocol implemented ✅ (Slice 1)
 - [x] locator.screenshot() works with ElementHandles ✅ (Slice 1)
-- [ ] Screenshot options fully implemented (type, quality, full_page, clip, etc.)
+- [x] Screenshot options fully implemented (type, quality, full_page, clip, etc.) ✅ (Slice 2)
 - [ ] Navigation timeout error handling tested
 - [ ] ClickOptions with builder pattern implemented
 - [ ] Action position and modifiers work correctly
@@ -244,7 +244,7 @@ Phase 4 will be considered complete when:
 
 ## Implementation Plan
 
-**Status:** In Progress - Slice 1 Complete ✅, Ready for Slice 2
+**Status:** In Progress - Slices 1 & 2 Complete ✅, Ready for Slice 3
 
 Phase 4 follows the same TDD and vertical slicing approach as Phase 3.
 
@@ -321,21 +321,43 @@ Phase 4 follows the same TDD and vertical slicing approach as Phase 3.
 
 ---
 
-### Slice 2: Screenshot Options (Type, Quality, Full Page, Clip)
+### Slice 2: Screenshot Options (Type, Quality, Full Page, Clip) ✅
+
+**Status:** Complete (2025-11-08)
 
 **Goal:** Implement ScreenshotOptions struct with builder pattern for page and element screenshots.
 
 **Why Second:** Second-highest priority deferred item. Users need JPEG, full-page, and clip options.
 
 **Tasks:**
-- [ ] Create ScreenshotOptions struct
-- [ ] Create ScreenshotType enum (Png, Jpeg)
-- [ ] Create ScreenshotClip struct
-- [ ] Implement builder pattern
-- [ ] Update page.screenshot() to accept ScreenshotOptions
-- [ ] Update ElementHandle.screenshot() to accept ScreenshotOptions
-- [ ] Tests for all option combinations
-- [ ] Cross-browser tests
+- [x] Create ScreenshotOptions struct
+- [x] Create ScreenshotType enum (Png, Jpeg)
+- [x] Create ScreenshotClip struct
+- [x] Implement builder pattern
+- [x] Update page.screenshot() to accept ScreenshotOptions
+- [x] Update ElementHandle.screenshot() to accept ScreenshotOptions
+- [x] Update locator.screenshot() to accept ScreenshotOptions
+- [x] Tests for all option combinations (combined into efficient tests)
+- [x] Cross-browser tests (Chromium, Firefox, WebKit)
+
+**Files Created:**
+- `crates/playwright-core/src/protocol/screenshot.rs`
+- `crates/playwright-core/tests/screenshot_options_test.rs`
+
+**Files Modified:**
+- `crates/playwright-core/src/protocol/mod.rs`
+- `crates/playwright-core/src/protocol/page.rs`
+- `crates/playwright-core/src/protocol/element_handle.rs`
+- `crates/playwright-core/src/protocol/locator.rs`
+- `crates/playwright-core/tests/screenshot_test.rs` (removed TODO)
+
+**Acceptance Criteria:** ✅ All Met
+- ✅ ScreenshotType enum (Png, Jpeg) with proper serialization
+- ✅ ScreenshotClip struct for region capture
+- ✅ ScreenshotOptions with builder pattern
+- ✅ Support for type, quality, full_page, clip, omit_background options
+- ✅ All screenshot methods accept options
+- ✅ All tests pass cross-browser
 
 ---
 

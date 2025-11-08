@@ -65,11 +65,16 @@ impl ElementHandle {
     /// ```
     ///
     /// See: <https://playwright.dev/docs/api/class-elementhandle#element-handle-screenshot>
-    pub async fn screenshot(&self, _options: Option<()>) -> Result<Vec<u8>> {
-        // For now, use default options - PNG format
-        let params = serde_json::json!({
-            "type": "png"
-        });
+    pub async fn screenshot(
+        &self,
+        options: Option<crate::protocol::ScreenshotOptions>,
+    ) -> Result<Vec<u8>> {
+        let params = if let Some(opts) = options {
+            opts.to_json()
+        } else {
+            // Default to PNG
+            serde_json::json!({ "type": "png" })
+        };
 
         #[derive(Deserialize)]
         struct ScreenshotResponse {

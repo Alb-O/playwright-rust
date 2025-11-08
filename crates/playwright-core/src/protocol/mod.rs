@@ -24,6 +24,7 @@ pub mod playwright;
 pub mod request;
 pub mod response;
 pub mod root;
+pub mod screenshot;
 
 pub use browser::Browser;
 pub use browser_context::BrowserContext;
@@ -38,3 +39,4 @@ pub use playwright::Playwright;
 pub use request::Request;
 pub use response::ResponseObject;
 pub use root::Root;
+pub use screenshot::{ScreenshotClip, ScreenshotOptions, ScreenshotType};

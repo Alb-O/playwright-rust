@@ -112,8 +112,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Take screenshots
     let screenshot_bytes = page.screenshot(None).await?;
-    // Or save to file:
-    // page.screenshot_to_file(&PathBuf::from("screenshot.png"), None).await?;
+
+    // Screenshot with options (JPEG, quality, full-page, etc.)
+    use playwright_core::protocol::{ScreenshotOptions, ScreenshotType};
+    let options = ScreenshotOptions::builder()
+        .screenshot_type(ScreenshotType::Jpeg)
+        .quality(80)
+        .full_page(true)
+        .build();
+    let jpeg_screenshot = page.screenshot(Some(options)).await?;
 
     // Element screenshot
     let element_screenshot = heading.screenshot(None).await?;
@@ -149,10 +156,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ Low-level keyboard control (`keyboard.down()`, `up()`, `press()`, `type_text()`, `insert_text()`)
 - ✅ Low-level mouse control (`mouse.move_to()`, `click()`, `dblclick()`, `down()`, `up()`, `wheel()`)
 - ✅ Screenshots (`page.screenshot()`, `locator.screenshot()`, save to file)
+- ✅ Screenshot options (JPEG format, quality, full-page, clip region, omit background)
 - ✅ Element queries (`page.query_selector()`, `query_selector_all()`)
 - ✅ Proper lifecycle management and cleanup
 
-**Coming next:** Screenshot options (JPEG, full-page, clip), action options, assertions
+**Coming next:** Action options (click position, modifiers, etc.), assertions, network interception
 
 ## Installation
 

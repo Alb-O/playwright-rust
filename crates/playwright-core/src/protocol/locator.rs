@@ -291,7 +291,10 @@ impl Locator {
     /// ```
     ///
     /// See: <https://playwright.dev/docs/api/class-locator#locator-screenshot>
-    pub async fn screenshot(&self, _options: Option<()>) -> Result<Vec<u8>> {
+    pub async fn screenshot(
+        &self,
+        options: Option<crate::protocol::ScreenshotOptions>,
+    ) -> Result<Vec<u8>> {
         // Query for the element using strict mode (should return exactly one)
         let element = self
             .frame
@@ -305,7 +308,7 @@ impl Locator {
             })?;
 
         // Delegate to ElementHandle.screenshot()
-        element.screenshot(None).await
+        element.screenshot(options).await
     }
 }
 
