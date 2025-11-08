@@ -174,6 +174,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Element screenshot
     let element_screenshot = heading.screenshot(None).await?;
 
+    // Assertions with auto-retry
+    use playwright_core::expect;
+
+    // Assert element is visible (auto-retries until timeout)
+    expect(heading).to_be_visible().await?;
+
+    // Assert element is hidden
+    let dialog = page.locator("#dialog").await;
+    expect(dialog).to_be_hidden().await?;
+
+    // Negation support
+    expect(dialog).not().to_be_visible().await?;
+
+    // Custom timeout
+    use std::time::Duration;
+    expect(heading)
+        .with_timeout(Duration::from_secs(10))
+        .to_be_visible()
+        .await?;
+
     // Cleanup
     page.close().await?;
     browser.close().await?;
@@ -217,8 +237,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ Screenshot options (JPEG format, quality, full-page, clip region, omit background)
 - ✅ Element queries (`page.query_selector()`, `query_selector_all()`)
 - ✅ Proper lifecycle management and cleanup
+- ✅ Assertions with auto-retry (`expect().to_be_visible()`, `to_be_hidden()`)
+- ✅ Assertion negation (`.not()`)
+- ✅ Custom assertion timeouts
 
-**Coming next:** Assertions with auto-retry, network interception, mobile emulation
+**Coming next:** More assertions (text, value, state), network interception, downloads/dialogs
 
 ## Installation
 

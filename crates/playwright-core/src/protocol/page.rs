@@ -779,6 +779,47 @@ impl Page {
 
         Ok(bytes)
     }
+
+    /// Evaluates JavaScript in the page context.
+    ///
+    /// Executes the provided JavaScript expression or function within the page's
+    /// context and returns the result. The return value must be JSON-serializable.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::protocol::Playwright;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let playwright = Playwright::launch().await?;
+    /// let browser = playwright.chromium().launch().await?;
+    /// let page = browser.new_page().await?;
+    ///
+    /// page.goto("https://example.com", None).await?;
+    ///
+    /// // Execute JavaScript
+    /// page.evaluate("console.log('Hello from Playwright!')").await?;
+    ///
+    /// // Manipulate DOM
+    /// page.evaluate(
+    ///     r#"
+    ///     const div = document.createElement('div');
+    ///     div.id = 'my-element';
+    ///     document.body.appendChild(div);
+    ///     "#
+    /// ).await?;
+    ///
+    /// browser.close().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// See: <https://playwright.dev/docs/api/class-page#page-evaluate>
+    pub async fn evaluate(&self, expression: &str) -> Result<()> {
+        // Delegate to the main frame, matching playwright-python's behavior
+        let frame = self.main_frame().await?;
+        frame.frame_evaluate_expression(expression).await
+    }
 }
 
 impl ChannelOwner for Page {

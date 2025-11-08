@@ -4,7 +4,7 @@
 
 **Architecture:** JSON-RPC communication with Playwright Node.js server (same as all official bindings)
 
-**Status:** Phase 4 complete, planning Phase 5
+**Status:** Phase 5 in progress
 
 ---
 
@@ -97,11 +97,11 @@ This roadmap outlines the path to a production-ready `playwright-rust` library. 
 
 ---
 
-## Phase 5: Advanced Testing Features
+## Phase 5: Advanced Testing Features - See [phase5-advanced-testing.md](./implementation-plans/phase5-advanced-testing.md)
 
 **Goal:** Implement advanced testing features including assertions, network interception, mobile emulation, and recording capabilities.
 
-**Status:** Not Started
+**Status:** In Progress
 
 **Key Deliverables:**
 - Assertions: `expect(locator).to_be_visible()` with auto-retry
@@ -112,39 +112,6 @@ This roadmap outlines the path to a production-ready `playwright-rust` library. 
 - Tracing: Playwright trace integration
 - Downloads: File download handling
 - Dialogs: Alert/confirm/prompt handling
-
-**API Preview (Phase 5):**
-```rust
-use playwright::expect;
-
-// Assertions with auto-retry
-expect(page.locator(".success-message"))
-    .to_be_visible()
-    .await?;
-
-expect(page.locator("h1"))
-    .to_have_text("Welcome")
-    .await?;
-
-// Network interception
-page.route("**/api/**", |route| async move {
-    route.fulfill(json!({
-        "status": 200,
-        "body": "mocked response"
-    })).await
-}).await?;
-
-// Mobile emulation
-let iphone = playwright.devices().get("iPhone 13")?;
-let context = browser.new_context()
-    .device(iphone)
-    .await?;
-
-// Video recording
-let context = browser.new_context()
-    .record_video_dir("videos/")
-    .await?;
-```
 
 ---
 

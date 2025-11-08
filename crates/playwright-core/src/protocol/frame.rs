@@ -875,6 +875,25 @@ impl Frame {
             )
             .await
     }
+
+    /// Evaluates JavaScript expression in the frame context.
+    ///
+    /// This is used internally by Page.evaluate().
+    pub(crate) async fn frame_evaluate_expression(&self, expression: &str) -> Result<()> {
+        let params = serde_json::json!({
+            "expression": expression,
+            "arg": {
+                "value": {"v": "null"},
+                "handles": []
+            }
+        });
+
+        // For now, we ignore the return value
+        // TODO: Support returning values from evaluate
+        let _: serde_json::Value = self.channel().send("evaluateExpression", params).await?;
+
+        Ok(())
+    }
 }
 
 impl ChannelOwner for Frame {

@@ -63,4 +63,8 @@ pub enum Error {
     /// Element not found by selector
     #[error("Element not found: {0}")]
     ElementNotFound(String),
+
+    /// Assertion timeout (expect API)
+    #[error("Assertion timeout: {0}")]
+    AssertionTimeout(String),
 }

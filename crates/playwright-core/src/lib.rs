@@ -4,6 +4,7 @@
 // `playwright` crate.
 
 pub mod api;
+pub mod assertions;
 pub mod channel;
 pub mod channel_owner;
 pub mod connection;
@@ -15,6 +16,7 @@ pub mod server;
 pub mod transport;
 
 pub use api::{IgnoreDefaultArgs, LaunchOptions, ProxySettings};
+pub use assertions::expect;
 pub use channel::Channel;
 pub use channel_owner::{ChannelOwner, ChannelOwnerImpl, DisposeReason, ParentOrConnection};
 pub use connection::{Connection, ConnectionLike};
