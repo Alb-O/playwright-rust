@@ -64,7 +64,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     expect(delayed).to_be_visible().await?;
     println!("✓ Delayed element became visible (auto-retry)");
 
-    // Example 6: Timeout error handling
+    // Example 6: Text assertions
+    expect(heading.clone())
+        .to_have_text("Example Domain")
+        .await?;
+    println!("✓ Heading has exact text");
+
+    expect(heading.clone()).to_contain_text("Example").await?;
+    println!("✓ Heading contains substring");
+
+    // Example 7: Regex pattern matching
+    expect(heading.clone())
+        .to_have_text_regex(r"Example.*")
+        .await?;
+    println!("✓ Heading matches regex pattern");
+
+    // Example 8: Input value assertions
+    // Inject an input with a value
+    page.evaluate(
+        r#"
+        const input = document.createElement('input');
+        input.id = 'email-input';
+        input.value = 'user@example.com';
+        document.body.appendChild(input);
+        "#,
+    )
+    .await?;
+
+    let email_input = page.locator("#email-input").await;
+    expect(email_input.clone())
+        .to_have_value("user@example.com")
+        .await?;
+    println!("✓ Input has expected value");
+
+    expect(email_input)
+        .to_have_value_regex(r".*@example\.com")
+        .await?;
+    println!("✓ Input value matches regex");
+
+    // Example 9: Timeout error handling
     // Create element that stays hidden
     page.evaluate(
         r#"

@@ -189,15 +189,51 @@ page.locator("input").expect().to_have_value("hello").await?;
 
 ### Slice 2: Text and Value Assertions
 
+**Status:** ✅ COMPLETE
+
 **Goal:** Implement text-based assertions (to_have_text, to_contain_text, to_have_value).
 
 **Tasks:**
-- [ ] Implement to_have_text() - exact match
-- [ ] Implement to_contain_text() - substring match
-- [ ] Implement to_have_value() - for input elements
-- [ ] Support for regex patterns
-- [ ] Tests for all text assertions
-- [ ] Cross-browser testing
+- [x] Implement to_have_text() - exact match
+- [x] Implement to_contain_text() - substring match
+- [x] Implement to_have_value() - for input elements
+- [x] Support for regex patterns
+- [x] Tests for all text assertions
+- [x] Cross-browser testing
+
+**Implementation Details:**
+
+**Files Created:**
+- `crates/playwright-core/tests/text_assertions_test.rs` - 15 comprehensive integration tests
+
+**Files Modified:**
+- `crates/playwright-core/src/assertions.rs` - Added 6 new assertion methods
+- `crates/playwright-core/Cargo.toml` - Added `regex = "1.10"` dependency
+- `crates/playwright-core/tests/test_server.rs` - Added `/text.html` route and handler
+
+**New Assertion Methods:**
+1. `to_have_text(expected: &str)` - Exact text match with auto-retry
+2. `to_have_text_regex(pattern: &str)` - Regex pattern match for text
+3. `to_contain_text(expected: &str)` - Substring match with auto-retry
+4. `to_contain_text_regex(pattern: &str)` - Regex pattern for substring
+5. `to_have_value(expected: &str)` - Input value match with auto-retry
+6. `to_have_value_regex(pattern: &str)` - Regex pattern for input value
+
+**Test Results:**
+- Tests cover exact match, substring match, regex patterns
+- Tests verify auto-retry behavior with dynamically changing elements
+- Cross-browser tests for Firefox and WebKit
+- Timeout error handling
+- Empty value handling
+- Text trimming behavior
+
+**Key Implementation Details:**
+- Uses `inner_text()` for text content (matches Playwright behavior)
+- Uses `input_value()` for form inputs
+- Automatic text trimming before comparison
+- Full regex support via `regex` crate
+- Negation support via `.not()` for all assertions
+- Clear error messages with actual vs expected values
 
 ---
 

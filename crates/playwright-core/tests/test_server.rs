@@ -35,7 +35,8 @@ impl TestServer {
             .route("/select.html", get(select_page))
             .route("/upload.html", get(upload_page))
             .route("/keyboard_mouse.html", get(keyboard_mouse_page))
-            .route("/click_options.html", get(click_options_page));
+            .route("/click_options.html", get(click_options_page))
+            .route("/text.html", get(text_page));
 
         // Bind to port 0 to get any available port
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
@@ -434,6 +435,28 @@ async fn click_options_page() -> Response<Body> {
       result.textContent = 'hidden-button-clicked';
     });
   </script>
+</body>
+</html>"#,
+        ))
+        .unwrap()
+}
+
+async fn text_page() -> Response<Body> {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "text/html")
+        .body(Body::from(
+            r#"<!DOCTYPE html>
+<html>
+<head><title>Text Assertions Test</title></head>
+<body>
+  <h1>Welcome to Playwright</h1>
+  <p id="whitespace">
+    Text with whitespace
+  </p>
+  <p id="long-text">This is the beginning and middle of the text and the end.</p>
+  <input type="text" id="name-input" value="John Doe" />
+  <input type="text" id="empty-input" value="" />
 </body>
 </html>"#,
         ))

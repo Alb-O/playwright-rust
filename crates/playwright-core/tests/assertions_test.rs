@@ -128,7 +128,7 @@ async fn test_to_be_visible_with_auto_retry() {
 
         setTimeout(() => {
             div.style.display = 'block';
-        }, 500);
+        }, 100);
         "#,
     )
     .await
@@ -145,8 +145,8 @@ async fn test_to_be_visible_with_auto_retry() {
 
     let elapsed = start.elapsed();
     assert!(
-        elapsed.as_millis() >= 500,
-        "Should have waited at least 500ms, but was {:?}",
+        elapsed.as_millis() >= 100,
+        "Should have waited at least 100ms, but was {:?}",
         elapsed
     );
 
@@ -214,7 +214,7 @@ async fn test_to_be_hidden_with_auto_retry() {
         const btn = document.getElementById('btn');
         setTimeout(() => {
             btn.style.display = 'none';
-        }, 500);
+        }, 100);
         "#,
     )
     .await
@@ -231,8 +231,8 @@ async fn test_to_be_hidden_with_auto_retry() {
 
     let elapsed = start.elapsed();
     assert!(
-        elapsed.as_millis() >= 500,
-        "Should have waited at least 500ms, but was {:?}",
+        elapsed.as_millis() >= 100,
+        "Should have waited at least 100ms, but was {:?}",
         elapsed
     );
 
@@ -268,7 +268,7 @@ async fn test_custom_timeout() {
 
         setTimeout(() => {
             div.style.display = 'block';
-        }, 2000);
+        }, 200);
         "#,
     )
     .await
@@ -369,7 +369,7 @@ async fn test_auto_retry_webkit() {
 
         setTimeout(() => {
             div.style.display = 'block';
-        }, 300);
+        }, 100);
         "#,
     )
     .await

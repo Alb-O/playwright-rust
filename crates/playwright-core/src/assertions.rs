@@ -206,6 +206,361 @@ impl Expectation {
         };
         negated.to_be_visible().await
     }
+
+    /// Asserts that the element has the specified text content (exact match).
+    ///
+    /// This assertion will retry until the element has the exact text or timeout.
+    /// Text is trimmed before comparison.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::{expect, protocol::Playwright};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// expect(page.locator("h1").await).to_have_text("Welcome").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// See: <https://playwright.dev/docs/test-assertions#locator-assertions-to-have-text>
+    pub async fn to_have_text(self, expected: &str) -> Result<()> {
+        let start = std::time::Instant::now();
+        let selector = self.locator.selector().to_string();
+        let expected = expected.trim();
+
+        loop {
+            // Get text content (using inner_text for consistency with Playwright)
+            let actual_text = self.locator.inner_text().await?;
+            let actual = actual_text.trim();
+
+            // Check if condition matches (with negation support)
+            let matches = if self.negate {
+                actual != expected
+            } else {
+                actual == expected
+            };
+
+            if matches {
+                return Ok(());
+            }
+
+            // Check timeout
+            if start.elapsed() >= self.timeout {
+                let message = if self.negate {
+                    format!(
+                        "Expected element '{}' NOT to have text '{}', but it did after {:?}",
+                        selector, expected, self.timeout
+                    )
+                } else {
+                    format!(
+                        "Expected element '{}' to have text '{}', but had '{}' after {:?}",
+                        selector, expected, actual, self.timeout
+                    )
+                };
+                return Err(crate::error::Error::AssertionTimeout(message));
+            }
+
+            // Wait before next poll
+            tokio::time::sleep(self.poll_interval).await;
+        }
+    }
+
+    /// Asserts that the element's text matches the specified regex pattern.
+    ///
+    /// This assertion will retry until the element's text matches the pattern or timeout.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::{expect, protocol::Playwright};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// expect(page.locator("h1").await).to_have_text_regex(r"Welcome.*").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn to_have_text_regex(self, pattern: &str) -> Result<()> {
+        let start = std::time::Instant::now();
+        let selector = self.locator.selector().to_string();
+        let re = regex::Regex::new(pattern)
+            .map_err(|e| crate::error::Error::InvalidArgument(format!("Invalid regex: {}", e)))?;
+
+        loop {
+            let actual_text = self.locator.inner_text().await?;
+            let actual = actual_text.trim();
+
+            // Check if condition matches (with negation support)
+            let matches = if self.negate {
+                !re.is_match(actual)
+            } else {
+                re.is_match(actual)
+            };
+
+            if matches {
+                return Ok(());
+            }
+
+            // Check timeout
+            if start.elapsed() >= self.timeout {
+                let message = if self.negate {
+                    format!(
+                        "Expected element '{}' NOT to match pattern '{}', but it did after {:?}",
+                        selector, pattern, self.timeout
+                    )
+                } else {
+                    format!(
+                        "Expected element '{}' to match pattern '{}', but had '{}' after {:?}",
+                        selector, pattern, actual, self.timeout
+                    )
+                };
+                return Err(crate::error::Error::AssertionTimeout(message));
+            }
+
+            // Wait before next poll
+            tokio::time::sleep(self.poll_interval).await;
+        }
+    }
+
+    /// Asserts that the element contains the specified text (substring match).
+    ///
+    /// This assertion will retry until the element contains the text or timeout.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::{expect, protocol::Playwright};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// expect(page.locator("p").await).to_contain_text("substring").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// See: <https://playwright.dev/docs/test-assertions#locator-assertions-to-contain-text>
+    pub async fn to_contain_text(self, expected: &str) -> Result<()> {
+        let start = std::time::Instant::now();
+        let selector = self.locator.selector().to_string();
+
+        loop {
+            let actual_text = self.locator.inner_text().await?;
+            let actual = actual_text.trim();
+
+            // Check if condition matches (with negation support)
+            let matches = if self.negate {
+                !actual.contains(expected)
+            } else {
+                actual.contains(expected)
+            };
+
+            if matches {
+                return Ok(());
+            }
+
+            // Check timeout
+            if start.elapsed() >= self.timeout {
+                let message = if self.negate {
+                    format!(
+                        "Expected element '{}' NOT to contain text '{}', but it did after {:?}",
+                        selector, expected, self.timeout
+                    )
+                } else {
+                    format!(
+                        "Expected element '{}' to contain text '{}', but had '{}' after {:?}",
+                        selector, expected, actual, self.timeout
+                    )
+                };
+                return Err(crate::error::Error::AssertionTimeout(message));
+            }
+
+            // Wait before next poll
+            tokio::time::sleep(self.poll_interval).await;
+        }
+    }
+
+    /// Asserts that the element's text contains a substring matching the regex pattern.
+    ///
+    /// This assertion will retry until the element contains the pattern or timeout.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::{expect, protocol::Playwright};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// expect(page.locator("p").await).to_contain_text_regex(r"sub.*ing").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn to_contain_text_regex(self, pattern: &str) -> Result<()> {
+        let start = std::time::Instant::now();
+        let selector = self.locator.selector().to_string();
+        let re = regex::Regex::new(pattern)
+            .map_err(|e| crate::error::Error::InvalidArgument(format!("Invalid regex: {}", e)))?;
+
+        loop {
+            let actual_text = self.locator.inner_text().await?;
+            let actual = actual_text.trim();
+
+            // Check if condition matches (with negation support)
+            let matches = if self.negate {
+                !re.is_match(actual)
+            } else {
+                re.is_match(actual)
+            };
+
+            if matches {
+                return Ok(());
+            }
+
+            // Check timeout
+            if start.elapsed() >= self.timeout {
+                let message = if self.negate {
+                    format!(
+                        "Expected element '{}' NOT to contain pattern '{}', but it did after {:?}",
+                        selector, pattern, self.timeout
+                    )
+                } else {
+                    format!(
+                        "Expected element '{}' to contain pattern '{}', but had '{}' after {:?}",
+                        selector, pattern, actual, self.timeout
+                    )
+                };
+                return Err(crate::error::Error::AssertionTimeout(message));
+            }
+
+            // Wait before next poll
+            tokio::time::sleep(self.poll_interval).await;
+        }
+    }
+
+    /// Asserts that the input element has the specified value.
+    ///
+    /// This assertion will retry until the input has the exact value or timeout.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::{expect, protocol::Playwright};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// expect(page.locator("input").await).to_have_value("expected value").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// See: <https://playwright.dev/docs/test-assertions#locator-assertions-to-have-value>
+    pub async fn to_have_value(self, expected: &str) -> Result<()> {
+        let start = std::time::Instant::now();
+        let selector = self.locator.selector().to_string();
+
+        loop {
+            let actual = self.locator.input_value(None).await?;
+
+            // Check if condition matches (with negation support)
+            let matches = if self.negate {
+                actual != expected
+            } else {
+                actual == expected
+            };
+
+            if matches {
+                return Ok(());
+            }
+
+            // Check timeout
+            if start.elapsed() >= self.timeout {
+                let message = if self.negate {
+                    format!(
+                        "Expected input '{}' NOT to have value '{}', but it did after {:?}",
+                        selector, expected, self.timeout
+                    )
+                } else {
+                    format!(
+                        "Expected input '{}' to have value '{}', but had '{}' after {:?}",
+                        selector, expected, actual, self.timeout
+                    )
+                };
+                return Err(crate::error::Error::AssertionTimeout(message));
+            }
+
+            // Wait before next poll
+            tokio::time::sleep(self.poll_interval).await;
+        }
+    }
+
+    /// Asserts that the input element's value matches the specified regex pattern.
+    ///
+    /// This assertion will retry until the input value matches the pattern or timeout.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::{expect, protocol::Playwright};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// expect(page.locator("input").await).to_have_value_regex(r"value.*").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn to_have_value_regex(self, pattern: &str) -> Result<()> {
+        let start = std::time::Instant::now();
+        let selector = self.locator.selector().to_string();
+        let re = regex::Regex::new(pattern)
+            .map_err(|e| crate::error::Error::InvalidArgument(format!("Invalid regex: {}", e)))?;
+
+        loop {
+            let actual = self.locator.input_value(None).await?;
+
+            // Check if condition matches (with negation support)
+            let matches = if self.negate {
+                !re.is_match(&actual)
+            } else {
+                re.is_match(&actual)
+            };
+
+            if matches {
+                return Ok(());
+            }
+
+            // Check timeout
+            if start.elapsed() >= self.timeout {
+                let message = if self.negate {
+                    format!(
+                        "Expected input '{}' NOT to match pattern '{}', but it did after {:?}",
+                        selector, pattern, self.timeout
+                    )
+                } else {
+                    format!(
+                        "Expected input '{}' to match pattern '{}', but had '{}' after {:?}",
+                        selector, pattern, actual, self.timeout
+                    )
+                };
+                return Err(crate::error::Error::AssertionTimeout(message));
+            }
+
+            // Wait before next poll
+            tokio::time::sleep(self.poll_interval).await;
+        }
+    }
 }
 
 #[cfg(test)]

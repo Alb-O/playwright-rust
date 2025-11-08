@@ -187,6 +187,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Negation support
     expect(dialog).not().to_be_visible().await?;
 
+    // Text assertions
+    expect(heading).to_have_text("Example Domain").await?;
+    expect(heading).to_contain_text("Example").await?;
+
+    // Regex pattern matching
+    expect(heading).to_have_text_regex(r"Example.*").await?;
+
+    // Input value assertions
+    let input = page.locator("input[name='email']").await;
+    expect(input).to_have_value("user@example.com").await?;
+    expect(input).to_have_value_regex(r".*@example\.com").await?;
+
     // Custom timeout
     use std::time::Duration;
     expect(heading)
@@ -240,8 +252,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ Assertions with auto-retry (`expect().to_be_visible()`, `to_be_hidden()`)
 - ✅ Assertion negation (`.not()`)
 - ✅ Custom assertion timeouts
+- ✅ Text assertions (`to_have_text()`, `to_contain_text()`)
+- ✅ Value assertions (`to_have_value()`)
+- ✅ Regex pattern support for all text/value assertions
 
-**Coming next:** More assertions (text, value, state), network interception, downloads/dialogs
+**Coming next:** State assertions (enabled, checked, editable), network interception, downloads/dialogs
 
 ## Installation
 
