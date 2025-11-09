@@ -1,0 +1,43 @@
+name: Windows Debug
+
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  debug-windows:
+    name: Debug Windows Browser Launch
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Playwright browsers
+      run: |
+        npx playwright@1.49.0 install chromium --with-deps
+        npx playwright@1.49.0 install-deps chromium
+
+    - name: List installed browsers
+      run: |
+        dir "$env:USERPROFILE\AppData\Local\ms-playwright"
+
+    - name: Build
+      run: cargo build --verbose
+
+    - name: Run single simple test
+      timeout-minutes: 5
+      run: |
+        cargo test --package playwright-core --test browser_launch_test test_browser_launch_chromium -- --nocapture --test-threads=1

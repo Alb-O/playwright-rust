@@ -59,7 +59,7 @@
 
 ## Phase 6 Slices
 
-### Slice 1: Windows Support and Stdio Cleanup ✅ COMPLETE
+### Slice 1: Windows Support and Stdio Cleanup 🚧 IN PROGRESS
 
 **Goal:** Fix Windows integration test hangs and enable full Windows CI support.
 
@@ -69,23 +69,24 @@
 - [x] Research Windows stdio pipe cleanup behavior
 - [x] Implement platform-specific cleanup logic (Windows vs Unix)
 - [x] Test on macOS (Unix) - all tests pass
-- [x] Verify all integration tests pass locally
 - [x] Enable Windows CI in GitHub Actions
-- [x] Update README to remove Windows warning
+- [ ] Debug Windows browser launch hangs in CI
+- [ ] Verify all integration tests pass on Windows CI
+- [ ] Update README to remove Windows warning (when tests pass)
 - [x] Document platform-specific behavior in code
 
 **Files Modified:**
 - `crates/playwright-core/src/server.rs` - Platform-specific cleanup in shutdown() and kill()
 - `crates/playwright-core/src/transport.rs` - Documentation on platform-specific cleanup
 - `crates/playwright-core/tests/windows_cleanup_test.rs` - New tests for cleanup verification
-- `.github/workflows/test.yml` - Enabled full integration tests on Windows
-- `README.md` - Removed Windows known issue warning
+- `.github/workflows/test.yml` - Enabled Windows tests in CI
+- `.github/workflows/test-debug.yml` - Created debug workflow for Windows testing
 
 **Implementation Summary:**
 
-The Windows stdio cleanup issue was caused by tokio's use of a blocking threadpool for child process stdio on Windows. When stdio pipes weren't properly closed before terminating the process, the cleanup would hang indefinitely.
+Attempted to fix Windows stdio cleanup issue caused by tokio's use of a blocking threadpool for child process stdio. Implemented platform-specific cleanup for the Playwright server process, but Windows CI tests reveal a deeper issue: browser launches themselves are hanging.
 
-**Solution Implemented:**
+**Solution Implemented So Far:**
 1. **Platform-specific cleanup in `server.rs`:**
    - On Windows: Explicitly close stdin, stdout, stderr before calling `kill()`
    - On Windows: Use timeout-based wait (5 seconds) to prevent permanent hangs
@@ -97,16 +98,35 @@ The Windows stdio cleanup issue was caused by tokio's use of a blocking threadpo
    - `test_server_kill_no_hang` - Tests force-kill path
    - `test_connection_cleanup_no_hang` - Tests cleanup when transport owns stdio handles
 
-3. **Documentation:**
-   - Added rustdoc explaining platform-specific behavior
-   - Noted Windows limitation in transport documentation
-   - Referenced tokio's blocking threadpool behavior on Windows
+3. **Windows CI Configuration:**
+   - Separate browser cache paths for Windows (`~\AppData\Local\ms-playwright`)
+   - Added `install-deps` step for Windows browser dependencies
+   - Configured `--test-threads=1` for Windows tests
+   - 30-minute timeout for Windows test execution
 
-**Success Criteria:** ✅ All Met
-- All tests pass on macOS (Unix) - verified locally
-- No stdio cleanup hangs in tests (5-second timeout used)
-- Windows CI enabled and configured
-- Code documented with platform differences
+**Current Issue:**
+
+Windows CI hangs during browser launch in tests (e.g., `action_options_test`). Browser installation completes successfully, but when tests attempt to launch browsers, the process hangs indefinitely.
+
+**Hypothesis:**
+The issue is not just about Playwright server stdio cleanup, but about how browsers are launched and managed on Windows. Possible causes:
+- Browser process stdio pipe handling on Windows
+- Browser process creation/cleanup on Windows
+- Windows CI environment differences (sandboxing, permissions, etc.)
+- Need for Windows-specific browser launch options
+
+**Next Steps:**
+1. Use test-debug.yml workflow to isolate the issue with single test
+2. Add logging to understand where browser launch hangs
+3. Consider Windows-specific browser launch options
+4. Investigate if browsers need different stdio configuration on Windows
+
+**Success Criteria:** ⬜ Not Yet Met
+- All tests pass on macOS (Unix) - ✅ verified locally
+- All tests pass on Windows CI - ❌ hangs during browser launch
+- No stdio cleanup hangs - ✅ for server, ❌ for browser processes
+- Windows CI runs without timeouts - ❌ requires manual cancellation
+- Code documented with platform differences - ✅
 
 ---
 
