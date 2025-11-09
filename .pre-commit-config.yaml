@@ -34,11 +34,12 @@ repos:
   # Rust-specific checks (matches CI exactly)
   - repo: local
     hooks:
-      # 1. Format check (same as CI: cargo fmt -- --check)
+      # 1. Format code (auto-fix)
+      # Note: CI uses cargo fmt -- --check for enforcement
       - id: cargo-fmt
         name: cargo fmt
-        description: Check Rust code formatting
-        entry: cargo fmt --all -- --check
+        description: Auto-format Rust code
+        entry: cargo fmt --all
         language: system
         types: [rust]
         pass_filenames: false

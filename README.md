@@ -199,6 +199,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     expect(input).to_have_value("user@example.com").await?;
     expect(input).to_have_value_regex(r".*@example\.com").await?;
 
+    // State assertions
+    let button = page.locator("button").await;
+    expect(button).to_be_enabled().await?;
+
+    let checkbox = page.locator("input[type='checkbox']").await;
+    expect(checkbox).to_be_checked().await?;
+
+    let text_input = page.locator("input[type='text']").await;
+    expect(text_input).to_be_editable().await?;
+
     // Custom timeout
     use std::time::Duration;
     expect(heading)
@@ -255,8 +265,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ Text assertions (`to_have_text()`, `to_contain_text()`)
 - ✅ Value assertions (`to_have_value()`)
 - ✅ Regex pattern support for all text/value assertions
+- ✅ State assertions (`to_be_enabled()`, `to_be_disabled()`, `to_be_checked()`, `to_be_unchecked()`, `to_be_editable()`)
 
-**Coming next:** State assertions (enabled, checked, editable), network interception, downloads/dialogs
+**Coming next:** Network interception, downloads/dialogs
 
 ## Installation
 

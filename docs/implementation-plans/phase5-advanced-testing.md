@@ -239,15 +239,49 @@ page.locator("input").expect().to_have_value("hello").await?;
 
 ### Slice 3: State Assertions
 
+**Status:** ✅ COMPLETE (except `to_be_focused()` - deferred)
+
 **Goal:** Implement state-based assertions (enabled, disabled, checked, editable).
 
 **Tasks:**
-- [ ] Implement to_be_enabled() / to_be_disabled()
-- [ ] Implement to_be_checked() / to_be_unchecked()
-- [ ] Implement to_be_editable()
-- [ ] Implement to_be_focused()
-- [ ] Tests for all state assertions
-- [ ] Cross-browser testing
+- [x] Implement to_be_enabled() / to_be_disabled()
+- [x] Implement to_be_checked() / to_be_unchecked()
+- [x] Implement to_be_editable()
+- Implement to_be_focused() - **DEFERRED** (requires 'expect' protocol command or evalOnSelector return values)
+- [x] Tests for all state assertions
+- [x] Cross-browser testing
+
+**Implementation Details:**
+
+**Files Created:**
+- `crates/playwright-core/tests/state_assertions_test.rs`
+
+**Files Modified:**
+- `crates/playwright-core/src/assertions.rs`
+- `crates/playwright-core/src/protocol/frame.rs` - No changes needed (used existing is_* methods)
+- `crates/playwright-core/src/protocol/locator.rs` - No changes needed (used existing is_* methods)
+
+**New Assertion Methods:**
+1. `to_be_enabled()` - Asserts element is enabled (no disabled attribute)
+2. `to_be_disabled()` - Asserts element is disabled (reuses to_be_enabled with negation)
+3. `to_be_checked()` - Asserts checkbox/radio is checked
+4. `to_be_unchecked()` - Asserts checkbox/radio is unchecked (reuses to_be_checked with negation)
+5. `to_be_editable()` - Asserts element is editable (enabled + no readonly attribute)
+6. ~~`to_be_focused()`~~ - **DEFERRED** (not in this slice)
+
+**Key Implementation Details:**
+- All assertions use existing `is_enabled()`, `is_checked()`, `is_editable()` from Locator
+- Auto-retry polling: 100ms interval, 5s default timeout
+- Negation support via `.not()` for all assertions
+- Uses negation-inversion pattern for `to_be_disabled()` and `to_be_unchecked()` (DRY principle)
+- Clear error messages with selector and timeout information
+
+**Deferred:**
+- `to_be_focused()` - Playwright doesn't expose `isFocused()` at the protocol level. The assertion exists in Playwright's test assertions API but requires:
+  - Option 1: Implementing the 'expect' protocol command (complex, touches core protocol)
+  - Option 2: Properly handling `evalOnSelector` return values (needs investigation of return value deserialization)
+  - Deferred to future slice (likely after network mocking is complete)
+  - See code comments in Frame, Locator, and assertions.rs for details
 
 ---
 

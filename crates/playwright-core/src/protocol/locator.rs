@@ -147,6 +147,8 @@ impl Locator {
         self.frame.locator_is_editable(&self.selector).await
     }
 
+    // NOTE: is_focused() is not implemented - see Frame for explanation
+
     // Action methods
 
     /// Clicks the element.

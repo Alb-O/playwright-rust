@@ -561,6 +561,239 @@ impl Expectation {
             tokio::time::sleep(self.poll_interval).await;
         }
     }
+
+    /// Asserts that the element is enabled.
+    ///
+    /// This assertion will retry until the element is enabled or timeout.
+    /// An element is enabled if it does not have the "disabled" attribute.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::{expect, protocol::Playwright};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// expect(page.locator("button").await).to_be_enabled().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// See: <https://playwright.dev/docs/test-assertions#locator-assertions-to-be-enabled>
+    pub async fn to_be_enabled(self) -> Result<()> {
+        let start = std::time::Instant::now();
+        let selector = self.locator.selector().to_string();
+
+        loop {
+            let is_enabled = self.locator.is_enabled().await?;
+
+            // Check if condition matches (with negation support)
+            let matches = if self.negate { !is_enabled } else { is_enabled };
+
+            if matches {
+                return Ok(());
+            }
+
+            // Check timeout
+            if start.elapsed() >= self.timeout {
+                let message = if self.negate {
+                    format!(
+                        "Expected element '{}' NOT to be enabled, but it was enabled after {:?}",
+                        selector, self.timeout
+                    )
+                } else {
+                    format!(
+                        "Expected element '{}' to be enabled, but it was not enabled after {:?}",
+                        selector, self.timeout
+                    )
+                };
+                return Err(crate::error::Error::AssertionTimeout(message));
+            }
+
+            // Wait before next poll
+            tokio::time::sleep(self.poll_interval).await;
+        }
+    }
+
+    /// Asserts that the element is disabled.
+    ///
+    /// This assertion will retry until the element is disabled or timeout.
+    /// An element is disabled if it has the "disabled" attribute.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::{expect, protocol::Playwright};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// expect(page.locator("button").await).to_be_disabled().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// See: <https://playwright.dev/docs/test-assertions#locator-assertions-to-be-disabled>
+    pub async fn to_be_disabled(self) -> Result<()> {
+        // to_be_disabled is the opposite of to_be_enabled
+        // Use negation to reuse the enabled logic
+        let negated = Expectation {
+            negate: !self.negate, // Flip negation
+            ..self
+        };
+        negated.to_be_enabled().await
+    }
+
+    /// Asserts that the checkbox or radio button is checked.
+    ///
+    /// This assertion will retry until the element is checked or timeout.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::{expect, protocol::Playwright};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// expect(page.locator("input[type=checkbox]").await).to_be_checked().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// See: <https://playwright.dev/docs/test-assertions#locator-assertions-to-be-checked>
+    pub async fn to_be_checked(self) -> Result<()> {
+        let start = std::time::Instant::now();
+        let selector = self.locator.selector().to_string();
+
+        loop {
+            let is_checked = self.locator.is_checked().await?;
+
+            // Check if condition matches (with negation support)
+            let matches = if self.negate { !is_checked } else { is_checked };
+
+            if matches {
+                return Ok(());
+            }
+
+            // Check timeout
+            if start.elapsed() >= self.timeout {
+                let message = if self.negate {
+                    format!(
+                        "Expected element '{}' NOT to be checked, but it was checked after {:?}",
+                        selector, self.timeout
+                    )
+                } else {
+                    format!(
+                        "Expected element '{}' to be checked, but it was not checked after {:?}",
+                        selector, self.timeout
+                    )
+                };
+                return Err(crate::error::Error::AssertionTimeout(message));
+            }
+
+            // Wait before next poll
+            tokio::time::sleep(self.poll_interval).await;
+        }
+    }
+
+    /// Asserts that the checkbox or radio button is unchecked.
+    ///
+    /// This assertion will retry until the element is unchecked or timeout.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::{expect, protocol::Playwright};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// expect(page.locator("input[type=checkbox]").await).to_be_unchecked().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// See: <https://playwright.dev/docs/test-assertions#locator-assertions-to-be-checked>
+    pub async fn to_be_unchecked(self) -> Result<()> {
+        // to_be_unchecked is the opposite of to_be_checked
+        // Use negation to reuse the checked logic
+        let negated = Expectation {
+            negate: !self.negate, // Flip negation
+            ..self
+        };
+        negated.to_be_checked().await
+    }
+
+    /// Asserts that the element is editable.
+    ///
+    /// This assertion will retry until the element is editable or timeout.
+    /// An element is editable if it is enabled and does not have the "readonly" attribute.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::{expect, protocol::Playwright};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let playwright = Playwright::launch().await?;
+    /// # let browser = playwright.chromium().launch().await?;
+    /// # let page = browser.new_page().await?;
+    /// expect(page.locator("input").await).to_be_editable().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// See: <https://playwright.dev/docs/test-assertions#locator-assertions-to-be-editable>
+    pub async fn to_be_editable(self) -> Result<()> {
+        let start = std::time::Instant::now();
+        let selector = self.locator.selector().to_string();
+
+        loop {
+            let is_editable = self.locator.is_editable().await?;
+
+            // Check if condition matches (with negation support)
+            let matches = if self.negate {
+                !is_editable
+            } else {
+                is_editable
+            };
+
+            if matches {
+                return Ok(());
+            }
+
+            // Check timeout
+            if start.elapsed() >= self.timeout {
+                let message = if self.negate {
+                    format!(
+                        "Expected element '{}' NOT to be editable, but it was editable after {:?}",
+                        selector, self.timeout
+                    )
+                } else {
+                    format!(
+                        "Expected element '{}' to be editable, but it was not editable after {:?}",
+                        selector, self.timeout
+                    )
+                };
+                return Err(crate::error::Error::AssertionTimeout(message));
+            }
+
+            // Wait before next poll
+            tokio::time::sleep(self.poll_interval).await;
+        }
+    }
+
+    // NOTE: to_be_focused() is not implemented yet - Playwright doesn't expose isFocused() at the protocol level.
+    // The assertion exists in Playwright's test assertions API but requires implementing the 'expect'
+    // protocol command or properly handling evalOnSelector return values.
+    // See: https://playwright.dev/docs/test-assertions#locator-assertions-to-be-focused
+    // Deferred to future implementation (likely Phase 5 Slice 4+).
 }
 
 #[cfg(test)]

@@ -511,6 +511,10 @@ impl Frame {
         Ok(response.value)
     }
 
+    // NOTE: is_focused() is not implemented - Playwright doesn't expose isFocused() at the protocol level.
+    // The to_be_focused() assertion exists in test assertions API but requires implementing the 'expect'
+    // protocol command or properly handling evalOnSelector return values. Deferred to future implementation.
+
     // Action delegate methods
 
     /// Clicks the element matching the selector.
