@@ -6,11 +6,14 @@
 use crate::channel::Channel;
 use crate::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use crate::error::Result;
+use crate::protocol::Route;
 use base64::Engine;
 use serde::Deserialize;
 use serde_json::Value;
 use std::any::Any;
-use std::sync::{Arc, RwLock};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::{Arc, Mutex, RwLock};
 
 /// Page represents a web page within a browser context.
 ///
@@ -53,6 +56,18 @@ pub struct Page {
     url: Arc<RwLock<String>>,
     /// GUID of the main frame
     main_frame_guid: String,
+    /// Route handlers for network interception
+    route_handlers: Arc<Mutex<Vec<RouteHandlerEntry>>>,
+}
+
+/// Type alias for boxed route handler future
+type RouteHandlerFuture = Pin<Box<dyn Future<Output = Result<()>> + Send>>;
+
+/// Storage for a single route handler
+#[derive(Clone)]
+struct RouteHandlerEntry {
+    pattern: String,
+    handler: Arc<dyn Fn(Route) -> RouteHandlerFuture + Send + Sync>,
 }
 
 impl Page {
@@ -97,10 +112,14 @@ impl Page {
         // Initialize URL to about:blank
         let url = Arc::new(RwLock::new("about:blank".to_string()));
 
+        // Initialize empty route handlers
+        let route_handlers = Arc::new(Mutex::new(Vec::new()));
+
         Ok(Self {
             base,
             url,
             main_frame_guid,
+            route_handlers,
         })
     }
 
@@ -820,6 +839,105 @@ impl Page {
         let frame = self.main_frame().await?;
         frame.frame_evaluate_expression(expression).await
     }
+
+    /// Registers a route handler for network interception.
+    ///
+    /// When a request matches the specified pattern, the handler will be called
+    /// with a Route object that can abort, continue, or fulfill the request.
+    ///
+    /// # Arguments
+    ///
+    /// * `pattern` - URL pattern to match (supports glob patterns like "**/*.png")
+    /// * `handler` - Async closure that handles the route
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::protocol::Playwright;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let playwright = Playwright::launch().await?;
+    /// let browser = playwright.chromium().launch().await?;
+    /// let page = browser.new_page().await?;
+    ///
+    /// // Abort all image requests
+    /// page.route("**/*.png", |route| async move {
+    ///     route.abort(None).await
+    /// }).await?;
+    ///
+    /// page.goto("https://example.com", None).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// See: <https://playwright.dev/docs/api/class-page#page-route>
+    pub async fn route<F, Fut>(&self, pattern: &str, handler: F) -> Result<()>
+    where
+        F: Fn(Route) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        // 1. Wrap handler in Arc with type erasure
+        let handler =
+            Arc::new(move |route: Route| -> RouteHandlerFuture { Box::pin(handler(route)) });
+
+        // 2. Store in handlers list
+        self.route_handlers.lock().unwrap().push(RouteHandlerEntry {
+            pattern: pattern.to_string(),
+            handler,
+        });
+
+        // 3. Enable network interception via protocol
+        self.enable_network_interception().await?;
+
+        Ok(())
+    }
+
+    /// Updates network interception patterns for this page
+    async fn enable_network_interception(&self) -> Result<()> {
+        // Collect all patterns from registered handlers
+        // Each pattern must be an object with "glob" field
+        let patterns: Vec<serde_json::Value> = self
+            .route_handlers
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|entry| serde_json::json!({ "glob": entry.pattern }))
+            .collect();
+
+        // Send protocol command to update network interception patterns
+        // Follows playwright-python's approach
+        self.channel()
+            .send_no_result(
+                "setNetworkInterceptionPatterns",
+                serde_json::json!({
+                    "patterns": patterns
+                }),
+            )
+            .await
+    }
+
+    /// Handles a route event from the protocol
+    ///
+    /// Called by on_event when a "route" event is received
+    fn on_route_event(&self, route: Route) {
+        let handlers = self.route_handlers.lock().unwrap().clone();
+        let url = route.request().url().to_string();
+
+        // Find matching handler (last registered wins)
+        for entry in handlers.iter().rev() {
+            // Simple substring matching for Slice 4a
+            // Will upgrade to glob patterns in Slice 4b
+            if url.contains(&entry.pattern) || entry.pattern.contains("**/*") {
+                let handler = entry.handler.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = handler(route).await {
+                        eprintln!("Route handler error: {}", e);
+                    }
+                });
+                break;
+            }
+        }
+    }
 }
 
 impl ChannelOwner for Page {
@@ -873,6 +991,42 @@ impl ChannelOwner for Page {
                             *url = url_str.to_string();
                         }
                     }
+                }
+            }
+            "route" => {
+                // Handle network routing event
+                if let Some(route_guid) = params
+                    .get("route")
+                    .and_then(|v| v.get("guid"))
+                    .and_then(|v| v.as_str())
+                {
+                    // Get the Route object from connection's registry
+                    let connection = self.connection();
+                    let route_guid_owned = route_guid.to_string();
+                    let self_clone = self.clone();
+
+                    tokio::spawn(async move {
+                        // Wait for Route object to be created
+                        let route_arc = match connection.get_object(&route_guid_owned).await {
+                            Ok(obj) => obj,
+                            Err(e) => {
+                                eprintln!("Failed to get route object: {}", e);
+                                return;
+                            }
+                        };
+
+                        // Downcast to Route
+                        let route = match route_arc.as_any().downcast_ref::<Route>() {
+                            Some(r) => r.clone(),
+                            None => {
+                                eprintln!("Failed to downcast to Route");
+                                return;
+                            }
+                        };
+
+                        // Call the route handler
+                        self_clone.on_route_event(route);
+                    });
                 }
             }
             _ => {

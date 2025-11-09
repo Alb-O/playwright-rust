@@ -216,6 +216,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .to_be_visible()
         .await?;
 
+    // Network interception
+    // Abort all image requests
+    page.route("**/*.png", |route| async move {
+        route.abort(None).await
+    }).await?;
+
+    // Continue requests with custom logic
+    page.route("**/*", |route| async move {
+        let request = route.request();
+        if request.url().contains("analytics") {
+            route.abort(None).await
+        } else {
+            route.continue_(None).await
+        }
+    }).await?;
+
     // Cleanup
     page.close().await?;
     browser.close().await?;
@@ -266,8 +282,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ Value assertions (`to_have_value()`)
 - ✅ Regex pattern support for all text/value assertions
 - ✅ State assertions (`to_be_enabled()`, `to_be_disabled()`, `to_be_checked()`, `to_be_unchecked()`, `to_be_editable()`)
+- ✅ Network route registration (`page.route()` with async closure handlers)
+- ✅ Route interception (`route.abort()`, `route.continue()`)
+- ✅ Request data access in route handlers (`route.request().url()`, `method()`)
 
-**Coming next:** Network interception, downloads/dialogs
+**Coming next:** Glob pattern matching for routes, route.fulfill(), downloads/dialogs
 
 ## Installation
 

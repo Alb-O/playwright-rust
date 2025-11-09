@@ -287,16 +287,124 @@ page.locator("input").expect().to_have_value("hello").await?;
 
 ### Slice 4: Network Route API Foundation
 
+**Status:** 🚧 In Progress - Slice 4a Complete, 4b and 4c Pending
+
 **Goal:** Implement page.route() for basic request interception.
 
+**Why Split into Sub-slices:** Network routing requires handling async closures in Rust, which has architectural complexity. Breaking into 3 sub-slices allows incremental validation of the architecture.
+
+**Architecture Research:** See [docs/technical/phase5-slice4-routing-architecture.md](../technical/phase5-slice4-routing-architecture.md) for detailed analysis of 3 routing architecture options and rationale for choosing callback-based approach with boxed futures.
+
+---
+
+#### Slice 4a: Basic Route Infrastructure
+
+**Status:** ✅ COMPLETE
+
+**Goal:** Get ONE test passing with minimal implementation - prove architecture end-to-end.
+
 **Tasks:**
-- [ ] Research Playwright route API
-- [ ] Implement route matching (URL patterns, regex)
-- [ ] Implement route handlers (closure-based)
-- [ ] Implement route.continue()
-- [ ] Implement route.abort()
-- [ ] Basic route tests
-- [ ] Cross-browser testing
+- [x] Research Playwright route API (page.route, Route class methods)
+- [x] Design Rust API for route matching (chose callback-based with boxed futures)
+- [x] Document architecture decision in technical docs
+- [x] Add route_handlers storage to Page struct
+- [x] Implement page.route() with async closure support
+- [x] Implement simple pattern matching (substring + wildcard for initial version)
+- [x] Handle "route" event from protocol and invoke handlers
+- [x] Implement Route protocol object (abort, continue, request access)
+- [x] Register Route in object factory
+- [x] Basic protocol integration (setNetworkInterceptionPatterns command)
+- [x] Create simplified integration tests
+- [x] Verify basic routing works (registration and continue tests passing)
+
+**Implementation Details:**
+
+**Files Created:**
+- `docs/technical/phase5-slice4-routing-architecture.md` - Architecture research and decision
+- `crates/playwright-core/src/protocol/route.rs` - Route protocol object
+- `crates/playwright-core/tests/network_route_test_simple.rs` - Simplified integration tests
+
+**Files Modified:**
+- `crates/playwright-core/src/protocol/page.rs` - Added route() method, handler storage, event handling
+- `crates/playwright-core/src/protocol/request.rs` - Added url() and method() accessors
+- `crates/playwright-core/src/object_factory.rs` - Registered Route
+- `crates/playwright-core/src/protocol/mod.rs` - Exported Route and ContinueOptions
+
+**Test Results:**
+- `test_route_registration` - ✅ Verifies route handler registration
+- `test_route_continue` - ✅ Verifies route.continue() works correctly
+
+**Key Implementation Details:**
+- Architecture: Callback-based with boxed futures (Arc<dyn Fn(Route) -> Pin<Box<dyn Future>>>)
+- Handler storage: Arc<Mutex<Vec<RouteHandlerEntry>>>
+- Protocol command: setNetworkInterceptionPatterns with glob objects
+- Pattern matching: Simple substring + wildcard (will upgrade in 4b)
+- Handler invocation: Independent execution via tokio::spawn
+- Last-registered-wins pattern priority
+- Route.abort() with error codes
+- Route.continue() with isFallback parameter
+- Request.url() and Request.method() for routing logic
+
+**Deferred to Slice 4b:**
+- Full glob pattern matching (currently substring + wildcard)
+- Multiple pattern tests
+- Pattern priority verification
+
+---
+
+#### Slice 4b: Pattern Matching
+
+**Status:** ⏳ Pending
+
+**Goal:** Support proper glob patterns for production use.
+
+**Tasks:**
+- [ ] Add `glob` crate dependency to Cargo.toml
+- [ ] Replace substring matching with glob pattern matching
+- [ ] Support multiple handlers with priority (last registered wins)
+- [ ] Test pattern edge cases (wildcards, subdirectories, extensions)
+- [ ] Implement pattern matching tests from original test suite
+
+**Test Targets:**
+- `test_route_pattern_matching` - Multiple routes with different patterns
+- `test_route_conditional_abort` - Conditional logic in handler based on URL
+
+**Why Second:** Builds on working infrastructure, adds production-ready matching
+
+**Files to Modify:**
+- `crates/playwright-core/Cargo.toml` - Add glob dependency
+- `crates/playwright-core/src/protocol/page.rs` - Upgrade pattern matching in on_route_event()
+
+---
+
+#### Slice 4c: Cross-browser & Polish
+
+**Status:** ⏳ Pending
+
+**Goal:** Production readiness with cross-browser support.
+
+**Tasks:**
+- [ ] Verify route.continue() works correctly across browsers
+- [ ] Cross-browser testing (Firefox, WebKit)
+- [ ] Error handling (handler errors, protocol errors)
+- [ ] Polish error messages
+- [ ] Restore original comprehensive test suite
+- [ ] Add evaluate() return value support (needed for full test suite)
+
+**Test Targets:**
+- `test_route_abort_basic` - Single pattern abort
+- `test_route_abort_with_error_code` - Error code variants
+- `test_route_continue_basic` - Request continuation
+- `test_route_request_access` - Handler can access request
+- `test_route_abort_firefox` - Firefox compatibility
+- `test_route_continue_webkit` - WebKit compatibility
+
+**Why Last:** Completes feature with quality and compatibility
+
+**Files to Modify:**
+- `crates/playwright-core/src/protocol/route.rs` - Error handling improvements
+- `crates/playwright-core/src/protocol/page.rs` - Add evaluate() with return values
+- `crates/playwright-core/tests/network_route_test.rs` - Restore full test suite
 
 ---
 

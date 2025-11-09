@@ -40,6 +40,26 @@ impl Request {
 
         Ok(Self { base })
     }
+
+    /// Returns the URL of the request.
+    ///
+    /// See: <https://playwright.dev/docs/api/class-request#request-url>
+    pub fn url(&self) -> &str {
+        self.initializer()
+            .get("url")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+    }
+
+    /// Returns the HTTP method of the request (GET, POST, etc.).
+    ///
+    /// See: <https://playwright.dev/docs/api/class-request#request-method>
+    pub fn method(&self) -> &str {
+        self.initializer()
+            .get("method")
+            .and_then(|v| v.as_str())
+            .unwrap_or("GET")
+    }
 }
 
 impl ChannelOwner for Request {

@@ -15,7 +15,7 @@
 use crate::channel_owner::{ChannelOwner, ParentOrConnection};
 use crate::error::{Error, Result};
 use crate::protocol::{
-    Browser, BrowserContext, BrowserType, Frame, Page, Playwright, Request, ResponseObject,
+    Browser, BrowserContext, BrowserType, Frame, Page, Playwright, Request, ResponseObject, Route,
 };
 use serde_json::Value;
 use std::sync::Arc;
@@ -177,6 +177,20 @@ pub async fn create_object(
             };
 
             Arc::new(Request::new(parent_owner, type_name, guid, initializer)?)
+        }
+
+        "Route" => {
+            // Route has Frame as parent (created during network interception)
+            let parent_owner = match parent {
+                ParentOrConnection::Parent(p) => p,
+                ParentOrConnection::Connection(_) => {
+                    return Err(Error::ProtocolError(
+                        "Route must have Frame as parent".to_string(),
+                    ))
+                }
+            };
+
+            Arc::new(Route::new(parent_owner, type_name, guid, initializer)?)
         }
 
         "Response" => {

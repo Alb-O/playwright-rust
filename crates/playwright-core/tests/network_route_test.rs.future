@@ -1,0 +1,351 @@
+// Integration tests for Network Routing (Phase 5, Slice 4)
+//
+// Following TDD: Write tests first (Red), then implement (Green)
+//
+// Tests cover:
+// - page.route() with string patterns
+// - route.abort() with error codes
+// - route.continue() to allow requests
+// - Access to request data in handler
+// - Multiple route handlers
+
+mod test_server;
+
+use playwright_core::protocol::Playwright;
+use test_server::TestServer;
+
+#[tokio::test]
+async fn test_route_abort_basic() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .chromium()
+        .launch()
+        .await
+        .expect("Failed to launch browser");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    // Test: Route handler can abort image requests
+    page.route("**/*.png", |route| async move {
+        route.abort(None).await
+    })
+    .await
+    .expect("Failed to set up route");
+
+    page.goto(&format!("{}/", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    // Try to load an image - should fail due to abort
+    let result = page
+        .evaluate(
+            r#"
+        fetch('/image.png')
+            .then(() => 'success')
+            .catch(() => 'failed')
+        "#,
+        )
+        .await
+        .expect("Failed to evaluate");
+
+    assert_eq!(result, "failed", "Image request should have been aborted");
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+#[tokio::test]
+async fn test_route_abort_with_error_code() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .chromium()
+        .launch()
+        .await
+        .expect("Failed to launch browser");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    // Test: Route can abort with specific error code
+    page.route("**/data.json", |route| async move {
+        route.abort(Some("accessdenied")).await
+    })
+    .await
+    .expect("Failed to set up route");
+
+    page.goto(&format!("{}/", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    let result = page
+        .evaluate(
+            r#"
+        fetch('/data.json')
+            .then(() => 'success')
+            .catch(err => err.message)
+        "#,
+        )
+        .await
+        .expect("Failed to evaluate");
+
+    assert!(
+        result.contains("Failed") || result.contains("failed"),
+        "Request should have failed"
+    );
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+#[tokio::test]
+async fn test_route_continue_basic() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .chromium()
+        .launch()
+        .await
+        .expect("Failed to launch browser");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    // Test: Route can continue requests unchanged
+    page.route("**/*", |route| async move {
+        route.continue_(None).await
+    })
+    .await
+    .expect("Failed to set up route");
+
+    let response = page
+        .goto(&format!("{}/", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    assert_eq!(
+        response.status(),
+        200,
+        "Request should succeed when continued"
+    );
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+#[tokio::test]
+async fn test_route_request_access() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .chromium()
+        .launch()
+        .await
+        .expect("Failed to launch browser");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    // Test: Route handler can access request data
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(1);
+
+    page.route("**/button.html", move |route| {
+        let tx = tx.clone();
+        async move {
+            let request = route.request();
+            let url = request.url();
+            tx.send(url.to_string()).await.ok();
+            route.continue_(None).await
+        }
+    })
+    .await
+    .expect("Failed to set up route");
+
+    page.goto(&format!("{}/button.html", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    // Verify the route handler saw the request
+    let captured_url = rx.recv().await.expect("Should receive URL from handler");
+    assert!(
+        captured_url.contains("/button.html"),
+        "Handler should see request URL"
+    );
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+#[tokio::test]
+async fn test_route_pattern_matching() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .chromium()
+        .launch()
+        .await
+        .expect("Failed to launch browser");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    // Test: Multiple routes with different patterns
+    page.route("**/*.css", |route| async move { route.abort(None).await })
+        .await
+        .expect("Failed to set up CSS route");
+
+    page.route("**/*.js", |route| async move {
+        route.abort(None).await
+    })
+    .await
+    .expect("Failed to set up JS route");
+
+    page.route("**/*.html", |route| async move {
+        route.continue_(None).await
+    })
+    .await
+    .expect("Failed to set up HTML route");
+
+    // Navigate should work (HTML continues)
+    let response = page
+        .goto(&format!("{}/", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+    assert_eq!(response.status(), 200);
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+#[tokio::test]
+async fn test_route_conditional_abort() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .chromium()
+        .launch()
+        .await
+        .expect("Failed to launch browser");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    // Test: Conditionally abort based on request URL
+    page.route("**/*", |route| async move {
+        let request = route.request();
+        if request.url().contains("block-me") {
+            route.abort(None).await
+        } else {
+            route.continue_(None).await
+        }
+    })
+    .await
+    .expect("Failed to set up route");
+
+    page.goto(&format!("{}/", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    // Request with "block-me" should fail
+    let blocked = page
+        .evaluate(
+            r#"
+        fetch('/block-me')
+            .then(() => 'success')
+            .catch(() => 'failed')
+        "#,
+        )
+        .await
+        .expect("Failed to evaluate");
+    assert_eq!(blocked, "failed");
+
+    // Normal request should succeed
+    let allowed = page
+        .evaluate(
+            r#"
+        fetch('/allowed')
+            .then(() => 'success')
+            .catch(() => 'failed')
+        "#,
+        )
+        .await
+        .expect("Failed to evaluate");
+    assert_eq!(allowed, "success");
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+// Cross-browser tests
+
+#[tokio::test]
+async fn test_route_abort_firefox() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .firefox()
+        .launch()
+        .await
+        .expect("Failed to launch Firefox");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    page.route("**/*.png", |route| async move {
+        route.abort(None).await
+    })
+    .await
+    .expect("Failed to set up route");
+
+    page.goto(&format!("{}/", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    let result = page
+        .evaluate(
+            r#"
+        fetch('/image.png')
+            .then(() => 'success')
+            .catch(() => 'failed')
+        "#,
+        )
+        .await
+        .expect("Failed to evaluate");
+
+    assert_eq!(result, "failed", "Should work in Firefox");
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
+
+#[tokio::test]
+async fn test_route_continue_webkit() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .webkit()
+        .launch()
+        .await
+        .expect("Failed to launch WebKit");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    page.route("**/*", |route| async move {
+        route.continue_(None).await
+    })
+    .await
+    .expect("Failed to set up route");
+
+    let response = page
+        .goto(&format!("{}/", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    assert_eq!(response.status(), 200, "Should work in WebKit");
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}

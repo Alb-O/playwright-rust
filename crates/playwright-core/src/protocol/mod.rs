@@ -26,6 +26,7 @@ pub mod playwright;
 pub mod request;
 pub mod response;
 pub mod root;
+pub mod route;
 pub mod screenshot;
 pub mod select_option;
 
@@ -47,5 +48,6 @@ pub use playwright::Playwright;
 pub use request::Request;
 pub use response::ResponseObject;
 pub use root::Root;
+pub use route::{ContinueOptions, Route};
 pub use screenshot::{ScreenshotClip, ScreenshotOptions, ScreenshotType};
 pub use select_option::SelectOption;
