@@ -290,7 +290,45 @@ A feature is complete when:
 - ✅ Cross-browser tests pass (or limitations documented)
 - ✅ Rustdoc documentation complete with examples
 - ✅ Code follows project conventions (rustfmt, clippy clean)
-- ✅ Implementation plan updated (if in active phase)
+- ✅ Documentation updated via Documentation Maintenance Agent
+
+## Documentation Handoff
+
+**IMPORTANT**: At the end of feature implementation, ALWAYS invoke the Documentation Maintenance Agent to update documentation:
+
+```
+Task(
+  subagent_type="documentation-maintenance",
+  description="Update docs for {feature} completion",
+  prompt="""
+  Update documentation to reflect completion of {feature}.
+
+  **Context:**
+  - Just completed implementation of {feature}
+  - All {N} tests passing
+  - Implementation is production-ready
+
+  **What was implemented:**
+  [List files created and modified with brief descriptions]
+
+  **Key Architectural Insights:**
+  [Any important design decisions, patterns, or gotchas discovered]
+
+  **Test Coverage:**
+  [Summary of test results]
+
+  **API Compatibility:**
+  [Compatibility status with Playwright]
+
+  **Tasks:**
+  - Update implementation plan if in active phase
+  - Update README if feature is user-facing (following Just-In-Time philosophy)
+  - Update roadmap if phase/slice completed
+  """
+)
+```
+
+This ensures documentation is kept current without cluttering the TDD workflow.
 
 ## Your Personality
 

@@ -75,7 +75,28 @@ Ensure that documentation stays current, accurate, and follows the strict docume
 
 **Philosophy**: The code is self-documenting. Implementation plans document WHY and HOW (architecture), not WHAT (files/tests/methods).
 
-### 4. docs/adr/####-*.md - Architecture Decision Records
+### 4. crates/playwright/examples/*.rs - Working Examples
+**Purpose**: Demonstrate features through runnable code
+
+**Content Rules**:
+- ✅ One example per major feature area
+- ✅ Must compile and run successfully
+- ✅ Clear comments explaining what's demonstrated
+- ✅ Realistic use cases (not minimal "hello world")
+- ✅ Show best practices
+- ❌ NO outdated APIs
+- ❌ NO unimplemented features
+
+**Update Triggers**:
+- New feature completes (create or update example)
+- API changes (update affected examples)
+- Before release (verify all examples compile and run)
+
+**Update Frequency**: Medium (when features change)
+
+**Philosophy**: Examples are executable documentation. They must always work with current code.
+
+### 5. docs/adr/####-*.md - Architecture Decision Records
 **Purpose**: Document significant architectural decisions
 
 **Content Rules**:
@@ -92,7 +113,7 @@ Ensure that documentation stays current, accurate, and follows the strict docume
 
 **Update Frequency**: Low (only for significant decisions)
 
-### 5. CHANGELOG.md - Version History
+### 6. CHANGELOG.md - Version History
 **Purpose**: Track changes for users and contributors
 
 **Content Rules**:
@@ -131,13 +152,19 @@ Ensure that documentation stays current, accurate, and follows the strict docume
    - Update the working example if it can demonstrate new features
    - Keep it brief and focused on current functionality
 
-3. **Update CHANGELOG.md**:
+3. **Check examples** (`crates/playwright/examples/`):
+   - Verify existing examples still compile and run
+   - Identify if new examples are needed for phase features
+   - Suggest creating examples for major new features
+   - Flag outdated examples that use old APIs
+
+4. **Update CHANGELOG.md** (if exists):
    - Review git commits since last update
    - Add entries under `## [Unreleased]` section
    - Group by: Added, Changed, Fixed
    - Focus on user-facing changes
 
-4. **Check if version bump needed**:
+5. **Check if version bump needed**:
    - Minor version (0.x.0): New features added
    - Patch version (0.x.y): Bug fixes only
    - Suggest preparing for crates.io release
@@ -207,6 +234,14 @@ Ensure that documentation stays current, accurate, and follows the strict docume
 - [ ] NO test result lists (tests are self-documenting)
 - [ ] NO API method lists (rustdoc is source of truth)
 - [ ] Key technical decisions and protocol quirks documented
+
+### crates/playwright/examples/ Validation
+- [ ] All examples compile successfully (`cargo build --examples`)
+- [ ] Examples use current APIs (no deprecated/unimplemented features)
+- [ ] Each major feature area has an example
+- [ ] Examples include clear comments explaining what they demonstrate
+- [ ] Examples show realistic use cases (not just minimal code)
+- [ ] Examples follow Rust best practices
 
 ### CHANGELOG.md Validation
 - [ ] Follows Keep a Changelog format

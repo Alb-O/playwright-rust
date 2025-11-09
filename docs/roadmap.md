@@ -4,7 +4,7 @@
 
 **Architecture:** JSON-RPC communication with Playwright Node.js server (same as all official bindings)
 
-**Status:** Phase 5 in progress
+**Status:** Phase 5 complete (2025-11-09)
 
 ---
 
@@ -17,8 +17,8 @@ This roadmap outlines the path to a production-ready `playwright-rust` library. 
 - ✅ **v0.2.0** - Phase 2 complete (Browser API)
 - ✅ **v0.3.0** - Phase 3 complete (Page Interactions)
 - ✅ **v0.4.0** - Phase 4 complete (Options & ElementHandles)
-- 🚀 **v0.5.0** - Phase 5 next (Advanced Testing Features)
-- **v0.6.0** - Phase 6 (Production Hardening)
+- ✅ **v0.5.0** - Phase 5 complete (Advanced Testing Features) - 2025-11-09
+- 🚀 **v0.6.0** - Phase 6 next (Production Hardening)
 - **v1.0.0** - Stable release, ready for broad adoption
 
 ---
@@ -97,21 +97,29 @@ This roadmap outlines the path to a production-ready `playwright-rust` library. 
 
 ---
 
-## Phase 5: Advanced Testing Features - See [phase5-advanced-testing.md](./implementation-plans/phase5-advanced-testing.md)
+## Phase 5: Advanced Testing Features ✅ Complete
 
-**Goal:** Implement advanced testing features including assertions, network interception, mobile emulation, and recording capabilities.
+**Goal:** Implement advanced testing features including assertions, network interception, and testing utilities.
 
-**Status:** In Progress
+**Status:** ✅ Complete (2025-11-09) - See [phase5-advanced-testing.md](./implementation-plans/phase5-advanced-testing.md)
 
-**Key Deliverables:**
-- Assertions: `expect(locator).to_be_visible()` with auto-retry
-- Network interception: Request/response handling
-- Route mocking: `page.route()` API
-- Mobile emulation: Device descriptors
-- Videos: Recording support
-- Tracing: Playwright trace integration
-- Downloads: File download handling
-- Dialogs: Alert/confirm/prompt handling
+**Delivered:**
+- Assertions: `expect(locator).to_be_visible()` with auto-retry (5s default timeout, 100ms polling)
+- Text assertions: `to_have_text()`, `to_contain_text()` with regex pattern support
+- Value assertions: `to_have_value()` with regex pattern support
+- State assertions: `to_be_enabled()`, `to_be_disabled()`, `to_be_checked()`, `to_be_unchecked()`, `to_be_editable()`
+- Negation support: `.not()` for all assertions
+- Custom timeouts: `.with_timeout()` configuration
+- Network interception: `page.route()` with async closure handlers
+- Route handling: `route.abort()`, `route.continue()`, `route.fulfill()`
+- Response mocking: Custom status, headers, body (works for API/fetch, main document needs investigation)
+- JSON helpers: `.json()` for automatic serialization
+- Glob pattern matching: `**/*.png`, `**/*`, etc.
+- Request data access: `route.request().url()`, `method()`
+- Downloads: Event handling, save functionality, metadata access
+- Dialogs: Alert/confirm/prompt handling with accept/dismiss
+- Convenience methods: `locator.set_checked()` for boolean-based check/uncheck
+- Cross-browser testing: All features verified on Chromium, Firefox, WebKit
 
 ---
 
@@ -219,4 +227,4 @@ Implementation plans are created when the previous phase is ~80% complete, allow
 
 ---
 
-**Last Updated:** 2025-11-08
+**Last Updated:** 2025-11-09

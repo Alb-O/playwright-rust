@@ -271,6 +271,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         route.fulfill(Some(options)).await
     }).await?;
 
+    // Handle downloads
+    use tokio::sync::oneshot;
+    let (tx, rx) = oneshot::channel();
+
+    page.on_download(move |download| {
+        let tx = tx;
+        async move {
+            println!("Download started: {}", download.url());
+            println!("Suggested filename: {}", download.suggested_filename());
+
+            // Save to a specific path
+            download.save_as("./downloaded-file.pdf").await?;
+            let _ = tx.send(());
+            Ok(())
+        }
+    });
+
+    // Trigger download (e.g., click a download link)
+    // page.locator("a#download-link").click(None).await?;
+    // rx.await.ok();
+
+    // Handle dialogs (alert, confirm, prompt)
+    page.on_dialog(|dialog| async move {
+        println!("Dialog type: {:?}", dialog.dialog_type());
+        println!("Dialog message: {}", dialog.message());
+
+        // Accept the dialog
+        dialog.accept(None).await?;
+
+        // Or dismiss it
+        // dialog.dismiss().await?;
+
+        // For prompts, provide input
+        // dialog.accept(Some("User input text".to_string())).await?;
+
+        Ok(())
+    });
+
+    // Checkbox convenience method
+    let checkbox = page.locator("input[type='checkbox']").await;
+    checkbox.set_checked(true, None).await?;  // Checks if unchecked
+    checkbox.set_checked(false, None).await?; // Unchecks if checked
+
     // Cleanup
     page.close().await?;
     browser.close().await?;
@@ -331,8 +374,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ⚠️ Response mocking (`route.fulfill()` with status, headers, body) - Works for API/fetch, main document navigation needs investigation
 - ✅ JSON response helpers (`.json()` with automatic serialization)
 - ✅ Custom status codes and headers in mocked responses
+- ✅ Download handling (`page.on_download()`, `download.save_as()`, metadata access)
+- ✅ Dialog handling (`page.on_dialog()`, `dialog.accept()`, `dialog.dismiss()`)
+- ✅ Dialog types: alert, confirm, prompt
+- ✅ Checkbox convenience (`locator.set_checked()` for boolean-based check/uncheck)
 
-**Coming next:** fulfill() main document support, downloads/dialogs
+**Coming next:** Production hardening, documentation, stability testing (Phase 6)
 
 ## Installation
 

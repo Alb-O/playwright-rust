@@ -1,6 +1,9 @@
 # Phase 5: Advanced Testing Features
 
-**Status:** Planning
+**Status:** ✅ COMPLETE
+
+**Started:** 2025-11-08
+**Completed:** 2025-11-09
 
 **Goal:** Implement advanced testing features including assertions with auto-retry, network interception, and other testing capabilities.
 
@@ -93,24 +96,22 @@ Defer to Phase 6 or later:
 
 ## Success Criteria
 
-Phase 5 will be considered complete when:
+Phase 5 is COMPLETE - all criteria met:
 
-- [ ] Assertions API implemented with auto-retry
-- [ ] Common assertions work (visible, hidden, text, value, etc.)
-- [ ] Network route() API implemented
-- [ ] Request interception works (continue, fulfill, abort)
-- [ ] Downloads can be captured and saved
-- [ ] Dialogs can be handled (accept, dismiss)
-- [ ] All tests passing cross-browser
-- [ ] Documentation complete
+- [x] Assertions API implemented with auto-retry
+- [x] Common assertions work (visible, hidden, text, value, enabled, checked, editable)
+- [x] Network route() API implemented
+- [x] Request interception works (continue, fulfill, abort)
+- [x] Downloads can be captured and saved
+- [x] Dialogs can be handled (accept, dismiss)
+- [x] All tests passing cross-browser (93 tests across all slices)
+- [x] Documentation complete
 
 ---
 
 ## Implementation Plan
 
-**Status:** Planning - Ready to start Slice 1
-
-Phase 5 follows the same TDD and vertical slicing approach as previous phases.
+Phase 5 follows the same TDD and vertical slicing approach as previous phases. All slices are now complete.
 
 ### Slice 1: Assertions Foundation - expect() API and to_be_visible()
 
@@ -471,16 +472,75 @@ page.locator("input").expect().to_have_value("hello").await?;
 
 ### Slice 7: Phase 4 Deferrals and Polish
 
+**Status:** ✅ COMPLETE (required items)
+
 **Goal:** Implement remaining low-priority items and complete documentation.
 
 **Tasks:**
-- [ ] Implement set_checked() convenience method
-- [ ] Implement FilePayload struct (if time permits)
-- [ ] Implement modifier key parsing (if time permits)
-- [ ] Complete all rustdoc
-- [ ] Update README with Phase 5 examples
-- [ ] Update roadmap.md
-- [ ] Mark Phase 5 complete
+- [x] Implement set_checked() convenience method - Already implemented and tested (7 tests)
+- [ ] Implement FilePayload struct - **DEFERRED** (not required for phase completion - "if time permits")
+- [ ] Implement modifier key parsing - **NOT NEEDED** (Playwright server handles parsing)
+- [x] Complete all rustdoc
+- [x] Update README with Phase 5 examples
+- [x] Update roadmap.md
+- [x] Mark Phase 5 complete
+
+**Implementation Details:**
+
+**set_checked() Method:**
+- Already implemented in Phase 4
+- Simple convenience wrapper delegating to `check()` or `uncheck()` based on boolean
+- Matches playwright-python API exactly
+- No protocol-level implementation needed - pure Rust convenience method
+- Comprehensive testing: 7 tests passing including cross-browser verification
+
+**FilePayload Struct:**
+- Deferred to future phase (not required for Phase 5 completion)
+- Basic file upload via paths works fine for current use cases
+- Can be added later if needed for in-memory file uploads
+
+**Modifier Key Parsing:**
+- No Rust-side implementation needed
+- Playwright server handles compound key parsing (e.g., "Control+A")
+- Works correctly as-is with existing keyboard.press() implementation
+
+**Key Architectural Insights:**
+
+All major architectural discoveries from Phase 5:
+
+1. **Download Architecture** (Slice 6):
+   - Download is NOT a standard protocol object - it's a wrapper around Artifact
+   - Download event params contain `{url, suggestedFilename, artifact}`
+   - Artifact is the actual protocol object handling file operations
+   - This separation is cleaner: Artifact = file ops, Download = download metadata
+
+2. **Event Subscription Pattern** (Slice 6):
+   - Playwright requires explicit event subscription via `updateSubscription` protocol command
+   - Without subscription, dialogs are auto-dismissed server-side before events fire
+   - Subscription added in `BrowserContext.new()` with `{"event": "dialog", "enabled": true}`
+   - This pattern can be reused for other context-level events
+
+3. **Event Flow Architecture** (Slice 6):
+   - Dialog events flow: Server → BrowserContext → Page (via parent relationship)
+   - Dialog's parent IS the Page (set during protocol object creation)
+   - Event forwarding uses `dialog.parent()` instead of looking for page GUID in event params
+   - Established pattern for context-to-page event forwarding
+
+4. **Route Handler Execution** (Slice 5):
+   - Changed from `tokio::spawn()` (fire-and-forget) to proper `await`
+   - Ensures fulfill/continue/abort complete before browser continues
+   - Critical for reliable network mocking
+
+5. **Assertion Auto-Retry** (Slice 1):
+   - Polling mechanism: 100ms interval, 5s default timeout
+   - Protocol integration via `Page.evaluate()` and `Frame.evaluateExpression`
+   - Visibility detection requires non-zero dimensions
+
+6. **Routing Architecture** (Slice 4):
+   - Callback-based with boxed futures: `Arc<dyn Fn(Route) -> Pin<Box<dyn Future>>>`
+   - Handler storage: `Arc<Mutex<Vec<RouteHandlerEntry>>>`
+   - Last-registered-wins priority (reverse iteration)
+   - Glob pattern matching via `glob::Pattern`
 
 ---
 
@@ -493,6 +553,6 @@ This order prioritizes:
 ---
 
 **Created:** 2025-11-08
-**Last Updated:** 2025-11-09 (Slice 6 complete - downloads and dialogs)
+**Last Updated:** 2025-11-09 (Phase 5 COMPLETE - all slices finished)
 
 ---

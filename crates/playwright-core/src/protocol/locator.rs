@@ -212,6 +212,53 @@ impl Locator {
         self.frame.locator_uncheck(&self.selector, options).await
     }
 
+    /// Sets the checkbox or radio button to the specified checked state.
+    ///
+    /// This is a convenience method that calls `check()` if `checked` is true,
+    /// or `uncheck()` if `checked` is false.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use playwright_core::protocol::Playwright;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let playwright = Playwright::launch().await?;
+    /// let browser = playwright.chromium().launch().await?;
+    /// let page = browser.new_page().await?;
+    /// page.goto("https://example.com/form", None).await?;
+    ///
+    /// let checkbox = page.locator("#terms").await;
+    ///
+    /// // Set to checked
+    /// checkbox.set_checked(true, None).await?;
+    ///
+    /// // Set to unchecked
+    /// checkbox.set_checked(false, None).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Element is not a checkbox or radio button
+    /// - Element is not actionable (disabled, not visible, etc.)
+    /// - Action timeout is exceeded
+    ///
+    /// See: <https://playwright.dev/docs/api/class-locator#locator-set-checked>
+    pub async fn set_checked(
+        &self,
+        checked: bool,
+        options: Option<crate::protocol::CheckOptions>,
+    ) -> Result<()> {
+        if checked {
+            self.check(options).await
+        } else {
+            self.uncheck(options).await
+        }
+    }
+
     /// Hovers the mouse over the element.
     ///
     /// See: <https://playwright.dev/docs/api/class-locator#locator-hover>

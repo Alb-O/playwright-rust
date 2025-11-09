@@ -411,3 +411,60 @@ async fn test_mouse_webkit() {
     browser.close().await.expect("Failed to close browser");
     server.shutdown();
 }
+
+#[tokio::test]
+async fn test_keyboard_press_with_modifier_compound_key() {
+    let server = TestServer::start().await;
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
+    let browser = playwright
+        .chromium()
+        .launch()
+        .await
+        .expect("Failed to launch browser");
+    let page = browser.new_page().await.expect("Failed to create page");
+
+    page.goto(&format!("{}/keyboard_mouse.html", server.url()), None)
+        .await
+        .expect("Failed to navigate");
+
+    // Focus input and type some text
+    let input = page.locator("#keyboard-input").await;
+    input.click(None).await.expect("Failed to focus input");
+
+    let keyboard = page.keyboard();
+    keyboard
+        .type_text("Hello World", None)
+        .await
+        .expect("Failed to type");
+
+    // Test: Try to select all with Control+a (or Meta+a on Mac)
+    // Playwright's keyboard.press supports compound keys like "Control+a"
+    #[cfg(target_os = "macos")]
+    keyboard
+        .press("Meta+a", None)
+        .await
+        .expect("Failed to press Meta+a");
+
+    #[cfg(not(target_os = "macos"))]
+    keyboard
+        .press("Control+a", None)
+        .await
+        .expect("Failed to press Control+a");
+
+    // If selection works, typing should replace all text
+    keyboard
+        .type_text("Replaced", None)
+        .await
+        .expect("Failed to type replacement");
+
+    let value = input.input_value(None).await.expect("Failed to get value");
+    assert_eq!(
+        value, "Replaced",
+        "Text should be replaced if select-all worked"
+    );
+
+    browser.close().await.expect("Failed to close browser");
+    server.shutdown();
+}
