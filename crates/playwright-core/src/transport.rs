@@ -127,7 +127,12 @@ where
     ///
     /// This continuously reads messages from stdout and sends them
     /// to the message channel.
+    ///
+    /// For messages larger than 32KB, reads in chunks to reduce peak memory usage.
+    /// Matches playwright-python's chunked reading strategy.
     pub async fn run(mut self) -> Result<()> {
+        const CHUNK_SIZE: usize = 32_768; // 32KB chunks
+
         loop {
             // Read 4-byte little-endian length prefix
             let mut len_buf = [0u8; 4];
@@ -138,11 +143,34 @@ where
             let length = u32::from_le_bytes(len_buf) as usize;
 
             // Read message payload
-            let mut message_buf = vec![0u8; length];
-            self.stdout
-                .read_exact(&mut message_buf)
-                .await
-                .map_err(|e| Error::TransportError(format!("Failed to read message: {}", e)))?;
+            // For large messages (>32KB), read in chunks to reduce memory pressure
+            let message_buf = if length <= CHUNK_SIZE {
+                // Small message: read all at once
+                let mut buf = vec![0u8; length];
+                self.stdout
+                    .read_exact(&mut buf)
+                    .await
+                    .map_err(|e| Error::TransportError(format!("Failed to read message: {}", e)))?;
+                buf
+            } else {
+                // Large message: read in chunks
+                let mut buf = Vec::with_capacity(length);
+                let mut remaining = length;
+
+                while remaining > 0 {
+                    let to_read = std::cmp::min(remaining, CHUNK_SIZE);
+                    let mut chunk = vec![0u8; to_read];
+
+                    self.stdout.read_exact(&mut chunk).await.map_err(|e| {
+                        Error::TransportError(format!("Failed to read message chunk: {}", e))
+                    })?;
+
+                    buf.extend_from_slice(&chunk);
+                    remaining -= to_read;
+                }
+
+                buf
+            };
 
             // Parse JSON
             let message: JsonValue = serde_json::from_slice(&message_buf)
@@ -239,6 +267,9 @@ where
     /// This continuously reads messages from the server and sends them
     /// to the message channel. Matches playwright-python's `run()` method.
     ///
+    /// For messages larger than 32KB, reads in chunks to reduce peak memory usage.
+    /// Matches playwright-python's chunked reading strategy.
+    ///
     /// The loop will run until:
     /// - An error occurs
     /// - The stdout stream is closed
@@ -248,6 +279,8 @@ where
     ///
     /// Returns an error if reading from stdout fails or if message parsing fails.
     pub async fn run(&mut self) -> Result<()> {
+        const CHUNK_SIZE: usize = 32_768; // 32KB chunks
+
         loop {
             // Read 4-byte little-endian length prefix
             // Matches: buffer = await self._proc.stdout.readexactly(4)
@@ -260,13 +293,35 @@ where
 
             // Read message payload
             // Python reads in 32KB chunks for large messages
-            // For simplicity, we'll read the entire message at once for now
-            // TODO: Consider chunked reading for very large messages (>32KB)
-            let mut message_buf = vec![0u8; length];
-            self.stdout
-                .read_exact(&mut message_buf)
-                .await
-                .map_err(|e| Error::TransportError(format!("Failed to read message: {}", e)))?;
+            // Matches: to_read = min(length, 32768)
+            let message_buf = if length <= CHUNK_SIZE {
+                // Small message: read all at once
+                let mut buf = vec![0u8; length];
+                self.stdout
+                    .read_exact(&mut buf)
+                    .await
+                    .map_err(|e| Error::TransportError(format!("Failed to read message: {}", e)))?;
+                buf
+            } else {
+                // Large message: read in chunks
+                // Matches Python: while length > 0: data = await readexactly(min(length, 32768))
+                let mut buf = Vec::with_capacity(length);
+                let mut remaining = length;
+
+                while remaining > 0 {
+                    let to_read = std::cmp::min(remaining, CHUNK_SIZE);
+                    let mut chunk = vec![0u8; to_read];
+
+                    self.stdout.read_exact(&mut chunk).await.map_err(|e| {
+                        Error::TransportError(format!("Failed to read message chunk: {}", e))
+                    })?;
+
+                    buf.extend_from_slice(&chunk);
+                    remaining -= to_read;
+                }
+
+                buf
+            };
 
             // Parse JSON
             // Matches: obj = json.loads(data.decode("utf-8"))

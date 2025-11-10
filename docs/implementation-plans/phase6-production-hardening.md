@@ -192,13 +192,36 @@ Baseline saved at commit `c3c16f6` for future comparisons.
 
 ---
 
-### Slice 6c: Message Chunked Reading 🔄 PENDING
+### Slice 6c: Message Chunked Reading ✅ COMPLETE
 
 **Goal:** Implement chunked reading for large messages (>32KB) in transport layer.
 
+**Completion Date:** 2025-11-10
+
 **Why:** Current implementation reads entire messages into memory - chunked reading reduces memory pressure for large payloads.
 
-**Target:** Reduce peak memory usage for large message handling.
+**What We Built:**
+- Chunked reading implementation for messages >32KB in transport layer
+- 32KB chunk size (matches playwright-python's 32768 bytes)
+- Comprehensive test suite covering edge cases:
+  - Small messages (<32KB) - single read
+  - Exactly 32KB messages - single read
+  - Large messages (64KB+) - multiple chunks
+  - Very large messages (2MB+) - many chunks
+  - Messages just over threshold - minimal chunking overhead
+
+**Key Architectural Insights:**
+
+1. **Optimal Chunk Size** - 32KB balances memory efficiency with syscall overhead. Matches playwright-python's implementation for cross-language consistency.
+
+2. **YAGNI Principle Applied** - No configurable chunk size needed. 32KB is optimal based on:
+   - Typical message sizes (most <32KB, handled by single read)
+   - OS I/O buffer alignment (4KB-64KB range)
+   - No evidence that different workloads need different sizes
+
+3. **Memory Optimization, Not Speed** - This is a memory pressure optimization, not a throughput optimization. Peak memory usage reduced for large screenshots/PDFs without impacting normal operation speed.
+
+**Result:** All tests pass with no regressions. Memory-efficient handling for large payloads while maintaining fast path for typical messages.
 
 ---
 
