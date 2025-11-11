@@ -417,19 +417,43 @@ cargo build
 
 ### Installing Browsers
 
-**⚠️ IMPORTANT:** Browser versions must match the Playwright server version!
+**⚠️ IMPORTANT:** Browsers are installed **automatically** after building the project!
 
-The Playwright server bundled in `drivers/` is version **1.49.0**. You must install matching browsers:
+When you run `cargo build`, the build script ([build.rs](crates/playwright-core/build.rs)) automatically:
+1. Downloads the Playwright driver (version **1.56.1**) from Azure CDN
+2. Extracts it to `drivers/playwright-1.56.1-<platform>/`
+
+After building, install browsers using the downloaded driver's CLI:
 
 ```bash
-# Install browsers matching Playwright 1.49.0
-npx playwright@1.49.0 install chromium firefox webkit
+# Build the project (downloads Playwright 1.56.1 driver)
+cargo build
+
+# Install browsers using the driver's CLI
+# macOS/Linux:
+drivers/playwright-1.56.1-*/node drivers/playwright-1.56.1-*/package/cli.js install chromium firefox webkit
+
+# Windows:
+drivers\playwright-1.56.1-win32_x64\node.exe drivers\playwright-1.56.1-win32_x64\package\cli.js install chromium firefox webkit
+```
+
+**Platform-specific examples:**
+
+```bash
+# macOS (arm64):
+drivers/playwright-1.56.1-mac-arm64/node drivers/playwright-1.56.1-mac-arm64/package/cli.js install chromium firefox webkit
+
+# macOS (x64):
+drivers/playwright-1.56.1-mac/node drivers/playwright-1.56.1-mac/package/cli.js install chromium firefox webkit
+
+# Linux:
+drivers/playwright-1.56.1-linux/node drivers/playwright-1.56.1-linux/package/cli.js install chromium firefox webkit
 ```
 
 **Why this matters:**
-- Playwright server 1.49.0 expects specific browser builds (e.g., chromium build 1148)
-- If you run `npx playwright install` without version, you'll get the latest browsers
-- Mismatched versions will cause "Executable doesn't exist" errors during tests
+- Playwright server 1.56.1 expects specific browser builds (chromium-1194, firefox-1495, webkit-2215)
+- Using the driver's CLI ensures version compatibility
+- The `drivers/` directory is gitignored, so each developer/CI environment installs its own
 
 **Platform Support:**
 - ✅ **Windows**: Full support with CI stability flags enabled (2025-11-09)
@@ -446,31 +470,46 @@ npx playwright@1.49.0 install chromium firefox webkit
 # Windows: %USERPROFILE%\AppData\Local\ms-playwright\
 
 ls ~/Library/Caches/ms-playwright/
-# Should show: chromium-1148, chromium_headless_shell-1148, firefox-1466, webkit-2104
+# Should show: chromium-1194, chromium_headless_shell-1194, firefox-1495, webkit-2215
 ```
 
 ### Running Tests
 
+**Note:** This project uses [cargo-nextest](https://nexte.st/) for faster test execution. Install it once globally:
 ```bash
-# All tests
+cargo install cargo-nextest
+```
+
+```bash
+# All tests (recommended - faster)
+cargo nextest run
+
+# All tests (standard cargo)
 cargo test
 
 # Integration tests only (requires browsers)
-cargo test --test '*'
+cargo nextest run --test '*'
 
 # Specific test
-cargo test test_launch_chromium
+cargo nextest run test_launch_chromium
 
 # With logging
-RUST_LOG=debug cargo test
+RUST_LOG=debug cargo nextest run
+
+# Doc-tests (nextest doesn't run these)
+cargo test --doc
 ```
 
 ### Running Examples
 
 ```bash
-# Set driver path and run example
-PLAYWRIGHT_DRIVER_PATH=./drivers/playwright-1.49.0-mac-arm64 \
-    cargo run --package playwright --example basic
+# Run a single example
+cargo run --package playwright --example basic
+
+# Run all examples
+for example in crates/playwright/examples/*.rs; do
+    cargo run --package playwright --example $(basename "$example" .rs) || exit 1
+done
 ```
 
 ## API Design Philosophy

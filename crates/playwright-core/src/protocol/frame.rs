@@ -71,10 +71,16 @@ impl Frame {
         if let Some(opts) = options {
             if let Some(timeout) = opts.timeout {
                 params["timeout"] = serde_json::json!(timeout.as_millis() as u64);
+            } else {
+                // Default timeout required in Playwright 1.56.1+
+                params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
             }
             if let Some(wait_until) = opts.wait_until {
                 params["waitUntil"] = serde_json::json!(wait_until.as_str());
             }
+        } else {
+            // No options provided, set default timeout (required in Playwright 1.56.1+)
+            params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         // Send goto RPC to Frame
@@ -352,7 +358,8 @@ impl Frame {
                 "textContent",
                 serde_json::json!({
                     "selector": selector,
-                    "strict": true
+                    "strict": true,
+                    "timeout": crate::DEFAULT_TIMEOUT_MS
                 }),
             )
             .await?;
@@ -373,7 +380,8 @@ impl Frame {
                 "innerText",
                 serde_json::json!({
                     "selector": selector,
-                    "strict": true
+                    "strict": true,
+                    "timeout": crate::DEFAULT_TIMEOUT_MS
                 }),
             )
             .await?;
@@ -394,7 +402,8 @@ impl Frame {
                 "innerHTML",
                 serde_json::json!({
                     "selector": selector,
-                    "strict": true
+                    "strict": true,
+                    "timeout": crate::DEFAULT_TIMEOUT_MS
                 }),
             )
             .await?;
@@ -420,7 +429,8 @@ impl Frame {
                 serde_json::json!({
                     "selector": selector,
                     "name": name,
-                    "strict": true
+                    "strict": true,
+                    "timeout": crate::DEFAULT_TIMEOUT_MS
                 }),
             )
             .await?;
@@ -441,7 +451,8 @@ impl Frame {
                 "isVisible",
                 serde_json::json!({
                     "selector": selector,
-                    "strict": true
+                    "strict": true,
+                    "timeout": crate::DEFAULT_TIMEOUT_MS
                 }),
             )
             .await?;
@@ -462,7 +473,8 @@ impl Frame {
                 "isEnabled",
                 serde_json::json!({
                     "selector": selector,
-                    "strict": true
+                    "strict": true,
+                    "timeout": crate::DEFAULT_TIMEOUT_MS
                 }),
             )
             .await?;
@@ -483,7 +495,8 @@ impl Frame {
                 "isChecked",
                 serde_json::json!({
                     "selector": selector,
-                    "strict": true
+                    "strict": true,
+                    "timeout": crate::DEFAULT_TIMEOUT_MS
                 }),
             )
             .await?;
@@ -504,7 +517,8 @@ impl Frame {
                 "isEditable",
                 serde_json::json!({
                     "selector": selector,
-                    "strict": true
+                    "strict": true,
+                    "timeout": crate::DEFAULT_TIMEOUT_MS
                 }),
             )
             .await?;
@@ -573,6 +587,8 @@ impl Frame {
                     obj.extend(opts_obj.clone());
                 }
             }
+        } else {
+            params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         self.channel().send_no_result("click", params).await
@@ -596,6 +612,8 @@ impl Frame {
                     obj.extend(opts_obj.clone());
                 }
             }
+        } else {
+            params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         self.channel().send_no_result("dblclick", params).await
@@ -621,6 +639,8 @@ impl Frame {
                     obj.extend(opts_obj.clone());
                 }
             }
+        } else {
+            params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         self.channel().send_no_result("fill", params).await
@@ -645,6 +665,8 @@ impl Frame {
                     obj.extend(opts_obj.clone());
                 }
             }
+        } else {
+            params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         self.channel().send_no_result("fill", params).await
@@ -670,6 +692,8 @@ impl Frame {
                     obj.extend(opts_obj.clone());
                 }
             }
+        } else {
+            params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         self.channel().send_no_result("press", params).await
@@ -692,6 +716,8 @@ impl Frame {
                     obj.extend(opts_obj.clone());
                 }
             }
+        } else {
+            params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         self.channel().send_no_result("check", params).await
@@ -714,6 +740,8 @@ impl Frame {
                     obj.extend(opts_obj.clone());
                 }
             }
+        } else {
+            params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         self.channel().send_no_result("uncheck", params).await
@@ -736,6 +764,8 @@ impl Frame {
                     obj.extend(opts_obj.clone());
                 }
             }
+        } else {
+            params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         self.channel().send_no_result("hover", params).await
@@ -753,7 +783,8 @@ impl Frame {
                 "inputValue",
                 serde_json::json!({
                     "selector": selector,
-                    "strict": true
+                    "strict": true,
+                    "timeout": crate::DEFAULT_TIMEOUT_MS  // Required in Playwright 1.56.1+
                 }),
             )
             .await?;
@@ -785,6 +816,9 @@ impl Frame {
                     obj.extend(opts_obj.clone());
                 }
             }
+        } else {
+            // No options provided, add default timeout (required in Playwright 1.56.1+)
+            params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         let response: SelectOptionResponse = self.channel().send("selectOption", params).await?;
@@ -818,6 +852,9 @@ impl Frame {
                     obj.extend(opts_obj.clone());
                 }
             }
+        } else {
+            // No options provided, add default timeout (required in Playwright 1.56.1+)
+            params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         let response: SelectOptionResponse = self.channel().send("selectOption", params).await?;
@@ -853,6 +890,7 @@ impl Frame {
                 serde_json::json!({
                     "selector": selector,
                     "strict": true,
+                    "timeout": crate::DEFAULT_TIMEOUT_MS,  // Required in Playwright 1.56.1+
                     "payloads": [{
                         "name": file_name,
                         "buffer": base64_content
@@ -879,6 +917,7 @@ impl Frame {
                     serde_json::json!({
                         "selector": selector,
                         "strict": true,
+                        "timeout": crate::DEFAULT_TIMEOUT_MS,  // Required in Playwright 1.56.1+
                         "payloads": []
                     }),
                 )
@@ -912,6 +951,7 @@ impl Frame {
                 serde_json::json!({
                     "selector": selector,
                     "strict": true,
+                    "timeout": crate::DEFAULT_TIMEOUT_MS,  // Required in Playwright 1.56.1+
                     "payloads": file_objects
                 }),
             )

@@ -73,12 +73,3 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
-
-      # 5. Run examples (same as CI)
-      - id: cargo-run-examples
-        name: cargo run all examples
-        description: Verify all examples work
-        entry: bash -c 'for example in crates/playwright/examples/*.rs; do cargo run --package playwright --example $(basename "$example" .rs) || exit 1; done'
-        language: system
-        types: [rust]
-        pass_filenames: false

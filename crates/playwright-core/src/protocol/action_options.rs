@@ -42,8 +42,11 @@ impl FillOptions {
             json["force"] = serde_json::json!(force);
         }
 
+        // Timeout is required in Playwright 1.56.1+
         if let Some(timeout) = self.timeout {
             json["timeout"] = serde_json::json!(timeout);
+        } else {
+            json["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         json
@@ -117,8 +120,11 @@ impl PressOptions {
             json["delay"] = serde_json::json!(delay);
         }
 
+        // Timeout is required in Playwright 1.56.1+
         if let Some(timeout) = self.timeout {
             json["timeout"] = serde_json::json!(timeout);
+        } else {
+            json["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         json
@@ -201,8 +207,11 @@ impl CheckOptions {
             json["position"] = serde_json::to_value(position).unwrap();
         }
 
+        // Timeout is required in Playwright 1.56.1+
         if let Some(timeout) = self.timeout {
             json["timeout"] = serde_json::json!(timeout);
+        } else {
+            json["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         if let Some(trial) = self.trial {
@@ -311,8 +320,11 @@ impl HoverOptions {
             json["position"] = serde_json::to_value(position).unwrap();
         }
 
+        // Timeout is required in Playwright 1.56.1+
         if let Some(timeout) = self.timeout {
             json["timeout"] = serde_json::json!(timeout);
+        } else {
+            json["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         if let Some(trial) = self.trial {
@@ -414,8 +426,11 @@ impl SelectOptions {
             json["force"] = serde_json::json!(force);
         }
 
+        // Timeout is required in Playwright 1.56.1+
         if let Some(timeout) = self.timeout {
             json["timeout"] = serde_json::json!(timeout);
+        } else {
+            json["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         json

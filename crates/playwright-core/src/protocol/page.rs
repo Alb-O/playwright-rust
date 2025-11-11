@@ -585,10 +585,14 @@ impl Page {
         if let Some(opts) = options {
             if let Some(timeout) = opts.timeout {
                 params["timeout"] = serde_json::json!(timeout.as_millis() as u64);
+            } else {
+                params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
             }
             if let Some(wait_until) = opts.wait_until {
                 params["waitUntil"] = serde_json::json!(wait_until.as_str());
             }
+        } else {
+            params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
         // Send reload RPC directly to Page (not Frame!)
@@ -757,8 +761,11 @@ impl Page {
         let params = if let Some(opts) = options {
             opts.to_json()
         } else {
-            // Default to PNG
-            serde_json::json!({ "type": "png" })
+            // Default to PNG with required timeout
+            serde_json::json!({
+                "type": "png",
+                "timeout": crate::DEFAULT_TIMEOUT_MS
+            })
         };
 
         #[derive(Deserialize)]
@@ -1311,7 +1318,7 @@ impl std::fmt::Debug for Page {
 /// Options for page.goto() and page.reload()
 #[derive(Debug, Clone)]
 pub struct GotoOptions {
-    /// Maximum operation time in milliseconds. Default: 30000 (30 seconds)
+    /// Maximum operation time in milliseconds
     pub timeout: Option<std::time::Duration>,
     /// When to consider operation succeeded
     pub wait_until: Option<WaitUntil>,

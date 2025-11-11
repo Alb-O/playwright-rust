@@ -1,7 +1,7 @@
 // Screenshot examples demonstrating various screenshot options
 //
 // Run with:
-// PLAYWRIGHT_DRIVER_PATH=./drivers/playwright-1.49.0-mac-arm64 \
+// PLAYWRIGHT_DRIVER_PATH=./drivers/playwright-1.56.1-mac-arm64 \
 //     cargo run --package playwright --example screenshots
 
 use playwright_core::protocol::{Playwright, ScreenshotClip, ScreenshotOptions, ScreenshotType};

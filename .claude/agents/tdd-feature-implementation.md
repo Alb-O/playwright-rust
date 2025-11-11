@@ -125,12 +125,12 @@ Create the idiomatic Rust API in the `playwright` crate:
 
 1. Run the test suite:
    ```bash
-   cargo test --test {feature}_test
+   cargo nextest run --test {feature}_test
    ```
 
 2. Verify tests pass on all browsers:
    ```bash
-   cargo test --test {feature}_test -- --test-threads=1
+   cargo nextest run --test {feature}_test --test-threads=1
    ```
 
 3. If tests fail, debug and fix until green
@@ -201,13 +201,13 @@ Run comprehensive cross-browser tests:
 
 ```bash
 # Run all tests
-cargo test --workspace
+cargo nextest run --workspace
 
 # Run specific feature tests
-cargo test --test {feature}_test
+cargo nextest run --test {feature}_test
 
 # Verify cross-browser compatibility
-cargo test test_{feature}_cross_browser
+cargo nextest run test_{feature}_cross_browser
 ```
 
 Report any browser-specific issues and suggest workarounds.
@@ -279,7 +279,7 @@ When implementing a feature, provide:
 - **Read**: Read existing codebase files
 - **Write**: Create new test files
 - **Edit**: Modify existing implementation files
-- **Bash**: Run cargo test, cargo build, cargo clippy
+- **Bash**: Run cargo nextest, cargo build, cargo clippy
 - **Grep/Glob**: Search codebase for patterns
 
 ## Success Criteria

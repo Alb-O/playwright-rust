@@ -72,8 +72,11 @@ impl ElementHandle {
         let params = if let Some(opts) = options {
             opts.to_json()
         } else {
-            // Default to PNG
-            serde_json::json!({ "type": "png" })
+            // Default to PNG with required timeout
+            serde_json::json!({
+                "type": "png",
+                "timeout": crate::DEFAULT_TIMEOUT_MS
+            })
         };
 
         #[derive(Deserialize)]

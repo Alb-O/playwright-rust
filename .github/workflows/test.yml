@@ -72,21 +72,6 @@ jobs:
       with:
         tool: cargo-nextest
 
-    - name: Install Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-
-    - name: Install Playwright browsers (Linux/macOS)
-      if: runner.os != 'Windows'
-      run: npx playwright@1.56.1 install chromium firefox webkit --with-deps
-
-    - name: Install Playwright browsers (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        npx playwright@1.56.1 install chromium firefox webkit
-        npx playwright@1.56.1 install-deps chromium firefox webkit
-
     - name: Check formatting
       run: cargo fmt --all -- --check
 
@@ -95,6 +80,23 @@ jobs:
 
     - name: Build
       run: cargo build --verbose
+
+    - name: Install Playwright browsers (Linux)
+      if: runner.os == 'Linux'
+      run: drivers/playwright-1.56.1-linux/node drivers/playwright-1.56.1-linux/package/cli.js install chromium firefox webkit --with-deps
+
+    - name: Install Playwright browsers (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        if [ -d "drivers/playwright-1.56.1-mac-arm64" ]; then
+          drivers/playwright-1.56.1-mac-arm64/node drivers/playwright-1.56.1-mac-arm64/package/cli.js install chromium firefox webkit
+        else
+          drivers/playwright-1.56.1-mac/node drivers/playwright-1.56.1-mac/package/cli.js install chromium firefox webkit
+        fi
+
+    - name: Install Playwright browsers (Windows)
+      if: runner.os == 'Windows'
+      run: drivers\playwright-1.56.1-win32_x64\node.exe drivers\playwright-1.56.1-win32_x64\package\cli.js install chromium firefox webkit
 
     - name: Run tests (Linux/macOS)
       if: runner.os != 'Windows'

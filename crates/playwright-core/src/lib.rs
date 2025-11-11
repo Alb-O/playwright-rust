@@ -15,6 +15,14 @@ pub mod protocol;
 pub mod server;
 pub mod transport;
 
+/// Default timeout in milliseconds for Playwright operations.
+///
+/// This matches Playwright's standard default across all language implementations (Python, Java, .NET, JS).
+/// Required in Playwright 1.56.1+ when timeout parameter is not explicitly provided.
+///
+/// See: <https://playwright.dev/docs/test-timeouts>
+pub const DEFAULT_TIMEOUT_MS: f64 = 30000.0;
+
 pub use api::{IgnoreDefaultArgs, LaunchOptions, ProxySettings};
 pub use assertions::expect;
 pub use channel::Channel;

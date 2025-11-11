@@ -84,7 +84,7 @@ pub struct LaunchOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slow_mo: Option<f64>,
 
-    /// Timeout for browser launch in milliseconds (default: 30000)
+    /// Timeout for browser launch in milliseconds (default: DEFAULT_TIMEOUT_MS)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<f64>,
 
@@ -234,12 +234,19 @@ impl LaunchOptions {
     /// Normalize options for protocol transmission
     ///
     /// This performs transformations required by the Playwright protocol:
-    /// 1. Convert env HashMap to array of {name, value} objects
-    /// 2. Convert bool ignoreDefaultArgs to ignoreAllDefaultArgs
+    /// 1. Set default timeout if not specified (required in 1.56.1+)
+    /// 2. Convert env HashMap to array of {name, value} objects
+    /// 3. Convert bool ignoreDefaultArgs to ignoreAllDefaultArgs
     ///
     /// This matches the behavior of playwright-python's parameter normalization.
     pub(crate) fn normalize(self) -> Value {
         let mut value = serde_json::to_value(&self).unwrap();
+
+        // Set default timeout if not specified
+        // Note: In Playwright 1.56.1+, timeout became a required parameter
+        if value.get("timeout").is_none() {
+            value["timeout"] = json!(crate::DEFAULT_TIMEOUT_MS);
+        }
 
         // Convert env HashMap to array of {name, value} objects
         if let Some(env_map) = value.get_mut("env") {

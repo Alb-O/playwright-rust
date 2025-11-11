@@ -453,14 +453,25 @@ pub enum Error {
 # Build
 cargo build
 
-# Test
-cargo test
+# Test (recommended - uses cargo-nextest)
+cargo nextest run
 
 # Test specific crate
-cargo test -p playwright-core
+cargo nextest run -p playwright-core
+
+# Test (standard cargo, fallback)
+cargo test
+
+# Doc-tests (nextest doesn't run these)
+cargo test --doc
 
 # Run example
 cargo run --example basic
+
+# Run all examples
+for example in crates/playwright/examples/*.rs; do
+    cargo run --package playwright --example $(basename "$example" .rs) || exit 1
+done
 
 # Check formatting
 cargo fmt -- --check
@@ -474,3 +485,5 @@ cargo doc --open
 # Run CI locally
 pre-commit run --all-files
 ```
+
+**Note:** Install cargo-nextest once globally: `cargo install cargo-nextest`
