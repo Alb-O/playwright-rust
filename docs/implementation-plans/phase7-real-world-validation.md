@@ -36,9 +36,17 @@ This feedback-driven approach ensures we're solving real problems, not theoretic
      - Troubleshooting guide based on real issues encountered
    - **Success Metric**: Examples directly address top 5 user pain points
 
+2. **Flaky Test Improvements** (Phase 6 Slice 7)
+   - **Why Deferred**: Require real-world usage to determine if alternative approaches are needed
+   - **Items**:
+     - `test_no_zombie_processes`: Timing-dependent zombie reaping varies by OS/load. May need different approach to verify process cleanup without timing races.
+     - `test_error_recovery_stress`: Rapid navigation success rate varies by CI environment. Consider alternative stress test that doesn't depend on navigation success rates.
+   - **Context**: Both tests verify important properties but can't guarantee 100% CI reliability due to environmental variance. Currently marked `#[ignore]` but available for manual validation.
+   - **Success Metric**: Either stabilize for CI or replace with reliable alternatives
+
 ### Medium Priority
 
-2. **Performance Optimizations** (Informed by real usage)
+3. **Performance Optimizations** (Informed by real usage)
    - Profile actual bottlenecks from folio integration
    - Optimize based on real performance data, not assumptions
    - May include deferred items from Phase 6 if they prove important:
@@ -46,7 +54,7 @@ This feedback-driven approach ensures we're solving real problems, not theoretic
      - Transport chunked reading
      - Optimize tests (similar to Phase 6, Slice 6d)
 
-3. **API Enhancements** (Based on user requests)
+4. **API Enhancements** (Based on user requests)
    - FilePayload struct (if users need it)
    - BrowserContext options (if requested)
    - Route continue overrides (if use cases emerge)
@@ -211,4 +219,4 @@ This feedback-driven approach ensures we're solving real problems, not theoretic
 ---
 
 **Created:** 2025-11-10
-**Last Updated:** 2025-11-10 (Initial planning based on Phase 6 insights)
+**Last Updated:** 2025-11-12

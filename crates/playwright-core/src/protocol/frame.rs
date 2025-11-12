@@ -5,7 +5,7 @@
 
 use crate::channel::Channel;
 use crate::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::protocol::page::{GotoOptions, Response};
 use serde::Deserialize;
 use serde_json::Value;
@@ -591,7 +591,15 @@ impl Frame {
             params["timeout"] = serde_json::json!(crate::DEFAULT_TIMEOUT_MS);
         }
 
-        self.channel().send_no_result("click", params).await
+        self.channel()
+            .send_no_result("click", params)
+            .await
+            .map_err(|e| match e {
+                Error::Timeout(msg) => {
+                    Error::Timeout(format!("{} (selector: '{}')", msg, selector))
+                }
+                other => other,
+            })
     }
 
     /// Double clicks the element matching the selector.

@@ -3,6 +3,10 @@
 // Provides a local HTTP server serving test HTML pages.
 // This enables deterministic, offline integration testing.
 
+// Note: Functions appear "unused" because each test binary compiles separately,
+// but they ARE used across multiple test files. Suppress false-positive warnings.
+#![allow(dead_code)]
+
 use axum::{
     body::Body,
     http::{Response, StatusCode},

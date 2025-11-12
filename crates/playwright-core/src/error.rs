@@ -9,11 +9,19 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 pub enum Error {
     /// Playwright server binary was not found
-    #[error("Playwright server not found at expected location")]
+    ///
+    /// The Playwright Node.js driver could not be located.
+    /// To resolve this, install Playwright using: `npm install playwright`
+    /// Or ensure the PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD environment variable is not set.
+    #[error("Playwright server not found. Install with: npm install playwright")]
     ServerNotFound,
 
     /// Failed to launch the Playwright server process
-    #[error("Failed to launch Playwright server: {0}")]
+    ///
+    /// The Playwright server process could not be started.
+    /// Common causes: Node.js not installed, insufficient permissions, or port already in use.
+    /// Details: {0}
+    #[error("Failed to launch Playwright server: {0}. Check that Node.js is installed.")]
     LaunchFailed(String),
 
     /// Server error (runtime issue with Playwright server)
@@ -41,12 +49,29 @@ pub enum Error {
     Json(#[from] serde_json::Error),
 
     /// Timeout waiting for operation
+    ///
+    /// Contains context about what operation timed out and the timeout duration.
+    /// Common causes include slow network, server not responding, or element not becoming actionable.
+    /// Consider increasing the timeout or checking if the target is accessible.
     #[error("Timeout: {0}")]
     Timeout(String),
 
+    /// Navigation timeout
+    ///
+    /// Occurs when page navigation exceeds the specified timeout.
+    /// Includes the URL being navigated to and timeout duration.
+    #[error("Navigation timeout after {duration_ms}ms navigating to '{url}'")]
+    NavigationTimeout { url: String, duration_ms: u64 },
+
     /// Target was closed (browser, context, or page)
-    #[error("Target closed: {0}")]
-    TargetClosed(String),
+    ///
+    /// Occurs when attempting to perform an operation on a closed target.
+    /// The target must be recreated before it can be used again.
+    #[error("Target closed: Cannot perform operation on closed {target_type}. {context}")]
+    TargetClosed {
+        target_type: String,
+        context: String,
+    },
 
     /// Unknown protocol object type
     #[error("Unknown protocol object type: {0}")]
@@ -61,7 +86,10 @@ pub enum Error {
     InvalidArgument(String),
 
     /// Element not found by selector
-    #[error("Element not found: {0}")]
+    ///
+    /// Includes the selector that was used to locate the element.
+    /// This error typically occurs when waiting for an element times out.
+    #[error("Element not found: selector '{0}'")]
     ElementNotFound(String),
 
     /// Assertion timeout (expect API)

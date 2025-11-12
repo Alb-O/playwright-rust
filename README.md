@@ -379,8 +379,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ Dialog types: alert, confirm, prompt
 - ✅ Checkbox convenience (`locator.set_checked()` for boolean-based check/uncheck)
 
-**Coming next:** Production hardening, documentation, stability testing (Phase 6)
-
 ## Installation
 
 **Not yet published to crates.io** - Library is under active development.

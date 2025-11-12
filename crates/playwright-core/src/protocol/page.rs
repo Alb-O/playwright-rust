@@ -5,7 +5,7 @@
 
 use crate::channel::Channel;
 use crate::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::protocol::{Dialog, Download, Route};
 use base64::Engine;
 use serde::Deserialize;
@@ -271,8 +271,21 @@ impl Page {
     /// See: <https://playwright.dev/docs/api/class-page#page-goto>
     pub async fn goto(&self, url: &str, options: Option<GotoOptions>) -> Result<Response> {
         // Delegate to main frame
-        let frame = self.main_frame().await?;
-        let response = frame.goto(url, options).await?;
+        let frame = self.main_frame().await.map_err(|e| match e {
+            Error::TargetClosed { context, .. } => Error::TargetClosed {
+                target_type: "Page".to_string(),
+                context,
+            },
+            other => other,
+        })?;
+
+        let response = frame.goto(url, options).await.map_err(|e| match e {
+            Error::TargetClosed { context, .. } => Error::TargetClosed {
+                target_type: "Page".to_string(),
+                context,
+            },
+            other => other,
+        })?;
 
         // Update the page's URL
         if let Ok(mut page_url) = self.url.write() {

@@ -184,9 +184,9 @@ pub struct Request {
     pub metadata: Metadata,
 }
 
-/// Serde helpers for Arc<str> serialization
+/// Serde helpers for `Arc<str>` serialization
 ///
-/// These helpers allow Arc<str> to be serialized/deserialized as a regular string in JSON.
+/// These helpers allow `Arc<str>` to be serialized/deserialized as a regular string in JSON.
 /// This is used for GUID fields throughout the protocol layer for performance optimization.
 pub fn serialize_arc_str<S>(arc: &Arc<str>, serializer: S) -> std::result::Result<S::Ok, S::Error>
 where
@@ -900,7 +900,10 @@ where
 fn parse_protocol_error(error: ErrorPayload) -> Error {
     match error.name.as_deref() {
         Some("TimeoutError") => Error::Timeout(error.message),
-        Some("TargetClosedError") => Error::TargetClosed(error.message),
+        Some("TargetClosedError") => Error::TargetClosed {
+            target_type: "target".to_string(),
+            context: error.message,
+        },
         _ => Error::ProtocolError(error.message),
     }
 }
@@ -945,11 +948,25 @@ where
     fn get_object(&self, guid: &str) -> AsyncChannelOwnerResult<'_> {
         let guid_arc: Arc<str> = Arc::from(guid);
         Box::pin(async move {
-            self.objects
-                .lock()
-                .get(&guid_arc)
-                .cloned()
-                .ok_or_else(|| Error::ProtocolError(format!("Object not found: {}", guid_arc)))
+            self.objects.lock().get(&guid_arc).cloned().ok_or_else(|| {
+                // Determine target type from GUID prefix
+                let target_type = if guid_arc.starts_with("page@") {
+                    "Page"
+                } else if guid_arc.starts_with("frame@") {
+                    "Frame"
+                } else if guid_arc.starts_with("browser-context@") {
+                    "BrowserContext"
+                } else if guid_arc.starts_with("browser@") {
+                    "Browser"
+                } else {
+                    return Error::ProtocolError(format!("Object not found: {}", guid_arc));
+                };
+
+                Error::TargetClosed {
+                    target_type: target_type.to_string(),
+                    context: format!("Object not found: {}", guid_arc),
+                }
+            })
         })
     }
 }
@@ -1208,7 +1225,7 @@ mod tests {
             name: Some("TargetClosedError".to_string()),
             stack: None,
         });
-        assert!(matches!(error, Error::TargetClosed(_)));
+        assert!(matches!(error, Error::TargetClosed { .. }));
 
         // Generic error
         let error = parse_protocol_error(ErrorPayload {
