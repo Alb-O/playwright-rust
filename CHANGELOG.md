@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2025-11-15
+
+### Fixed
+
+- **[Critical] Build script workspace detection** - Fixed issue #3 where `build.rs` failed to detect the correct workspace root when playwright-core is used as a crates.io dependency
+  - Implemented robust three-tier detection strategy:
+    1. Use `CARGO_WORKSPACE_DIR` (Rust 1.73+) to detect dependent project's workspace
+    2. Walk up directory tree to find `Cargo.toml` with `[workspace]`
+    3. Fallback to platform-specific cache directory (matches playwright-python behavior)
+  - This fix unblocks usage of playwright-rust in downstream projects like Folio
+  - Drivers now download to the correct location in all scenarios (workspace development, crates.io dependency, non-workspace projects)
+
 ## [0.6.0] - 2025-11-14
 
 **First public release** of `playwright-rs` - Production-ready Rust bindings for Microsoft Playwright.
@@ -117,5 +129,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Playwright returns null for data URLs and `about:blank` (valid behavior, not an error)
   - Migration: `page.goto("https://example.com").await?.expect("response")` or use `if let Some(response) = page.goto(...).await? { ... }`
 
-[Unreleased]: https://github.com/padamson/playwright-rust/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/padamson/playwright-rust/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/padamson/playwright-rust/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/padamson/playwright-rust/releases/tag/v0.6.0

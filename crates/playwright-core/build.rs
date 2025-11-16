@@ -17,14 +17,8 @@ const DRIVER_BASE_URL: &str = "https://playwright.azureedge.net/builds/driver";
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
-    // Get workspace root (two levels up from CARGO_MANIFEST_DIR)
-    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let workspace_root = manifest_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .expect("Could not determine workspace root");
-
-    let drivers_dir = workspace_root.join("drivers");
+    // Get the appropriate drivers directory using robust workspace detection
+    let drivers_dir = get_drivers_dir();
 
     // Detect platform
     let platform = detect_platform();
@@ -59,6 +53,68 @@ fn main() {
             );
         }
     }
+}
+
+/// Get the drivers directory using robust workspace detection
+///
+/// This function handles multiple scenarios:
+/// 1. Development within playwright-rust workspace
+/// 2. Used as a dependency from crates.io in a workspace project
+/// 3. Used as a dependency from crates.io in a non-workspace project
+///
+/// The detection strategy:
+/// 1. Try CARGO_WORKSPACE_DIR (available in Rust 1.73+) - gets the dependent project's workspace
+/// 2. Walk up directory tree looking for Cargo.toml with [workspace]
+/// 3. Fallback to platform-specific cache directory (like playwright-python)
+fn get_drivers_dir() -> PathBuf {
+    // Strategy 1: Use CARGO_WORKSPACE_DIR if available (Rust 1.73+)
+    // This points to the workspace root of the project being built (not playwright-core)
+    if let Ok(workspace_dir) = env::var("CARGO_WORKSPACE_DIR") {
+        let drivers_dir = PathBuf::from(workspace_dir).join("drivers");
+        println!(
+            "cargo:warning=Using workspace drivers directory: {}",
+            drivers_dir.display()
+        );
+        return drivers_dir;
+    }
+
+    // Strategy 2: Walk up the directory tree to find a workspace Cargo.toml
+    // This handles cases where CARGO_WORKSPACE_DIR isn't available
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+
+    let mut current = manifest_dir.as_path();
+    while let Some(parent) = current.parent() {
+        let cargo_toml = parent.join("Cargo.toml");
+        if cargo_toml.exists() {
+            if let Ok(contents) = fs::read_to_string(&cargo_toml) {
+                if contents.contains("[workspace]") {
+                    let drivers_dir = parent.join("drivers");
+                    println!("cargo:warning=Found workspace at: {}", parent.display());
+                    println!(
+                        "cargo:warning=Using drivers directory: {}",
+                        drivers_dir.display()
+                    );
+                    return drivers_dir;
+                }
+            }
+        }
+        current = parent;
+    }
+
+    // Strategy 3: Fallback to platform-specific cache directory
+    // This matches playwright-python's approach and works in all scenarios
+    let cache_dir = dirs::cache_dir()
+        .expect("Could not determine cache directory")
+        .join("playwright-rust")
+        .join("drivers");
+
+    println!(
+        "cargo:warning=No workspace found, using cache directory: {}",
+        cache_dir.display()
+    );
+    println!("cargo:warning=This matches playwright-python's approach for system-wide driver installation");
+
+    cache_dir
 }
 
 /// Detect the current platform and return the Playwright platform identifier
