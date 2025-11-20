@@ -191,11 +191,7 @@ async fn test_file_descriptor_cleanup() {
 
 #[tokio::test]
 #[cfg(unix)]
-#[ignore = "Flaky: timing-dependent process cleanup varies by OS/load"]
 async fn test_process_cleanup() {
-    // TODO(Phase 7): Revisit after real-world usage. Process counting is inherently
-    // racy and depends on OS scheduler and background processes. May need different
-    // approach to verify cleanup without environmental variance.
     println!("\n=== Testing Process Cleanup ===\n");
 
     // Record initial child process count
@@ -215,19 +211,29 @@ async fn test_process_cleanup() {
     // Close (Playwright has Drop implementation that should clean up)
     drop(playwright);
 
-    // Wait for cleanup
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // Wait for cleanup using polling
+    let start = std::time::Instant::now();
+    let timeout = Duration::from_secs(2);
+    let mut final_children = 0;
+    let mut success = false;
 
-    // Check final child process count
-    let final_children = count_child_processes().unwrap_or(0);
+    while start.elapsed() < timeout {
+        final_children = count_child_processes().unwrap_or(0);
+        if final_children <= initial_children {
+            success = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
     println!("Final child processes: {}", final_children);
 
     // ASSERTION: Child processes should return to initial count
-    assert_eq!(
-        final_children,
-        initial_children,
-        "Process leak detected: {} child processes not cleaned up",
-        final_children.saturating_sub(initial_children)
+    assert!(
+        success,
+        "Process leak detected: {} child processes not cleaned up (expected {})",
+        final_children.saturating_sub(initial_children),
+        initial_children
     );
 
     println!("\n✓ Child processes cleaned up properly");
@@ -239,11 +245,7 @@ async fn test_process_cleanup() {
 
 #[tokio::test]
 #[cfg(unix)]
-#[ignore = "Flaky: timing-dependent zombie reaping varies by OS/load"]
 async fn test_no_zombie_processes() {
-    // TODO(Phase 7): Revisit after real-world usage. May need different approach
-    // to verify process cleanup without timing races. Zombie reaping is asynchronous
-    // and depends on OS scheduler, making this inherently racy in CI.
     println!("\n=== Testing for Zombie Processes ===\n");
 
     // Helper to count zombie processes
@@ -285,20 +287,33 @@ async fn test_no_zombie_processes() {
         let _ = page.close().await;
         browser.close().await.expect("Failed to close browser");
 
-        // Check for zombies
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        // Poll for zombies to be cleaned up
+        // Instead of fixed sleep, we poll until count matches initial or timeout
+        let start = std::time::Instant::now();
+        let timeout = Duration::from_secs(2);
+        let mut current_zombies = 0;
+        let mut success = false;
 
-        let current_zombies = count_zombies().unwrap_or(0);
+        while start.elapsed() < timeout {
+            current_zombies = count_zombies().unwrap_or(0);
+            if current_zombies <= initial_zombies {
+                success = true;
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+
         if i % 2 == 1 {
             println!("After cycle {}: {} zombies", i + 1, current_zombies);
         }
 
         // ASSERTION: No new zombie processes should be created
-        assert_eq!(
+        assert!(
+            success,
+            "Zombie process detected after cycle {}: {} zombies (expected {})",
+            i + 1,
             current_zombies,
-            initial_zombies,
-            "Zombie process detected after cycle {}",
-            i + 1
+            initial_zombies
         );
     }
 

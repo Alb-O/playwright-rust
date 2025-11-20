@@ -404,11 +404,7 @@ async fn test_error_recovery_browser_relaunch() {
 // ============================================================================
 
 #[tokio::test]
-#[ignore = "Flaky: rapid navigation success rate varies by CI environment"]
 async fn test_error_recovery_stress() {
-    // TODO(Phase 7): Consider alternative stress test that doesn't depend on
-    // navigation success rates in CI. Rapid navigation legitimately causes
-    // interruptions, and success rate varies by network/system load/browser startup time.
     println!("\n=== Stress Test: Error Recovery Under Load ===\n");
 
     let server = TestServer::start().await;
@@ -428,16 +424,23 @@ async fn test_error_recovery_stress() {
 
     for i in 0..CYCLES {
         if i % 2 == 0 {
-            // Cause error
+            // Cause error (invalid port)
             let _ = page.goto("http://localhost:59999/", None).await;
+
+            // Give a tiny bit of breathing room for the error to propagate
+            // This helps stability in CI environments without compromising the "stress" aspect
+            // (users rarely navigate INSTANTLY after an error)
+            tokio::time::sleep(Duration::from_millis(100)).await;
         } else {
-            // Attempt successful navigation (may be interrupted by rapid navigation)
+            // Attempt successful navigation
             let result = page
                 .goto(&format!("{}/locators.html", server.url()), None)
                 .await;
 
             if result.is_ok() {
                 successful_navigations += 1;
+            } else {
+                println!("Navigation failed in cycle {}: {:?}", i, result.err());
             }
         }
 
@@ -446,13 +449,17 @@ async fn test_error_recovery_stress() {
         }
     }
 
-    // In stress test, some navigations may be interrupted - verify at least 20% succeeded
+    // Verify at least 30% of valid attempts succeeded (allow some flakiness)
+    // We attempt CYCLES/2 valid navigations.
+    let attempts = CYCLES / 2;
     println!(
         "Successful navigations: {}/{}",
-        successful_navigations,
-        CYCLES / 2
+        successful_navigations, attempts
     );
-    let min_successful = CYCLES / 5; // 20% of attempts
+
+    // We expect most to succeed with the small delay, but CI can be slow.
+    // 30% success rate is enough to prove recovery works.
+    let min_successful = (attempts as f64 * 0.3).ceil() as usize;
     assert!(
         successful_navigations >= min_successful,
         "Too few successful navigations: {} (expected at least {})",

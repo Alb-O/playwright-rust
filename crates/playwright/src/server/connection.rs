@@ -557,7 +557,7 @@ where
     ///
     /// This method continuously reads messages from the transport and dispatches them:
     /// - Responses (with `id`) are correlated with pending requests
-    /// - Events (without `id`) are dispatched to protocol objects (TODO: Future phase - event handling)
+    /// - Events (without `id`) are dispatched to protocol objects
     ///
     /// The loop runs until the transport channel is closed.
     ///
@@ -633,7 +633,7 @@ where
     /// This method:
     /// - Parses the message as Response or Event
     /// - For responses: correlates by ID and completes the oneshot channel
-    /// - For events: dispatches to the appropriate object (TODO: Future phase - event handling)
+    /// - For events: dispatches to the appropriate object
     ///
     /// # Arguments
     ///

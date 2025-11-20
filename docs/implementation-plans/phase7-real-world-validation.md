@@ -103,6 +103,7 @@ This feedback-driven approach ensures we're solving real problems, not theoretic
 **Progress:**
 - [x] Resolved Issue #1: Headless mode control (Verified)
 - [x] Resolved Issue #2: Browser.isConnected() (Implemented)
+- [x] Stabilized flaky tests (Deferred from Phase 6) - `test_no_zombie_processes`, `test_process_cleanup`, `test_error_recovery_stress`
 
 **Iterative Workflow:**
 This slice follows a feedback loop with the Folio project:
