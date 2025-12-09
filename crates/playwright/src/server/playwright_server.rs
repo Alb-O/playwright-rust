@@ -54,15 +54,28 @@ impl PlaywrightServer {
         let (node_exe, cli_js) = get_driver_executable()?;
 
         // Launch the server process
-        let mut child = Command::new(&node_exe)
-            .arg(&cli_js)
+        let mut cmd = Command::new(&node_exe);
+        cmd.arg(&cli_js)
             .arg("run-driver")
             .env("PW_LANG_NAME", "rust")
             .env("PW_LANG_NAME_VERSION", env!("CARGO_PKG_RUST_VERSION"))
             .env("PW_CLI_DISPLAY_VERSION", env!("CARGO_PKG_VERSION"))
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::inherit());
+
+        // NixOS compatibility: Pass through PLAYWRIGHT_BROWSERS_PATH if set
+        // This allows Nix-installed browsers to be used instead of the bundled ones
+        if let Ok(browsers_path) = std::env::var("PLAYWRIGHT_BROWSERS_PATH") {
+            cmd.env("PLAYWRIGHT_BROWSERS_PATH", browsers_path);
+        }
+
+        // Also pass through PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD to prevent download attempts
+        if let Ok(skip_download) = std::env::var("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD") {
+            cmd.env("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", skip_download);
+        }
+
+        let mut child = cmd
             .spawn()
             .map_err(|e| Error::LaunchFailed(format!("Failed to spawn process: {}", e)))?;
 
