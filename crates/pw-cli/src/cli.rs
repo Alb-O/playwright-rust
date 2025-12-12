@@ -68,6 +68,10 @@ pub enum Commands {
     /// Get text content of element
     Text { url: String, selector: String },
 
+    /// List interactive elements (buttons, links, inputs, selects)
+    #[command(alias = "els")]
+    Elements { url: String },
+
     /// Wait for condition (selector, timeout, or load state)
     Wait { url: String, condition: String },
 
@@ -175,11 +179,15 @@ mod tests {
     fn verbose_flag_short_and_long() {
         let short_args = vec!["pw", "-v", "screenshot", "https://example.com"];
         let short_cli = Cli::try_parse_from(short_args).unwrap();
-        assert!(short_cli.verbose);
+        assert_eq!(short_cli.verbose, 1);
 
         let long_args = vec!["pw", "--verbose", "screenshot", "https://example.com"];
         let long_cli = Cli::try_parse_from(long_args).unwrap();
-        assert!(long_cli.verbose);
+        assert_eq!(long_cli.verbose, 1);
+        
+        let double_v = vec!["pw", "-vv", "screenshot", "https://example.com"];
+        let double_cli = Cli::try_parse_from(double_v).unwrap();
+        assert_eq!(double_cli.verbose, 2);
     }
 
     #[test]

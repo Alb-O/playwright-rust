@@ -2,6 +2,7 @@ mod auth;
 mod click;
 mod console;
 mod coords;
+mod elements;
 mod eval;
 mod html;
 mod navigate;
@@ -25,6 +26,7 @@ pub async fn dispatch(command: Commands, auth_file: Option<&Path>) -> Result<()>
         Commands::Screenshot { url, output, full_page } => screenshot::execute(&url, &output, full_page, auth_file).await,
         Commands::Click { url, selector } => click::execute(&url, &selector, auth_file).await,
         Commands::Text { url, selector } => text::execute(&url, &selector, auth_file).await,
+        Commands::Elements { url } => elements::execute(&url, auth_file).await,
         Commands::Wait { url, condition } => wait::execute(&url, &condition, auth_file).await,
         Commands::Auth { action } => match action {
             AuthAction::Login { url, output, timeout } => {
