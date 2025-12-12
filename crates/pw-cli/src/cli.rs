@@ -1,12 +1,14 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
+use crate::styles::cli_styles;
 use crate::types::BrowserKind;
 
 #[derive(Parser, Debug)]
 #[command(name = "pw")]
 #[command(about = "Playwright CLI - Browser automation from the command line")]
 #[command(version)]
+#[command(styles = cli_styles())]
 pub struct Cli {
     /// Increase verbosity (-v info, -vv debug)
     #[arg(short, long, global = true, action = clap::ArgAction::Count)]
