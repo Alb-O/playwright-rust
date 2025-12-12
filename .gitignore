@@ -2,10 +2,10 @@
 /target/
 **/*.rs.bk
 *.pdb
-Cargo.lock
 
-# Playwright drivers (downloaded at build time)
+# Playwright
 /drivers/
+/.playwright-browsers
 
 # IDE
 .vscode/
@@ -22,10 +22,12 @@ Thumbs.db
 .env
 .env.local
 
+# Nix
+/.direnv
+/result
+
 # Documentation
 *gap-analysis.md
 
+# Misc
 /tmp
-/.playwright-browsers
-/.direnv
-/result

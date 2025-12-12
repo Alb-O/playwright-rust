@@ -59,22 +59,22 @@
             # Nix provides browser version 1181, but playwright-rs 1.56.1 expects version 1194
             BROWSERS_BASE="${pkgs.playwright-driver.browsers}"
             BROWSERS_COMPAT="$PWD/.playwright-browsers"
-            
+
             # Create compatibility directory with symlinks if needed
             if [ ! -d "$BROWSERS_COMPAT" ] || [ ! -L "$BROWSERS_COMPAT/chromium_headless_shell-1194" ]; then
               rm -rf "$BROWSERS_COMPAT"
               mkdir -p "$BROWSERS_COMPAT"
-              
+
               # Link all existing browsers
               for browser in "$BROWSERS_BASE"/*; do
                 ln -sf "$browser" "$BROWSERS_COMPAT/$(basename $browser)"
               done
-              
+
               # Create version compatibility symlinks (1194 -> 1181)
               ln -sf "$BROWSERS_BASE/chromium-1181" "$BROWSERS_COMPAT/chromium-1194"
               ln -sf "$BROWSERS_BASE/chromium_headless_shell-1181" "$BROWSERS_COMPAT/chromium_headless_shell-1194"
             fi
-            
+
             export PLAYWRIGHT_BROWSERS_PATH="$BROWSERS_COMPAT"
             export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
@@ -85,7 +85,7 @@
         };
 
         packages.default = rustPlatform.buildRustPackage {
-          pname = "pw-tool";
+          pname = "pw";
           version = "0.1.0";
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
@@ -95,6 +95,9 @@
           OPENSSL_DIR = "${pkgs.openssl.dev}";
           OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
           OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
+
+          # e2e tests require browsers which aren't available in the sandbox
+          doCheck = false;
         };
       }
     );
