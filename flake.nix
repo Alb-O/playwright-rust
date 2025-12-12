@@ -61,18 +61,31 @@
             BROWSERS_COMPAT="$PWD/.playwright-browsers"
 
             # Create compatibility directory with symlinks if needed
-            if [ ! -d "$BROWSERS_COMPAT" ] || [ ! -L "$BROWSERS_COMPAT/chromium_headless_shell-1194" ]; then
+            # Nix provides browser revision 1181, but different playwright versions expect different revisions:
+            # - playwright-rs 1.56.1 expects revision 1194
+            # - @playwright/test 1.57 expects revision 1200
+            # Additionally, Playwright 1.57+ changed the internal directory structure:
+            # - Old: chrome-linux/headless_shell
+            # - New: chrome-headless-shell-linux64/chrome-headless-shell
+            if [ ! -d "$BROWSERS_COMPAT" ] || [ ! -d "$BROWSERS_COMPAT/chromium_headless_shell-1200" ]; then
               rm -rf "$BROWSERS_COMPAT"
               mkdir -p "$BROWSERS_COMPAT"
 
-              # Link all existing browsers
+              # Link all existing browsers from Nix store
               for browser in "$BROWSERS_BASE"/*; do
                 ln -sf "$browser" "$BROWSERS_COMPAT/$(basename $browser)"
               done
 
-              # Create version compatibility symlinks (1194 -> 1181)
+              # Create version compatibility symlinks for playwright-rs (1194 -> 1181)
               ln -sf "$BROWSERS_BASE/chromium-1181" "$BROWSERS_COMPAT/chromium-1194"
               ln -sf "$BROWSERS_BASE/chromium_headless_shell-1181" "$BROWSERS_COMPAT/chromium_headless_shell-1194"
+
+              # Create version compatibility structure for @playwright/test 1.57+ (revision 1200)
+              # This version expects a different internal directory layout
+              ln -sf "$BROWSERS_BASE/chromium-1181" "$BROWSERS_COMPAT/chromium-1200"
+              mkdir -p "$BROWSERS_COMPAT/chromium_headless_shell-1200/chrome-headless-shell-linux64"
+              ln -sf "$BROWSERS_BASE/chromium_headless_shell-1181/chrome-linux/headless_shell" \
+                     "$BROWSERS_COMPAT/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell"
             fi
 
             export PLAYWRIGHT_BROWSERS_PATH="$BROWSERS_COMPAT"

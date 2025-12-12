@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -80,6 +80,47 @@ pub enum Commands {
         #[command(subcommand)]
         action: AuthAction,
     },
+
+    /// Initialize a new playwright project structure
+    Init {
+        /// Project directory (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: PathBuf,
+
+        /// Template type: standard (full structure) or minimal (tests only)
+        #[arg(long, short, default_value = "standard", value_enum)]
+        template: InitTemplate,
+
+        /// Skip creating playwright.config.js
+        #[arg(long)]
+        no_config: bool,
+
+        /// Skip creating example test file
+        #[arg(long)]
+        no_example: bool,
+
+        /// Use TypeScript for config and tests
+        #[arg(long)]
+        typescript: bool,
+
+        /// Force overwrite existing files
+        #[arg(long, short)]
+        force: bool,
+
+        /// Generate Nix browser setup script (for NixOS/Nix users)
+        #[arg(long)]
+        nix: bool,
+    },
+}
+
+/// Project template type for init command
+#[derive(Clone, Debug, ValueEnum, Default)]
+pub enum InitTemplate {
+    /// Full structure: tests/, scripts/, results/, reports/, screenshots/
+    #[default]
+    Standard,
+    /// Minimal structure: tests/ only
+    Minimal,
 }
 
 #[derive(Subcommand, Debug)]

@@ -6,6 +6,9 @@ pub type Result<T> = std::result::Result<T, PwError>;
 
 #[derive(Debug, Error)]
 pub enum PwError {
+    #[error("initialization failed: {0}")]
+    Init(String),
+
     #[error("browser launch failed: {0}")]
     BrowserLaunch(String),
 

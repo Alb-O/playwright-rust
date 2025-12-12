@@ -5,6 +5,7 @@ mod coords;
 mod elements;
 mod eval;
 mod html;
+pub mod init;
 mod navigate;
 mod screenshot;
 mod text;
@@ -37,5 +38,16 @@ pub async fn dispatch(command: Commands, auth_file: Option<&Path>) -> Result<()>
             }
             AuthAction::Show { file } => auth::show(&file).await,
         },
+        Commands::Init { path, template, no_config, no_example, typescript, force, nix } => {
+            init::execute(init::InitOptions {
+                path,
+                template,
+                no_config,
+                no_example,
+                typescript,
+                force,
+                nix,
+            })
+        }
     }
 }
