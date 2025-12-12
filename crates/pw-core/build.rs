@@ -14,6 +14,14 @@ const PLAYWRIGHT_VERSION: &str = "1.56.1";
 /// Azure CDN base URL for Playwright drivers
 const DRIVER_BASE_URL: &str = "https://playwright.azureedge.net/builds/driver";
 
+/// Directory name constants - must match pw::dirs in lib.rs
+mod dir_names {
+    /// Main playwright directory under project root
+    pub const PLAYWRIGHT: &str = "playwright";
+    /// Drivers directory name
+    pub const DRIVERS: &str = "drivers";
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
@@ -64,18 +72,17 @@ fn main() {
 ///
 /// The detection strategy:
 /// 1. Try CARGO_WORKSPACE_DIR (available in Rust 1.73+) - gets the dependent project's workspace
+///    - First check if playwright/ directory exists, use playwright/drivers
+///    - Otherwise use drivers/ at workspace root
 /// 2. Walk up directory tree looking for Cargo.toml with [workspace]
+///    - Same playwright/ preference logic
 /// 3. Fallback to platform-specific cache directory (like playwright-python)
 fn get_drivers_dir() -> PathBuf {
     // Strategy 1: Use CARGO_WORKSPACE_DIR if available (Rust 1.73+)
     // This points to the workspace root of the project being built (not playwright-core)
     if let Ok(workspace_dir) = env::var("CARGO_WORKSPACE_DIR") {
-        let drivers_dir = PathBuf::from(workspace_dir).join("drivers");
-        println!(
-            "cargo:warning=Using workspace drivers directory: {}",
-            drivers_dir.display()
-        );
-        return drivers_dir;
+        let workspace = PathBuf::from(workspace_dir);
+        return select_drivers_dir(&workspace);
     }
 
     // Strategy 2: Walk up the directory tree to find a workspace Cargo.toml
@@ -88,13 +95,8 @@ fn get_drivers_dir() -> PathBuf {
         if cargo_toml.exists() {
             if let Ok(contents) = fs::read_to_string(&cargo_toml) {
                 if contents.contains("[workspace]") {
-                    let drivers_dir = parent.join("drivers");
                     println!("cargo:warning=Found workspace at: {}", parent.display());
-                    println!(
-                        "cargo:warning=Using drivers directory: {}",
-                        drivers_dir.display()
-                    );
-                    return drivers_dir;
+                    return select_drivers_dir(parent);
                 }
             }
         }
@@ -106,7 +108,7 @@ fn get_drivers_dir() -> PathBuf {
     let cache_dir = dirs::cache_dir()
         .expect("Could not determine cache directory")
         .join("playwright-rust")
-        .join("drivers");
+        .join(dir_names::DRIVERS);
 
     println!(
         "cargo:warning=No workspace found, using cache directory: {}",
@@ -115,6 +117,32 @@ fn get_drivers_dir() -> PathBuf {
     println!("cargo:warning=This matches playwright-python's approach for system-wide driver installation");
 
     cache_dir
+}
+
+/// Select the appropriate drivers directory for a project root.
+///
+/// Prefers `playwright/drivers` if a `playwright/` directory exists (scaffolded project),
+/// otherwise falls back to `drivers/` at the project root.
+fn select_drivers_dir(project_root: &Path) -> PathBuf {
+    let playwright_dir = project_root.join(dir_names::PLAYWRIGHT);
+    
+    // If playwright/ directory exists, put drivers inside it
+    if playwright_dir.exists() && playwright_dir.is_dir() {
+        let drivers_dir = playwright_dir.join(dir_names::DRIVERS);
+        println!(
+            "cargo:warning=Found playwright/ directory, using: {}",
+            drivers_dir.display()
+        );
+        return drivers_dir;
+    }
+
+    // Otherwise use drivers/ at project root (legacy behavior)
+    let drivers_dir = project_root.join(dir_names::DRIVERS);
+    println!(
+        "cargo:warning=Using workspace drivers directory: {}",
+        drivers_dir.display()
+    );
+    drivers_dir
 }
 
 /// Detect the current platform and return the Playwright platform identifier

@@ -22,6 +22,7 @@ use std::path::{Path, PathBuf};
 
 use crate::cli::InitTemplate;
 use crate::error::{PwError, Result};
+use pw::dirs;
 
 /// Options for project initialization
 pub struct InitOptions {
@@ -131,7 +132,7 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
         project_root
     };
 
-    let playwright_dir = project_root.join("playwright");
+    let playwright_dir = project_root.join(dirs::PLAYWRIGHT);
 
     let mut files_created = Vec::new();
     let mut directories_created = Vec::new();
@@ -145,7 +146,7 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
     create_dir_if_missing(&playwright_dir, &mut directories_created)?;
 
     // Create tests directory (always)
-    let tests_dir = playwright_dir.join("tests");
+    let tests_dir = playwright_dir.join(dirs::TESTS);
     create_dir_if_missing(&tests_dir, &mut directories_created)?;
 
     // Create example test if requested
@@ -162,7 +163,7 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
     // Standard template creates additional directories
     if matches!(options.template, InitTemplate::Standard) {
         // Scripts directory with common utilities
-        let scripts_dir = playwright_dir.join("scripts");
+        let scripts_dir = playwright_dir.join(dirs::SCRIPTS);
         create_dir_if_missing(&scripts_dir, &mut directories_created)?;
 
         let common_sh = scripts_dir.join("common.sh");
@@ -180,7 +181,7 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
         }
 
         // Output directories (gitignored, created empty for clarity)
-        for subdir in &["results", "reports", "screenshots", "auth"] {
+        for subdir in &[dirs::RESULTS, dirs::REPORTS, dirs::SCREENSHOTS, dirs::AUTH] {
             let dir = playwright_dir.join(subdir);
             create_dir_if_missing(&dir, &mut directories_created)?;
         }
@@ -193,7 +194,7 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
     // Create Nix browser setup script if requested
     if options.nix {
         // Ensure scripts directory exists (even for minimal template)
-        let scripts_dir = playwright_dir.join("scripts");
+        let scripts_dir = playwright_dir.join(dirs::SCRIPTS);
         create_dir_if_missing(&scripts_dir, &mut directories_created)?;
 
         let setup_browsers = scripts_dir.join("setup-browsers.sh");
@@ -214,9 +215,9 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
     // Create playwright config in project root
     if !options.no_config {
         let (config_filename, config_content) = if options.typescript {
-            ("playwright.config.ts", templates::PLAYWRIGHT_CONFIG_TS)
+            (dirs::CONFIG_TS, templates::PLAYWRIGHT_CONFIG_TS)
         } else {
-            ("playwright.config.js", templates::PLAYWRIGHT_CONFIG_JS)
+            (dirs::CONFIG_JS, templates::PLAYWRIGHT_CONFIG_JS)
         };
         let config_file = project_root.join(config_filename);
         write_file_if_missing(&config_file, config_content, options.force, &mut files_created)?;
@@ -231,9 +232,9 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
 
 /// Check if there's an existing playwright setup
 fn check_existing_setup(project_root: &Path) -> Result<()> {
-    let playwright_dir = project_root.join("playwright");
-    let config_js = project_root.join("playwright.config.js");
-    let config_ts = project_root.join("playwright.config.ts");
+    let playwright_dir = project_root.join(dirs::PLAYWRIGHT);
+    let config_js = project_root.join(dirs::CONFIG_JS);
+    let config_ts = project_root.join(dirs::CONFIG_TS);
 
     if playwright_dir.exists() || config_js.exists() || config_ts.exists() {
         return Err(PwError::Init(
@@ -290,15 +291,16 @@ mod tests {
 
         let result = scaffold_project(options).unwrap();
 
-        assert!(result.project_root.join("playwright").exists());
-        assert!(result.project_root.join("playwright/tests").exists());
-        assert!(result.project_root.join("playwright/tests/example.spec.js").exists());
-        assert!(result.project_root.join("playwright/.gitignore").exists());
-        assert!(result.project_root.join("playwright.config.js").exists());
+        let pw_dir = result.project_root.join(dirs::PLAYWRIGHT);
+        assert!(pw_dir.exists());
+        assert!(pw_dir.join(dirs::TESTS).exists());
+        assert!(pw_dir.join(dirs::TESTS).join("example.spec.js").exists());
+        assert!(pw_dir.join(".gitignore").exists());
+        assert!(result.project_root.join(dirs::CONFIG_JS).exists());
 
         // Minimal should NOT create scripts, results, reports, screenshots
-        assert!(!result.project_root.join("playwright/scripts").exists());
-        assert!(!result.project_root.join("playwright/results").exists());
+        assert!(!pw_dir.join(dirs::SCRIPTS).exists());
+        assert!(!pw_dir.join(dirs::RESULTS).exists());
     }
 
     #[test]
@@ -316,17 +318,18 @@ mod tests {
 
         let result = scaffold_project(options).unwrap();
 
+        let pw_dir = result.project_root.join(dirs::PLAYWRIGHT);
         // Standard creates all directories
-        assert!(result.project_root.join("playwright/tests").exists());
-        assert!(result.project_root.join("playwright/scripts").exists());
-        assert!(result.project_root.join("playwright/scripts/common.sh").exists());
-        assert!(result.project_root.join("playwright/results").exists());
-        assert!(result.project_root.join("playwright/reports").exists());
-        assert!(result.project_root.join("playwright/screenshots").exists());
-        assert!(result.project_root.join("playwright/auth").exists());
+        assert!(pw_dir.join(dirs::TESTS).exists());
+        assert!(pw_dir.join(dirs::SCRIPTS).exists());
+        assert!(pw_dir.join(dirs::SCRIPTS).join("common.sh").exists());
+        assert!(pw_dir.join(dirs::RESULTS).exists());
+        assert!(pw_dir.join(dirs::REPORTS).exists());
+        assert!(pw_dir.join(dirs::SCREENSHOTS).exists());
+        assert!(pw_dir.join(dirs::AUTH).exists());
 
         // No .gitkeep files (directories are empty but gitignored)
-        assert!(!result.project_root.join("playwright/results/.gitkeep").exists());
+        assert!(!pw_dir.join(dirs::RESULTS).join(".gitkeep").exists());
     }
 
     #[test]
@@ -344,8 +347,8 @@ mod tests {
 
         let result = scaffold_project(options).unwrap();
 
-        assert!(result.project_root.join("playwright.config.ts").exists());
-        assert!(result.project_root.join("playwright/tests/example.spec.ts").exists());
+        assert!(result.project_root.join(dirs::CONFIG_TS).exists());
+        assert!(result.project_root.join(dirs::PLAYWRIGHT).join(dirs::TESTS).join("example.spec.ts").exists());
     }
 
     #[test]
@@ -363,8 +366,9 @@ mod tests {
 
         let result = scaffold_project(options).unwrap();
 
-        assert!(result.project_root.join("playwright/tests").exists());
-        assert!(!result.project_root.join("playwright/tests/example.spec.js").exists());
+        let pw_dir = result.project_root.join(dirs::PLAYWRIGHT);
+        assert!(pw_dir.join(dirs::TESTS).exists());
+        assert!(!pw_dir.join(dirs::TESTS).join("example.spec.js").exists());
     }
 
     #[test]
@@ -382,8 +386,8 @@ mod tests {
 
         let result = scaffold_project(options).unwrap();
 
-        assert!(!result.project_root.join("playwright.config.js").exists());
-        assert!(!result.project_root.join("playwright.config.ts").exists());
+        assert!(!result.project_root.join(dirs::CONFIG_JS).exists());
+        assert!(!result.project_root.join(dirs::CONFIG_TS).exists());
     }
 
     #[test]
@@ -391,7 +395,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
 
         // Create existing playwright dir
-        fs::create_dir(temp.path().join("playwright")).unwrap();
+        fs::create_dir(temp.path().join(dirs::PLAYWRIGHT)).unwrap();
 
         let options = InitOptions {
             path: temp.path().to_path_buf(),
@@ -412,7 +416,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
 
         // Create existing playwright dir
-        fs::create_dir(temp.path().join("playwright")).unwrap();
+        fs::create_dir(temp.path().join(dirs::PLAYWRIGHT)).unwrap();
 
         let options = InitOptions {
             path: temp.path().to_path_buf(),
@@ -443,15 +447,16 @@ mod tests {
 
         let result = scaffold_project(options).unwrap();
 
+        let pw_dir = result.project_root.join(dirs::PLAYWRIGHT);
         // --nix should create scripts dir even with minimal template
-        assert!(result.project_root.join("playwright/scripts").exists());
-        assert!(result.project_root.join("playwright/scripts/setup-browsers.sh").exists());
+        assert!(pw_dir.join(dirs::SCRIPTS).exists());
+        assert!(pw_dir.join(dirs::SCRIPTS).join("setup-browsers.sh").exists());
 
         // Verify the script is executable
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let perms = fs::metadata(result.project_root.join("playwright/scripts/setup-browsers.sh"))
+            let perms = fs::metadata(pw_dir.join(dirs::SCRIPTS).join("setup-browsers.sh"))
                 .unwrap()
                 .permissions();
             assert_eq!(perms.mode() & 0o111, 0o111); // Check executable bits
@@ -473,8 +478,9 @@ mod tests {
 
         let result = scaffold_project(options).unwrap();
 
+        let scripts_dir = result.project_root.join(dirs::PLAYWRIGHT).join(dirs::SCRIPTS);
         // Should have both common.sh and setup-browsers.sh
-        assert!(result.project_root.join("playwright/scripts/common.sh").exists());
-        assert!(result.project_root.join("playwright/scripts/setup-browsers.sh").exists());
+        assert!(scripts_dir.join("common.sh").exists());
+        assert!(scripts_dir.join("setup-browsers.sh").exists());
     }
 }

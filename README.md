@@ -35,10 +35,13 @@ The API mirrors Playwright's official bindings. If you know `playwright-python` 
 
 ## Installing browsers
 
-`cargo build` downloads the Playwright driver (currently 1.56.1) to `drivers/playwright-1.56.1-<platform>/` in your workspace root. The driver bundles its own Node.js runtime. After building, install browsers using the driver's CLI:
+`cargo build` downloads the Playwright driver (currently 1.56.1) to your workspace. If a `playwright/` directory exists (created by `pw init`), the driver goes to `playwright/drivers/`; otherwise it goes to `drivers/` at the workspace root. The driver bundles its own Node.js runtime. After building, install browsers using the driver's CLI:
 
 ```bash
 cargo build
+# If you have a playwright/ directory (recommended):
+playwright/drivers/playwright-1.56.1-*/node playwright/drivers/playwright-1.56.1-*/package/cli.js install chromium
+# Otherwise:
 drivers/playwright-1.56.1-*/node drivers/playwright-1.56.1-*/package/cli.js install chromium
 ```
 

@@ -94,6 +94,7 @@ impl CommandContext {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pw::dirs;
     use std::fs;
     use tempfile::TempDir;
 
@@ -121,8 +122,8 @@ mod tests {
     #[test]
     fn test_screenshot_path_in_project() {
         let temp = TempDir::new().unwrap();
-        fs::write(temp.path().join("playwright.config.js"), "export default {}").unwrap();
-        fs::create_dir_all(temp.path().join("playwright/screenshots")).unwrap();
+        fs::write(temp.path().join(dirs::CONFIG_JS), "export default {}").unwrap();
+        fs::create_dir_all(temp.path().join(dirs::PLAYWRIGHT).join(dirs::SCREENSHOTS)).unwrap();
 
         // Change to temp dir to detect project
         let original_dir = std::env::current_dir().unwrap();
@@ -134,7 +135,11 @@ mod tests {
         let result = std::panic::catch_unwind(|| {
             assert!(ctx.project.is_some());
             let path = ctx.screenshot_path(Path::new("test.png"));
-            assert!(path.ends_with("playwright/screenshots/test.png"));
+            // Verify it ends with the expected path components
+            let expected_suffix = PathBuf::from(dirs::PLAYWRIGHT)
+                .join(dirs::SCREENSHOTS)
+                .join("test.png");
+            assert!(path.ends_with(&expected_suffix));
         });
 
         std::env::set_current_dir(original_dir).unwrap();

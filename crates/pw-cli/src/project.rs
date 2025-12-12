@@ -7,6 +7,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use pw::dirs;
 use tracing::debug;
 
 /// Paths extracted from a playwright project configuration
@@ -35,13 +36,13 @@ impl Default for ProjectPaths {
 impl ProjectPaths {
     /// Create default paths relative to a project root
     pub fn from_root(root: PathBuf) -> Self {
-        let playwright_dir = root.join("playwright");
+        let playwright_dir = root.join(dirs::PLAYWRIGHT);
         Self {
-            tests_dir: playwright_dir.join("tests"),
-            output_dir: playwright_dir.join("results"),
-            screenshots_dir: playwright_dir.join("screenshots"),
-            auth_dir: playwright_dir.join("auth"),
-            reports_dir: playwright_dir.join("reports"),
+            tests_dir: playwright_dir.join(dirs::TESTS),
+            output_dir: playwright_dir.join(dirs::RESULTS),
+            screenshots_dir: playwright_dir.join(dirs::SCREENSHOTS),
+            auth_dir: playwright_dir.join(dirs::AUTH),
+            reports_dir: playwright_dir.join(dirs::REPORTS),
             root,
         }
     }
@@ -82,8 +83,8 @@ impl Project {
 
     /// Create a project from a known root directory
     pub fn from_root(root: PathBuf) -> Self {
-        let config_js = root.join("playwright.config.js");
-        let config_ts = root.join("playwright.config.ts");
+        let config_js = root.join(dirs::CONFIG_JS);
+        let config_ts = root.join(dirs::CONFIG_TS);
 
         let (config_file, typescript) = if config_ts.exists() {
             (Some(config_ts), true)
@@ -132,8 +133,8 @@ pub fn find_project_root(start: &Path) -> Option<PathBuf> {
     loop {
         debug!(target = "pw", path = %current.display(), "checking for playwright config");
 
-        let config_js = current.join("playwright.config.js");
-        let config_ts = current.join("playwright.config.ts");
+        let config_js = current.join(dirs::CONFIG_JS);
+        let config_ts = current.join(dirs::CONFIG_TS);
 
         if config_js.exists() || config_ts.exists() {
             debug!(target = "pw", root = %current.display(), "found project root");
@@ -193,7 +194,7 @@ mod tests {
     #[test]
     fn test_find_project_root_with_js_config() {
         let temp = TempDir::new().unwrap();
-        let config = temp.path().join("playwright.config.js");
+        let config = temp.path().join(dirs::CONFIG_JS);
         fs::write(&config, "export default {}").unwrap();
 
         let result = find_project_root(temp.path());
@@ -204,7 +205,7 @@ mod tests {
     #[test]
     fn test_find_project_root_with_ts_config() {
         let temp = TempDir::new().unwrap();
-        let config = temp.path().join("playwright.config.ts");
+        let config = temp.path().join(dirs::CONFIG_TS);
         fs::write(&config, "export default {}").unwrap();
 
         let result = find_project_root(temp.path());
@@ -214,11 +215,11 @@ mod tests {
     #[test]
     fn test_find_project_root_from_subdirectory() {
         let temp = TempDir::new().unwrap();
-        let config = temp.path().join("playwright.config.js");
+        let config = temp.path().join(dirs::CONFIG_JS);
         fs::write(&config, "export default {}").unwrap();
 
-        // Create nested directory
-        let nested = temp.path().join("playwright/tests");
+        // Create nested directory using constants
+        let nested = temp.path().join(dirs::PLAYWRIGHT).join(dirs::TESTS);
         fs::create_dir_all(&nested).unwrap();
 
         let result = find_project_root(&nested);
@@ -236,7 +237,7 @@ mod tests {
     #[test]
     fn test_project_detect_from() {
         let temp = TempDir::new().unwrap();
-        fs::write(temp.path().join("playwright.config.ts"), "export default {}").unwrap();
+        fs::write(temp.path().join(dirs::CONFIG_TS), "export default {}").unwrap();
 
         let project = Project::detect_from(temp.path()).unwrap();
         assert!(project.typescript);
@@ -246,7 +247,7 @@ mod tests {
     #[test]
     fn test_extract_custom_test_dir() {
         let temp = TempDir::new().unwrap();
-        let config = temp.path().join("playwright.config.js");
+        let config = temp.path().join(dirs::CONFIG_JS);
         fs::write(
             &config,
             r#"
@@ -267,13 +268,23 @@ mod tests {
     fn test_project_paths_screenshot() {
         let paths = ProjectPaths::from_root(PathBuf::from("/project"));
         let screenshot = paths.screenshot_path("test.png");
-        assert_eq!(screenshot, PathBuf::from("/project/playwright/screenshots/test.png"));
+        // Verify it uses the correct directory structure
+        let expected = PathBuf::from("/project")
+            .join(dirs::PLAYWRIGHT)
+            .join(dirs::SCREENSHOTS)
+            .join("test.png");
+        assert_eq!(screenshot, expected);
     }
 
     #[test]
     fn test_project_paths_auth() {
         let paths = ProjectPaths::from_root(PathBuf::from("/project"));
         let auth = paths.auth_file("session.json");
-        assert_eq!(auth, PathBuf::from("/project/playwright/auth/session.json"));
+        // Verify it uses the correct directory structure
+        let expected = PathBuf::from("/project")
+            .join(dirs::PLAYWRIGHT)
+            .join(dirs::AUTH)
+            .join("session.json");
+        assert_eq!(auth, expected);
     }
 }

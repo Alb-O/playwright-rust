@@ -220,6 +220,9 @@ pub const PLAYWRIGHT_GITIGNORE: &str = r#"# Test outputs (regenerated on each ru
 # Auth state files (may contain sensitive data)
 /auth/
 
+# Playwright driver (downloaded by pw-core build.rs)
+/drivers/
+
 # Browser symlinks (created by setup-browsers.sh for Nix compatibility)
 /browsers/
 

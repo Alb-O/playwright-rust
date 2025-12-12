@@ -167,6 +167,36 @@ pub mod protocol;
 /// See: <https://playwright.dev/docs/test-timeouts>
 pub const DEFAULT_TIMEOUT_MS: f64 = 30000.0;
 
+/// Directory name constants for playwright project structure.
+///
+/// These match the scaffold structure created by `pw init` and are used
+/// consistently across build.rs and runtime code.
+pub mod dirs {
+    /// Main playwright directory under project root (contains tests, auth, screenshots, etc.)
+    pub const PLAYWRIGHT: &str = "playwright";
+    /// Drivers directory name (where playwright driver is downloaded)
+    pub const DRIVERS: &str = "drivers";
+    /// Tests directory name (inside playwright/)
+    pub const TESTS: &str = "tests";
+    /// Results/output directory name (inside playwright/)
+    pub const RESULTS: &str = "results";
+    /// Screenshots directory name (inside playwright/)
+    pub const SCREENSHOTS: &str = "screenshots";
+    /// Auth state directory name (inside playwright/)
+    pub const AUTH: &str = "auth";
+    /// Reports directory name (inside playwright/)
+    pub const REPORTS: &str = "reports";
+    /// Scripts directory name (inside playwright/)
+    pub const SCRIPTS: &str = "scripts";
+    /// Browsers directory name (inside playwright/, for Nix browser symlinks)
+    pub const BROWSERS: &str = "browsers";
+
+    /// JavaScript config file name
+    pub const CONFIG_JS: &str = "playwright.config.js";
+    /// TypeScript config file name
+    pub const CONFIG_TS: &str = "playwright.config.ts";
+}
+
 // Re-export error types
 pub use error::{Error, Result};
 
