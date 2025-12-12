@@ -6,9 +6,9 @@ use std::path::PathBuf;
 #[command(about = "Playwright CLI - Browser automation from the command line")]
 #[command(version)]
 pub struct Cli {
-    /// Enable verbose output
-    #[arg(short, long, global = true)]
-    pub verbose: bool,
+    /// Increase verbosity (-v info, -vv debug)
+    #[arg(short, long, global = true, action = clap::ArgAction::Count)]
+    pub verbose: u8,
 
     /// Load authentication state from file (cookies, localStorage)
     #[arg(long, global = true, value_name = "FILE")]

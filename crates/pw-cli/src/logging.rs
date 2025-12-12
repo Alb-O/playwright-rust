@@ -1,13 +1,19 @@
 use tracing_subscriber::fmt::writer::MakeWriterExt;
 use tracing_subscriber::EnvFilter;
 
-pub fn init_logging(verbose: bool) {
-    // Allow RUST_LOG overrides, fall back to cli flag-controlled level
-    let default_level = if verbose { "debug" } else { "info" };
+pub fn init_logging(verbosity: u8) {
+    // 0 = silent (suppress pw-core protocol noise entirely)
+    // 1 (-v) = info for pw-cli, warn for pw-core
+    // 2+ (-vv) = debug/trace for everything
+    let filter = match verbosity {
+        0 => "error,pw_core=off,pw=off",
+        1 => "info,pw_core=warn",
+        _ => "debug",
+    };
+    
     let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(default_level));
+        .unwrap_or_else(|_| EnvFilter::new(filter));
 
-    // Log to stderr; keep formatting compact
     let stderr = std::io::stderr.with_max_level(tracing::Level::TRACE);
 
     tracing_subscriber::fmt()
