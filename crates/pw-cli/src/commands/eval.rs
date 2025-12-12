@@ -1,15 +1,18 @@
-use std::path::Path;
-
 use crate::browser::BrowserSession;
+use crate::context::CommandContext;
 use crate::error::Result;
 use pw::WaitUntil;
 use tracing::{debug, info};
 
-pub async fn execute(url: &str, expression: &str, auth_file: Option<&Path>) -> Result<()> {
-    info!(target = "pw", %url, "eval js");
+pub async fn execute(url: &str, expression: &str, ctx: &CommandContext) -> Result<()> {
+    info!(target = "pw", %url, browser = %ctx.browser, "eval js");
     debug!(target = "pw", %expression, "expression");
 
-    let session = BrowserSession::with_auth(WaitUntil::NetworkIdle, auth_file).await?;
+    let session = BrowserSession::with_auth_and_browser(
+        WaitUntil::NetworkIdle,
+        ctx.auth_file(),
+        ctx.browser,
+    ).await?;
     session.goto(url).await?;
 
     let result = session

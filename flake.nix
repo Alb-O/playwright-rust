@@ -55,6 +55,11 @@
             export OPENSSL_INCLUDE_DIR="${pkgs.openssl.dev}/include"
             export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig"
 
+            # Use Nix-provided playwright driver instead of the bundled one
+            # The bundled driver's node binary is dynamically linked and won't work on NixOS
+            export PLAYWRIGHT_NODE_EXE="${pkgs.nodejs_22}/bin/node"
+            export PLAYWRIGHT_CLI_JS="${pkgs.playwright-driver}/cli.js"
+
             # Playwright browser path - create symlinks for version compatibility
             # Nix provides browser version 1181, but playwright-rs 1.56.1 expects version 1194
             BROWSERS_BASE="${pkgs.playwright-driver.browsers}"
@@ -93,6 +98,7 @@
 
             echo "pw-tool dev shell"
             echo "  Rust: $(rustc --version)"
+            echo "  Playwright driver: $PLAYWRIGHT_CLI_JS"
             echo "  Playwright browsers: $PLAYWRIGHT_BROWSERS_PATH"
           '';
         };

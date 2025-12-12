@@ -1,15 +1,19 @@
-use std::path::Path;
 use std::time::Duration;
 
 use crate::browser::BrowserSession;
+use crate::context::CommandContext;
 use crate::error::Result;
 use crate::types::NavigateResult;
 use pw::WaitUntil;
 use tracing::{info, warn};
 
-pub async fn execute(url: &str, auth_file: Option<&Path>) -> Result<()> {
-    info!(target = "pw", %url, "navigate");
-    let session = BrowserSession::with_auth(WaitUntil::NetworkIdle, auth_file).await?;
+pub async fn execute(url: &str, ctx: &CommandContext) -> Result<()> {
+    info!(target = "pw", %url, browser = %ctx.browser, "navigate");
+    let session = BrowserSession::with_auth_and_browser(
+        WaitUntil::NetworkIdle,
+        ctx.auth_file(),
+        ctx.browser,
+    ).await?;
     session.goto(url).await?;
 
     tokio::time::sleep(Duration::from_millis(2000)).await;

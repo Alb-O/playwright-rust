@@ -1,15 +1,19 @@
-use std::path::Path;
 use std::time::Duration;
 
 use crate::browser::{js::console_capture_injection_js, BrowserSession};
+use crate::context::CommandContext;
 use crate::error::Result;
 use crate::types::ConsoleMessage;
 use pw::WaitUntil;
 use tracing::{info, warn};
 
-pub async fn execute(url: &str, timeout_ms: u64, auth_file: Option<&Path>) -> Result<()> {
-    info!(target = "pw", %url, timeout_ms, "capture console");
-    let session = BrowserSession::with_auth(WaitUntil::NetworkIdle, auth_file).await?;
+pub async fn execute(url: &str, timeout_ms: u64, ctx: &CommandContext) -> Result<()> {
+    info!(target = "pw", %url, timeout_ms, browser = %ctx.browser, "capture console");
+    let session = BrowserSession::with_auth_and_browser(
+        WaitUntil::NetworkIdle,
+        ctx.auth_file(),
+        ctx.browser,
+    ).await?;
 
     if let Err(err) = session.page().evaluate(console_capture_injection_js()).await {
         warn!(target = "pw.browser.console", error = %err, "failed to inject console capture");

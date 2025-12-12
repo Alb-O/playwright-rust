@@ -1,15 +1,19 @@
-use std::path::Path;
 use std::time::Duration;
 
 use crate::browser::BrowserSession;
+use crate::context::CommandContext;
 use crate::error::{PwError, Result};
 use pw::WaitUntil;
 use tracing::info;
 
-pub async fn execute(url: &str, condition: &str, auth_file: Option<&Path>) -> Result<()> {
-    info!(target = "pw", %url, %condition, "wait");
+pub async fn execute(url: &str, condition: &str, ctx: &CommandContext) -> Result<()> {
+    info!(target = "pw", %url, %condition, browser = %ctx.browser, "wait");
 
-    let session = BrowserSession::with_auth(WaitUntil::NetworkIdle, auth_file).await?;
+    let session = BrowserSession::with_auth_and_browser(
+        WaitUntil::NetworkIdle,
+        ctx.auth_file(),
+        ctx.browser,
+    ).await?;
     session.goto(url).await?;
 
     if let Ok(ms) = condition.parse::<u64>() {

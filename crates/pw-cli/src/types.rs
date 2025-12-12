@@ -1,4 +1,28 @@
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
+
+/// Browser type for pw-cli commands
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BrowserKind {
+    /// Chromium-based browser (Chrome, Edge)
+    #[default]
+    Chromium,
+    /// Mozilla Firefox
+    Firefox,
+    /// WebKit (Safari)
+    Webkit,
+}
+
+impl std::fmt::Display for BrowserKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BrowserKind::Chromium => write!(f, "chromium"),
+            BrowserKind::Firefox => write!(f, "firefox"),
+            BrowserKind::Webkit => write!(f, "webkit"),
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]

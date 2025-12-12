@@ -1,15 +1,19 @@
-use std::path::Path;
 use std::time::Duration;
 
 use crate::browser::BrowserSession;
+use crate::context::CommandContext;
 use crate::error::Result;
 use pw::WaitUntil;
 use tracing::info;
 
-pub async fn execute(url: &str, selector: &str, auth_file: Option<&Path>) -> Result<()> {
-    info!(target = "pw", %url, %selector, "click element");
+pub async fn execute(url: &str, selector: &str, ctx: &CommandContext) -> Result<()> {
+    info!(target = "pw", %url, %selector, browser = %ctx.browser, "click element");
 
-    let session = BrowserSession::with_auth(WaitUntil::NetworkIdle, auth_file).await?;
+    let session = BrowserSession::with_auth_and_browser(
+        WaitUntil::NetworkIdle,
+        ctx.auth_file(),
+        ctx.browser,
+    ).await?;
     session.goto(url).await?;
 
     let locator = session.page().locator(selector).await;

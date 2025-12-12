@@ -11,30 +11,29 @@ mod screenshot;
 mod text;
 mod wait;
 
-use std::path::Path;
-
 use crate::cli::{AuthAction, Commands};
+use crate::context::CommandContext;
 use crate::error::Result;
 
-pub async fn dispatch(command: Commands, auth_file: Option<&Path>) -> Result<()> {
+pub async fn dispatch(command: Commands, ctx: CommandContext) -> Result<()> {
     match command {
-        Commands::Navigate { url } => navigate::execute(&url, auth_file).await,
-        Commands::Console { url, timeout_ms } => console::execute(&url, timeout_ms, auth_file).await,
-        Commands::Eval { url, expression } => eval::execute(&url, &expression, auth_file).await,
-        Commands::Html { url, selector } => html::execute(&url, &selector, auth_file).await,
-        Commands::Coords { url, selector } => coords::execute_single(&url, &selector, auth_file).await,
-        Commands::CoordsAll { url, selector } => coords::execute_all(&url, &selector, auth_file).await,
-        Commands::Screenshot { url, output, full_page } => screenshot::execute(&url, &output, full_page, auth_file).await,
-        Commands::Click { url, selector } => click::execute(&url, &selector, auth_file).await,
-        Commands::Text { url, selector } => text::execute(&url, &selector, auth_file).await,
-        Commands::Elements { url } => elements::execute(&url, auth_file).await,
-        Commands::Wait { url, condition } => wait::execute(&url, &condition, auth_file).await,
+        Commands::Navigate { url } => navigate::execute(&url, &ctx).await,
+        Commands::Console { url, timeout_ms } => console::execute(&url, timeout_ms, &ctx).await,
+        Commands::Eval { url, expression } => eval::execute(&url, &expression, &ctx).await,
+        Commands::Html { url, selector } => html::execute(&url, &selector, &ctx).await,
+        Commands::Coords { url, selector } => coords::execute_single(&url, &selector, &ctx).await,
+        Commands::CoordsAll { url, selector } => coords::execute_all(&url, &selector, &ctx).await,
+        Commands::Screenshot { url, output, full_page } => screenshot::execute(&url, &output, full_page, &ctx).await,
+        Commands::Click { url, selector } => click::execute(&url, &selector, &ctx).await,
+        Commands::Text { url, selector } => text::execute(&url, &selector, &ctx).await,
+        Commands::Elements { url } => elements::execute(&url, &ctx).await,
+        Commands::Wait { url, condition } => wait::execute(&url, &condition, &ctx).await,
         Commands::Auth { action } => match action {
             AuthAction::Login { url, output, timeout } => {
-                auth::login(&url, &output, timeout).await
+                auth::login(&url, &output, timeout, &ctx).await
             }
             AuthAction::Cookies { url, format } => {
-                auth::cookies(&url, &format, auth_file).await
+                auth::cookies(&url, &format, &ctx).await
             }
             AuthAction::Show { file } => auth::show(&file).await,
         },

@@ -10,11 +10,15 @@ use std::process::Command;
 /// Get the path to the Playwright driver executable
 ///
 /// This function attempts to locate the Playwright driver in the following order:
-/// 1. Bundled driver downloaded by build.rs (PRIMARY - matches official bindings)
-/// 2. PLAYWRIGHT_DRIVER_PATH environment variable (user override)
-/// 3. PLAYWRIGHT_NODE_EXE and PLAYWRIGHT_CLI_JS environment variables (user override)
+/// 1. PLAYWRIGHT_NODE_EXE and PLAYWRIGHT_CLI_JS environment variables (runtime override)
+/// 2. PLAYWRIGHT_DRIVER_PATH environment variable (runtime override)
+/// 3. Bundled driver downloaded by build.rs (matches official bindings)
 /// 4. Global npm installation (`npm root -g`) (development fallback)
 /// 5. Local npm installation (`npm root`) (development fallback)
+///
+/// Runtime environment variables take precedence over the bundled driver to support
+/// environments like NixOS where the bundled driver's dynamically-linked node binary
+/// won't work.
 ///
 /// Returns a tuple of (node_executable_path, cli_js_path).
 ///
@@ -33,18 +37,20 @@ use std::process::Command;
 /// # Ok::<(), pw::Error>(())
 /// ```
 pub fn get_driver_executable() -> Result<(PathBuf, PathBuf)> {
-    // 1. Try bundled driver from build.rs (PRIMARY PATH - matches official bindings)
-    if let Some(result) = try_bundled_driver()? {
+    // 1. Try PLAYWRIGHT_NODE_EXE and PLAYWRIGHT_CLI_JS environment variables (runtime override)
+    // These take precedence to support NixOS and other environments where the bundled
+    // driver's dynamically-linked node binary won't work.
+    if let Some(result) = try_node_cli_env()? {
         return Ok(result);
     }
 
-    // 2. Try PLAYWRIGHT_DRIVER_PATH environment variable
+    // 2. Try PLAYWRIGHT_DRIVER_PATH environment variable (runtime override)
     if let Some(result) = try_driver_path_env()? {
         return Ok(result);
     }
 
-    // 3. Try PLAYWRIGHT_NODE_EXE and PLAYWRIGHT_CLI_JS environment variables
-    if let Some(result) = try_node_cli_env()? {
+    // 3. Try bundled driver from build.rs (matches official bindings)
+    if let Some(result) = try_bundled_driver()? {
         return Ok(result);
     }
 

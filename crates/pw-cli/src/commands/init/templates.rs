@@ -293,12 +293,65 @@ pub const SETUP_BROWSERS_SH: &str = r##"#!/usr/bin/env bash
 #
 # Usage:
 #   eval "$(playwright/scripts/setup-browsers.sh)"
+#   eval "$(playwright/scripts/setup-browsers.sh --browser chromium)"
+#   eval "$(playwright/scripts/setup-browsers.sh --browser chromium,firefox)"
 #   npm install @playwright/test
 #   npx playwright test
+#
+# Options:
+#   --browser <list>  Comma-separated list of browsers to set up (chromium,firefox,webkit)
+#                     Default: all available browsers
 #
 # After sourcing, PLAYWRIGHT_BROWSERS_PATH will be set and ready to use.
 
 set -euo pipefail
+
+# Parse arguments
+SELECTED_BROWSERS=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --browser|-b)
+      SELECTED_BROWSERS="$2"
+      shift 2
+      ;;
+    --help|-h)
+      echo "Usage: $0 [--browser chromium,firefox,webkit]"
+      echo ""
+      echo "Options:"
+      echo "  --browser, -b  Comma-separated list of browsers to set up"
+      echo "                 Available: chromium, firefox, webkit"
+      echo "                 Default: all available browsers"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Convert comma-separated list to array
+if [[ -n "$SELECTED_BROWSERS" ]]; then
+  IFS=',' read -ra BROWSER_FILTER <<< "$SELECTED_BROWSERS"
+else
+  BROWSER_FILTER=()
+fi
+
+# Check if a browser should be included
+should_include_browser() {
+  local browser="$1"
+  # If no filter, include all
+  if [[ ${#BROWSER_FILTER[@]} -eq 0 ]]; then
+    return 0
+  fi
+  # Check if browser is in filter list
+  for b in "${BROWSER_FILTER[@]}"; do
+    if [[ "$b" == "$browser" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
 
 # Find Nix playwright browsers
 find_nix_browsers() {
@@ -369,9 +422,9 @@ setup_playwright_browsers() {
   if [[ ! -d "$browsers_compat" ]]; then
     needs_update=true
   else
-    # Check if all target revisions have compatibility entries
+    # Check if all target revisions have compatibility entries for selected browsers
     for rev in "${target_revisions[@]}"; do
-      if [[ ! -e "$browsers_compat/chromium_headless_shell-$rev" ]]; then
+      if should_include_browser "chromium" && [[ ! -e "$browsers_compat/chromium_headless_shell-$rev" ]]; then
         needs_update=true
         break
       fi
@@ -380,37 +433,65 @@ setup_playwright_browsers() {
   
   if [[ "$needs_update" == "true" ]]; then
     echo "# Setting up browser compatibility symlinks..." >&2
-    rm -rf "$browsers_compat"
     mkdir -p "$browsers_compat"
     
-    # Link all existing browsers from Nix store
+    # Link browsers from Nix store based on selection
     for browser in "$browsers_base"/*; do
-      ln -sf "$browser" "$browsers_compat/$(basename "$browser")"
-    done
-    
-    # Create version compatibility symlinks for each target revision
-    for rev in "${target_revisions[@]}"; do
-      if [[ "$rev" == "$nix_revision" ]]; then
-        continue  # Skip if this is the native revision
+      local browser_name
+      browser_name="$(basename "$browser")"
+      
+      # Determine browser type from directory name
+      local browser_type=""
+      case "$browser_name" in
+        chromium*) browser_type="chromium" ;;
+        firefox*) browser_type="firefox" ;;
+        webkit*) browser_type="webkit" ;;
+        ffmpeg*) browser_type="ffmpeg" ;;  # Always include ffmpeg
+        *) continue ;;
+      esac
+      
+      # Skip if not in filter (unless it's ffmpeg)
+      if [[ "$browser_type" != "ffmpeg" ]] && ! should_include_browser "$browser_type"; then
+        continue
       fi
       
-      # Simple symlink for main chromium
-      ln -sf "$browsers_base/chromium-$nix_revision" "$browsers_compat/chromium-$rev"
-      
-      # For headless shell, Playwright 1.57+ (revision 1200+) changed internal structure:
-      # Old: chrome-linux/headless_shell
-      # New: chrome-headless-shell-linux64/chrome-headless-shell
-      if [[ "$rev" -ge 1200 ]]; then
-        mkdir -p "$browsers_compat/chromium_headless_shell-$rev/chrome-headless-shell-linux64"
-        ln -sf "$browsers_base/chromium_headless_shell-$nix_revision/chrome-linux/headless_shell" \
-               "$browsers_compat/chromium_headless_shell-$rev/chrome-headless-shell-linux64/chrome-headless-shell"
-      else
-        ln -sf "$browsers_base/chromium_headless_shell-$nix_revision" \
-               "$browsers_compat/chromium_headless_shell-$rev"
-      fi
+      ln -sf "$browser" "$browsers_compat/$browser_name"
     done
     
-    echo "# Browser compatibility symlinks created" >&2
+    # Create version compatibility symlinks for chromium (if selected)
+    if should_include_browser "chromium"; then
+      for rev in "${target_revisions[@]}"; do
+        if [[ "$rev" == "$nix_revision" ]]; then
+          continue  # Skip if this is the native revision
+        fi
+        
+        # Simple symlink for main chromium
+        if [[ -d "$browsers_base/chromium-$nix_revision" ]]; then
+          ln -sf "$browsers_base/chromium-$nix_revision" "$browsers_compat/chromium-$rev"
+        fi
+        
+        # For headless shell, Playwright 1.57+ (revision 1200+) changed internal structure:
+        # Old: chrome-linux/headless_shell
+        # New: chrome-headless-shell-linux64/chrome-headless-shell
+        if [[ -d "$browsers_base/chromium_headless_shell-$nix_revision" ]]; then
+          if [[ "$rev" -ge 1200 ]]; then
+            mkdir -p "$browsers_compat/chromium_headless_shell-$rev/chrome-headless-shell-linux64"
+            ln -sf "$browsers_base/chromium_headless_shell-$nix_revision/chrome-linux/headless_shell" \
+                   "$browsers_compat/chromium_headless_shell-$rev/chrome-headless-shell-linux64/chrome-headless-shell"
+          else
+            ln -sf "$browsers_base/chromium_headless_shell-$nix_revision" \
+                   "$browsers_compat/chromium_headless_shell-$rev"
+          fi
+        fi
+      done
+    fi
+    
+    # Report which browsers were set up
+    local setup_browsers=""
+    if should_include_browser "chromium"; then setup_browsers="$setup_browsers chromium"; fi
+    if should_include_browser "firefox"; then setup_browsers="$setup_browsers firefox"; fi
+    if should_include_browser "webkit"; then setup_browsers="$setup_browsers webkit"; fi
+    echo "# Browser compatibility symlinks created for:$setup_browsers" >&2
   fi
   
   # Output the export command (can be eval'd by caller)

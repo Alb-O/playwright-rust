@@ -1,16 +1,26 @@
 use std::path::Path;
 
 use crate::browser::BrowserSession;
+use crate::context::CommandContext;
 use crate::error::Result;
 use pw::{StorageState, WaitUntil};
 use tracing::info;
 
 /// Interactive login - opens browser for manual login, then saves session
-pub async fn login(url: &str, output: &Path, timeout_secs: u64) -> Result<()> {
-    info!(target = "pw", %url, path = %output.display(), "starting interactive login");
+pub async fn login(url: &str, output: &Path, timeout_secs: u64, ctx: &CommandContext) -> Result<()> {
+    // Resolve output path using project context (into auth/ directory)
+    let output = if output.is_absolute() || output.parent().map_or(false, |p| !p.as_os_str().is_empty()) {
+        output.to_path_buf()
+    } else if let Some(ref proj) = ctx.project {
+        proj.paths.auth_file(output.to_string_lossy().as_ref())
+    } else {
+        output.to_path_buf()
+    };
+
+    info!(target = "pw", %url, path = %output.display(), browser = %ctx.browser, "starting interactive login");
 
     // Launch in headed mode (not headless) for manual login
-    let session = BrowserSession::with_options(WaitUntil::Load, None, false).await?;
+    let session = BrowserSession::with_options(WaitUntil::Load, None, false, ctx.browser).await?;
     session.goto(url).await?;
 
     println!("Browser opened at: {}", url);
@@ -45,7 +55,7 @@ pub async fn login(url: &str, output: &Path, timeout_secs: u64) -> Result<()> {
         }
     }
 
-    state.to_file(output)?;
+    state.to_file(&output)?;
 
     let cookie_count = state.cookies.len();
     let origin_count = state.origins.len();
@@ -61,13 +71,14 @@ pub async fn login(url: &str, output: &Path, timeout_secs: u64) -> Result<()> {
 }
 
 /// Show cookies for a URL
-pub async fn cookies(url: &str, format: &str, auth_file: Option<&Path>) -> Result<()> {
-    info!(target = "pw", %url, "fetching cookies");
+pub async fn cookies(url: &str, format: &str, ctx: &CommandContext) -> Result<()> {
+    info!(target = "pw", %url, browser = %ctx.browser, "fetching cookies");
 
-    let session = match auth_file {
-        Some(path) => BrowserSession::with_auth_file(WaitUntil::Load, path).await?,
-        None => BrowserSession::new(WaitUntil::Load).await?,
-    };
+    let session = BrowserSession::with_auth_and_browser(
+        WaitUntil::Load,
+        ctx.auth_file(),
+        ctx.browser,
+    ).await?;
 
     session.goto(url).await?;
 

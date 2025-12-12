@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
+use crate::types::BrowserKind;
+
 #[derive(Parser, Debug)]
 #[command(name = "pw")]
 #[command(about = "Playwright CLI - Browser automation from the command line")]
@@ -13,6 +15,14 @@ pub struct Cli {
     /// Load authentication state from file (cookies, localStorage)
     #[arg(long, global = true, value_name = "FILE")]
     pub auth: Option<PathBuf>,
+
+    /// Browser to use for automation
+    #[arg(short, long, global = true, value_enum, default_value = "chromium")]
+    pub browser: BrowserKind,
+
+    /// Disable project detection (use current directory paths)
+    #[arg(long, global = true)]
+    pub no_project: bool,
 
     #[command(subcommand)]
     pub command: Commands,

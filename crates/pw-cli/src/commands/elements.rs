@@ -1,6 +1,5 @@
-use std::path::Path;
-
 use crate::browser::BrowserSession;
+use crate::context::CommandContext;
 use crate::error::Result;
 use pw::WaitUntil;
 use serde::Deserialize;
@@ -165,10 +164,14 @@ const EXTRACT_ELEMENTS_JS: &str = r#"
 })()
 "#;
 
-pub async fn execute(url: &str, auth_file: Option<&Path>) -> Result<()> {
-    info!(target = "pw", %url, "list elements");
+pub async fn execute(url: &str, ctx: &CommandContext) -> Result<()> {
+    info!(target = "pw", %url, browser = %ctx.browser, "list elements");
 
-    let session = BrowserSession::with_auth(WaitUntil::NetworkIdle, auth_file).await?;
+    let session = BrowserSession::with_auth_and_browser(
+        WaitUntil::NetworkIdle,
+        ctx.auth_file(),
+        ctx.browser,
+    ).await?;
     session.goto(url).await?;
 
     let js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
