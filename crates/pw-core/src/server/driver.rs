@@ -5,7 +5,8 @@
 
 use crate::{Error, Result};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use tracing::warn;
 
 /// Get the path to the Playwright driver executable
 ///
@@ -40,28 +41,78 @@ pub fn get_driver_executable() -> Result<(PathBuf, PathBuf)> {
     // 1. Try PLAYWRIGHT_NODE_EXE and PLAYWRIGHT_CLI_JS environment variables (runtime override)
     // These take precedence to support NixOS and other environments where the bundled
     // driver's dynamically-linked node binary won't work.
-    if let Some(result) = try_node_cli_env()? {
-        return Ok(result);
+    if let Some((node, cli)) = try_node_cli_env()? {
+        let usable = node_is_usable(&node);
+        debug_candidate("env node/cli", &node, &cli, usable);
+        if usable {
+            return Ok((node, cli));
+        }
+        warn!(
+            target = "pw",
+            node = %node.display(),
+            cli = %cli.display(),
+            "PLAYWRIGHT_NODE_EXE is set but node is not runnable; falling back"
+        );
     }
 
     // 2. Try PLAYWRIGHT_DRIVER_PATH environment variable (runtime override)
-    if let Some(result) = try_driver_path_env()? {
-        return Ok(result);
+    if let Some((node, cli)) = try_driver_path_env()? {
+        let usable = node_is_usable(&node);
+        debug_candidate("PLAYWRIGHT_DRIVER_PATH", &node, &cli, usable);
+        if usable {
+            return Ok((node, cli));
+        }
+        warn!(
+            target = "pw",
+            node = %node.display(),
+            cli = %cli.display(),
+            "PLAYWRIGHT_DRIVER_PATH is set but node is not runnable; falling back"
+        );
     }
 
     // 3. Try bundled driver from build.rs (matches official bindings)
-    if let Some(result) = try_bundled_driver()? {
-        return Ok(result);
+    if let Some((node, cli)) = try_bundled_driver()? {
+        let usable = node_is_usable(&node);
+        debug_candidate("bundled driver", &node, &cli, usable);
+        if usable {
+            return Ok((node, cli));
+        }
+        warn!(
+            target = "pw",
+            node = %node.display(),
+            cli = %cli.display(),
+            "Bundled Playwright driver not runnable; falling back"
+        );
     }
 
     // 4. Try npm global installation (development fallback)
-    if let Some(result) = try_npm_global()? {
-        return Ok(result);
+    if let Some((node, cli)) = try_npm_global()? {
+        let usable = node_is_usable(&node);
+        debug_candidate("npm global", &node, &cli, usable);
+        if usable {
+            return Ok((node, cli));
+        }
+        warn!(
+            target = "pw",
+            node = %node.display(),
+            cli = %cli.display(),
+            "Global npm Playwright driver not runnable; falling back"
+        );
     }
 
     // 5. Try npm local installation (development fallback)
-    if let Some(result) = try_npm_local()? {
-        return Ok(result);
+    if let Some((node, cli)) = try_npm_local()? {
+        let usable = node_is_usable(&node);
+        debug_candidate("npm local", &node, &cli, usable);
+        if usable {
+            return Ok((node, cli));
+        }
+        warn!(
+            target = "pw",
+            node = %node.display(),
+            cli = %cli.display(),
+            "Local npm Playwright driver not runnable; falling back"
+        );
     }
 
     Err(Error::ServerNotFound)
@@ -74,8 +125,8 @@ pub fn get_driver_executable() -> Result<(PathBuf, PathBuf)> {
 fn try_bundled_driver() -> Result<Option<(PathBuf, PathBuf)>> {
     // Check if build.rs set the environment variables (compile-time)
     if let (Some(node_exe), Some(cli_js)) = (
-        option_env!("PLAYWRIGHT_NODE_EXE"),
-        option_env!("PLAYWRIGHT_CLI_JS"),
+        option_env!("PLAYWRIGHT_BUNDLED_NODE_EXE"),
+        option_env!("PLAYWRIGHT_BUNDLED_CLI_JS"),
     ) {
         let node_path = PathBuf::from(node_exe);
         let cli_path = PathBuf::from(cli_js);
@@ -181,6 +232,27 @@ fn try_npm_local() -> Result<Option<(PathBuf, PathBuf)>> {
     }
 
     Ok(None)
+}
+
+fn node_is_usable(node: &Path) -> bool {
+    Command::new(node)
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+fn debug_candidate(label: &str, node: &Path, cli: &Path, usable: bool) {
+    if std::env::var("PW_DEBUG_DRIVER").is_ok() {
+        eprintln!(
+            "[driver-check] {label}: node={} cli={} usable={}",
+            node.display(),
+            cli.display(),
+            usable
+        );
+    }
 }
 
 /// Find Playwright CLI in node_modules directory

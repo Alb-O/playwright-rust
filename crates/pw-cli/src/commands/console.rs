@@ -13,6 +13,7 @@ pub async fn execute(url: &str, timeout_ms: u64, ctx: &CommandContext) -> Result
         WaitUntil::NetworkIdle,
         ctx.auth_file(),
         ctx.browser,
+        ctx.cdp_endpoint(),
     ).await?;
 
     if let Err(err) = session.page().evaluate(console_capture_injection_js()).await {

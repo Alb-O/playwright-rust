@@ -14,6 +14,8 @@ pub struct CommandContext {
     pub project: Option<Project>,
     /// Browser to use for automation
     pub browser: BrowserKind,
+    /// Optional CDP endpoint for connecting to a running browser
+    cdp_endpoint: Option<String>,
     /// Auth file to use (resolved path)
     auth_file: Option<PathBuf>,
     /// Whether project detection is disabled
@@ -22,7 +24,12 @@ pub struct CommandContext {
 
 impl CommandContext {
     /// Create a new command context
-    pub fn new(browser: BrowserKind, no_project: bool, auth_file: Option<PathBuf>) -> Self {
+    pub fn new(
+        browser: BrowserKind,
+        no_project: bool,
+        auth_file: Option<PathBuf>,
+        cdp_endpoint: Option<String>,
+    ) -> Self {
         let project = if no_project {
             None
         } else {
@@ -44,6 +51,7 @@ impl CommandContext {
         Self {
             project,
             browser,
+            cdp_endpoint,
             auth_file: resolved_auth,
             no_project,
         }
@@ -52,6 +60,11 @@ impl CommandContext {
     /// Get the auth file path
     pub fn auth_file(&self) -> Option<&Path> {
         self.auth_file.as_deref()
+    }
+
+    /// Get the CDP endpoint URL if provided
+    pub fn cdp_endpoint(&self) -> Option<&str> {
+        self.cdp_endpoint.as_deref()
     }
 
     /// Get the screenshot output path, using project paths if available
@@ -100,21 +113,32 @@ mod tests {
 
     #[test]
     fn test_context_without_project() {
-        let ctx = CommandContext::new(BrowserKind::Chromium, true, None);
+        let ctx = CommandContext::new(BrowserKind::Chromium, true, None, None);
         assert!(ctx.project.is_none());
         assert!(ctx.no_project);
     }
 
     #[test]
+    fn test_cdp_endpoint_round_trip() {
+        let ctx = CommandContext::new(
+            BrowserKind::Chromium,
+            true,
+            None,
+            Some("ws://localhost:19988/cdp".into()),
+        );
+        assert_eq!(ctx.cdp_endpoint(), Some("ws://localhost:19988/cdp"));
+    }
+
+    #[test]
     fn test_screenshot_path_absolute() {
-        let ctx = CommandContext::new(BrowserKind::Chromium, true, None);
+        let ctx = CommandContext::new(BrowserKind::Chromium, true, None, None);
         let path = ctx.screenshot_path(Path::new("/tmp/test.png"));
         assert_eq!(path, PathBuf::from("/tmp/test.png"));
     }
 
     #[test]
     fn test_screenshot_path_with_directory() {
-        let ctx = CommandContext::new(BrowserKind::Chromium, true, None);
+        let ctx = CommandContext::new(BrowserKind::Chromium, true, None, None);
         let path = ctx.screenshot_path(Path::new("output/test.png"));
         assert_eq!(path, PathBuf::from("output/test.png"));
     }
@@ -129,7 +153,7 @@ mod tests {
         let original_dir = std::env::current_dir().unwrap();
         std::env::set_current_dir(temp.path()).unwrap();
 
-        let ctx = CommandContext::new(BrowserKind::Firefox, false, None);
+        let ctx = CommandContext::new(BrowserKind::Firefox, false, None, None);
 
         // Restore original dir before assertions (in case of panic)
         let result = std::panic::catch_unwind(|| {

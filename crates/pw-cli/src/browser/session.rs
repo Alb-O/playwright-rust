@@ -15,12 +15,17 @@ pub struct BrowserSession {
 
 impl BrowserSession {
     pub async fn new(wait_until: WaitUntil) -> Result<Self> {
-        Self::with_options(wait_until, None, true, BrowserKind::default()).await
+        Self::with_options(wait_until, None, true, BrowserKind::default(), None).await
     }
 
     /// Create a session with optional auth file (convenience for commands)
-    pub async fn with_auth(wait_until: WaitUntil, auth_file: Option<&Path>) -> Result<Self> {
-        Self::with_auth_and_browser(wait_until, auth_file, BrowserKind::default()).await
+    pub async fn with_auth(
+        wait_until: WaitUntil,
+        auth_file: Option<&Path>,
+        cdp_endpoint: Option<&str>,
+    ) -> Result<Self> {
+        Self::with_auth_and_browser(wait_until, auth_file, BrowserKind::default(), cdp_endpoint)
+            .await
     }
 
     /// Create a session with optional auth file and specific browser
@@ -28,10 +33,13 @@ impl BrowserSession {
         wait_until: WaitUntil,
         auth_file: Option<&Path>,
         browser_kind: BrowserKind,
+        cdp_endpoint: Option<&str>,
     ) -> Result<Self> {
         match auth_file {
-            Some(path) => Self::with_auth_file_and_browser(wait_until, path, browser_kind).await,
-            None => Self::with_options(wait_until, None, true, browser_kind).await,
+            Some(path) => {
+                Self::with_auth_file_and_browser(wait_until, path, browser_kind, cdp_endpoint).await
+            }
+            None => Self::with_options(wait_until, None, true, browser_kind, cdp_endpoint).await,
         }
     }
 
@@ -41,47 +49,83 @@ impl BrowserSession {
         storage_state: Option<StorageState>,
         headless: bool,
         browser_kind: BrowserKind,
+        cdp_endpoint: Option<&str>,
     ) -> Result<Self> {
-        debug!(target = "pw", browser = %browser_kind, "starting Playwright...");
+        debug!(
+            target = "pw",
+            browser = %browser_kind,
+            cdp = cdp_endpoint.is_some(),
+            "starting Playwright..."
+        );
         let playwright = Playwright::launch()
             .await
             .map_err(|e| PwError::BrowserLaunch(e.to_string()))?;
 
-        let launch_options = pw::LaunchOptions {
-            headless: Some(headless),
-            ..Default::default()
-        };
+        let (browser, context) = if let Some(endpoint) = cdp_endpoint {
+            if browser_kind != BrowserKind::Chromium {
+                return Err(PwError::BrowserLaunch(
+                    "CDP endpoint connections require the chromium browser".to_string(),
+                ));
+            }
 
-        // Select browser type based on browser_kind
-        let browser = match browser_kind {
-            BrowserKind::Chromium => {
-                playwright
-                    .chromium()
-                    .launch_with_options(launch_options)
-                    .await?
-            }
-            BrowserKind::Firefox => {
-                playwright
-                    .firefox()
-                    .launch_with_options(launch_options)
-                    .await?
-            }
-            BrowserKind::Webkit => {
-                playwright
-                    .webkit()
-                    .launch_with_options(launch_options)
-                    .await?
-            }
-        };
+            let connect_result = playwright
+                .chromium()
+                .connect_over_cdp(endpoint)
+                .await
+                .map_err(|e| PwError::BrowserLaunch(e.to_string()))?;
 
-        // Create context with optional storage state
-        let context = if let Some(state) = storage_state {
-            let options = BrowserContextOptions::builder()
-                .storage_state(state)
-                .build();
-            browser.new_context_with_options(options).await?
+            let browser = connect_result.browser;
+            let context = if let Some(state) = storage_state {
+                let options = BrowserContextOptions::builder()
+                    .storage_state(state)
+                    .build();
+                browser.new_context_with_options(options).await?
+            } else if let Some(default_ctx) = connect_result.default_context {
+                default_ctx
+            } else {
+                browser.new_context().await?
+            };
+
+            (browser, context)
         } else {
-            browser.new_context().await?
+            let launch_options = pw::LaunchOptions {
+                headless: Some(headless),
+                ..Default::default()
+            };
+
+            // Select browser type based on browser_kind
+            let browser = match browser_kind {
+                BrowserKind::Chromium => {
+                    playwright
+                        .chromium()
+                        .launch_with_options(launch_options)
+                        .await?
+                }
+                BrowserKind::Firefox => {
+                    playwright
+                        .firefox()
+                        .launch_with_options(launch_options)
+                        .await?
+                }
+                BrowserKind::Webkit => {
+                    playwright
+                        .webkit()
+                        .launch_with_options(launch_options)
+                        .await?
+                }
+            };
+
+            // Create context with optional storage state
+            let context = if let Some(state) = storage_state {
+                let options = BrowserContextOptions::builder()
+                    .storage_state(state)
+                    .build();
+                browser.new_context_with_options(options).await?
+            } else {
+                browser.new_context().await?
+            };
+
+            (browser, context)
         };
 
         let page = context.new_page().await?;
@@ -97,7 +141,7 @@ impl BrowserSession {
 
     /// Create a session with auth loaded from a file
     pub async fn with_auth_file(wait_until: WaitUntil, auth_file: &Path) -> Result<Self> {
-        Self::with_auth_file_and_browser(wait_until, auth_file, BrowserKind::default()).await
+        Self::with_auth_file_and_browser(wait_until, auth_file, BrowserKind::default(), None).await
     }
 
     /// Create a session with auth loaded from a file and specific browser
@@ -105,11 +149,12 @@ impl BrowserSession {
         wait_until: WaitUntil,
         auth_file: &Path,
         browser_kind: BrowserKind,
+        cdp_endpoint: Option<&str>,
     ) -> Result<Self> {
         let storage_state = StorageState::from_file(auth_file).map_err(|e| {
             PwError::BrowserLaunch(format!("Failed to load auth file: {}", e))
         })?;
-        Self::with_options(wait_until, Some(storage_state), true, browser_kind).await
+        Self::with_options(wait_until, Some(storage_state), true, browser_kind, cdp_endpoint).await
     }
 
     pub async fn goto(&self, url: &str) -> Result<()> {

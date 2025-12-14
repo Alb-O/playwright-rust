@@ -43,7 +43,7 @@ pub use browser::Browser;
 pub use browser_context::{
     BrowserContext, BrowserContextOptions, BrowserContextOptionsBuilder, Geolocation, Viewport,
 };
-pub use browser_type::BrowserType;
+pub use browser_type::{BrowserType, ConnectOverCDPResult};
 pub use click::{ClickOptions, KeyboardModifier, MouseButton, Position};
 pub use cookie::{
     ClearCookiesOptions, Cookie, LocalStorageEntry, OriginState, SameSite, StorageState,

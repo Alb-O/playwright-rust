@@ -9,7 +9,7 @@
 
 use crate::api::LaunchOptions;
 use crate::error::Result;
-use crate::protocol::Browser;
+use crate::protocol::{Browser, BrowserContext};
 use crate::server::channel::Channel;
 use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use crate::server::connection::ConnectionLike;
@@ -230,6 +230,75 @@ impl BrowserType {
 
         Ok(browser.clone())
     }
+
+    /// Connects to an existing browser over the Chrome DevTools Protocol.
+    ///
+    /// This keeps the standard Playwright driver in the loop while reusing a
+    /// running GUI browser (for example, the extension relay). The returned
+    /// default context, when present, represents the persistent browser profile.
+    pub async fn connect_over_cdp(
+        &self,
+        endpoint_url: impl Into<String>,
+    ) -> Result<ConnectOverCDPResult> {
+        #[derive(Serialize)]
+        struct ConnectParams {
+            #[serde(rename = "endpointURL")]
+            endpoint_url: String,
+        }
+
+        #[derive(Deserialize)]
+        struct ConnectResponse {
+            browser: BrowserRef,
+            #[serde(rename = "defaultContext")]
+            default_context: Option<BrowserContextRef>,
+        }
+
+        let params = ConnectParams {
+            endpoint_url: endpoint_url.into(),
+        };
+
+        let params_json = serde_json::to_value(params).map_err(|e| {
+            crate::error::Error::ProtocolError(format!(
+                "Failed to serialize connectOverCDP params: {}",
+                e
+            ))
+        })?;
+
+        let response: ConnectResponse =
+            self.channel().send("connectOverCDP", params_json).await?;
+
+        let browser_arc = self.connection().get_object(&response.browser.guid).await?;
+        let browser = browser_arc
+            .as_any()
+            .downcast_ref::<Browser>()
+            .ok_or_else(|| {
+                crate::error::Error::ProtocolError(format!(
+                    "Expected Browser object, got {}",
+                    browser_arc.type_name()
+                ))
+            })?;
+
+        let default_context = if let Some(ctx_ref) = response.default_context {
+            let ctx_arc = self.connection().get_object(&ctx_ref.guid).await?;
+            let ctx = ctx_arc
+                .as_any()
+                .downcast_ref::<BrowserContext>()
+                .ok_or_else(|| {
+                    crate::error::Error::ProtocolError(format!(
+                        "Expected BrowserContext object, got {}",
+                        ctx_arc.type_name()
+                    ))
+                })?;
+            Some(ctx.clone())
+        } else {
+            None
+        };
+
+        Ok(ConnectOverCDPResult {
+            browser: browser.clone(),
+            default_context,
+        })
+    }
 }
 
 /// Response from BrowserType.launch() protocol call
@@ -246,6 +315,23 @@ struct BrowserRef {
         deserialize_with = "crate::server::connection::deserialize_arc_str"
     )]
     guid: Arc<str>,
+}
+
+/// Reference to a BrowserContext returned by connectOverCDP
+#[derive(Debug, Deserialize, Serialize)]
+struct BrowserContextRef {
+    #[serde(
+        serialize_with = "crate::server::connection::serialize_arc_str",
+        deserialize_with = "crate::server::connection::deserialize_arc_str"
+    )]
+    guid: Arc<str>,
+}
+
+/// Result of connecting to an existing browser via CDP
+#[derive(Clone, Debug)]
+pub struct ConnectOverCDPResult {
+    pub browser: Browser,
+    pub default_context: Option<BrowserContext>,
 }
 
 impl ChannelOwner for BrowserType {

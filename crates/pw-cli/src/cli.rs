@@ -22,6 +22,10 @@ pub struct Cli {
     #[arg(short, long, global = true, value_enum, default_value = "chromium")]
     pub browser: BrowserKind,
 
+    /// Connect to an existing CDP endpoint instead of launching a browser
+    #[arg(long, global = true, value_name = "URL")]
+    pub cdp_endpoint: Option<String>,
+
     /// Disable project detection (use current directory paths)
     #[arg(long, global = true)]
     pub no_project: bool,
@@ -122,6 +126,16 @@ pub enum Commands {
         /// Generate Nix browser setup script (for NixOS/Nix users)
         #[arg(long)]
         nix: bool,
+    },
+
+    /// Run the CDP relay server for the browser extension bridge
+    Relay {
+        /// Host to bind
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        /// Port to bind
+        #[arg(long, default_value_t = 19988)]
+        port: u16,
     },
 }
 
@@ -241,6 +255,32 @@ mod tests {
         let double_v = vec!["pw", "-vv", "screenshot", "https://example.com"];
         let double_cli = Cli::try_parse_from(double_v).unwrap();
         assert_eq!(double_cli.verbose, 2);
+    }
+
+    #[test]
+    fn parse_cdp_endpoint_flag() {
+        let args = vec![
+            "pw",
+            "--cdp-endpoint",
+            "ws://localhost:19988/cdp",
+            "navigate",
+            "https://example.com",
+        ];
+        let cli = Cli::try_parse_from(args).unwrap();
+        assert_eq!(cli.cdp_endpoint.as_deref(), Some("ws://localhost:19988/cdp"));
+    }
+
+    #[test]
+    fn parse_relay_command() {
+        let args = vec!["pw", "relay", "--host", "0.0.0.0", "--port", "3000"];
+        let cli = Cli::try_parse_from(args).unwrap();
+        match cli.command {
+            Commands::Relay { host, port } => {
+                assert_eq!(host, "0.0.0.0");
+                assert_eq!(port, 3000);
+            }
+            _ => panic!("Expected Relay command"),
+        }
     }
 
     #[test]

@@ -20,7 +20,8 @@ pub async fn login(url: &str, output: &Path, timeout_secs: u64, ctx: &CommandCon
     info!(target = "pw", %url, path = %output.display(), browser = %ctx.browser, "starting interactive login");
 
     // Launch in headed mode (not headless) for manual login
-    let session = BrowserSession::with_options(WaitUntil::Load, None, false, ctx.browser).await?;
+    let session = BrowserSession::with_options(WaitUntil::Load, None, false, ctx.browser, ctx.cdp_endpoint())
+        .await?;
     session.goto(url).await?;
 
     println!("Browser opened at: {}", url);
@@ -78,6 +79,7 @@ pub async fn cookies(url: &str, format: &str, ctx: &CommandContext) -> Result<()
         WaitUntil::Load,
         ctx.auth_file(),
         ctx.browser,
+        ctx.cdp_endpoint(),
     ).await?;
 
     session.goto(url).await?;

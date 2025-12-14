@@ -11,6 +11,7 @@ pub async fn execute_single(url: &str, selector: &str, ctx: &CommandContext) -> 
         WaitUntil::NetworkIdle,
         ctx.auth_file(),
         ctx.browser,
+        ctx.cdp_endpoint(),
     ).await?;
     session.goto(url).await?;
 
@@ -35,6 +36,7 @@ pub async fn execute_all(url: &str, selector: &str, ctx: &CommandContext) -> Res
         WaitUntil::NetworkIdle,
         ctx.auth_file(),
         ctx.browser,
+        ctx.cdp_endpoint(),
     ).await?;
     session.goto(url).await?;
 

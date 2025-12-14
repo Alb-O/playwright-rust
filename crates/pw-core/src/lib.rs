@@ -204,7 +204,15 @@ pub use error::{Error, Result};
 pub use assertions::expect;
 
 // Re-export Playwright main entry point and browser API
-pub use protocol::{Browser, BrowserContext, BrowserType, Page, Playwright, Response};
+pub use protocol::{
+    Browser,
+    BrowserContext,
+    BrowserType,
+    ConnectOverCDPResult,
+    Page,
+    Playwright,
+    Response,
+};
 
 // Re-export Locator and element APIs
 pub use protocol::{ElementHandle, Locator};

@@ -15,6 +15,7 @@ pub async fn execute(url: &str, selector: &str, ctx: &CommandContext) -> Result<
         WaitUntil::NetworkIdle,
         ctx.auth_file(),
         ctx.browser,
+        ctx.cdp_endpoint(),
     ).await?;
     session.goto(url).await?;
 

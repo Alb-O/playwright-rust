@@ -271,12 +271,18 @@ fn set_output_env_vars(driver_dir: &Path, platform: &str) {
     };
 
     if node_exe.exists() {
-        println!("cargo:rustc-env=PLAYWRIGHT_NODE_EXE={}", node_exe.display());
+        println!(
+            "cargo:rustc-env=PLAYWRIGHT_BUNDLED_NODE_EXE={}",
+            node_exe.display()
+        );
     }
 
     // CLI.js path
     let cli_js = driver_dir.join("package").join("cli.js");
     if cli_js.exists() {
-        println!("cargo:rustc-env=PLAYWRIGHT_CLI_JS={}", cli_js.display());
+        println!(
+            "cargo:rustc-env=PLAYWRIGHT_BUNDLED_CLI_JS={}",
+            cli_js.display()
+        );
     }
 }
