@@ -1,387 +1,128 @@
-# pw-tool Refactor Plan
+# pw-core Refactoring Plan
 
-## Current State Analysis
+Three files in `pw-core` have grown past 1100 lines. Each conflates multiple responsibilities that would be clearer as separate modules. This document proposes splitting them without changing public APIs.
 
-The codebase is a 969-line monolithic `main.rs` with the following concerns conflated:
+## The Problem
 
-1. CLI argument parsing (clap derive structs)
-2. Output data structures (serde DTOs)
-3. Logging utilities
-4. Browser lifecycle management (repeated in every command)
-5. Command implementations
-6. Unit tests
+`page.rs` at 1212 lines contains the Page struct, navigation logic, screenshot capture, JavaScript evaluation, keyboard/mouse input delegation, and three distinct event systems (routing, downloads, dialogs). Finding the route handler registration means scrolling past 400 lines of input device methods.
 
-### Problems
+`connection.rs` at 1188 lines mixes message type definitions, connection state, dispatch logic, object registry operations, and 265 lines of tests. The `Connection` struct itself is obscured by the protocol message boilerplate above it.
 
-1. **Browser boilerplate duplication**: Every `cmd_*` function repeats:
-   ```rust
-   let playwright = Playwright::launch().await?;
-   let browser = playwright.chromium().launch().await?;
-   let page = browser.new_page().await?;
-   let goto_opts = GotoOptions { wait_until: Some(WaitUntil::NetworkIdle), ..Default::default() };
-   page.goto(url, Some(goto_opts)).await?;
-   // ... command logic ...
-   browser.close().await?;
-   ```
+`frame.rs` at 1147 lines has 20+ `locator_*` methods that exist solely to delegate from `Locator` to the Frame's channel. These occupy 600 lines of nearly identical boilerplate, burying the actual frame logic.
 
-2. **No abstraction over page operations**: Commands directly call `page.evaluate_value()` with inline JS strings. No reusable primitives.
 
-3. **Verbose flag threaded manually**: `verbose: bool` passed through every function signature.
+## page.rs
 
-4. **Mixed concerns in single file**: CLI parsing, business logic, and I/O formatting interleaved.
+The Page struct coordinates too many concerns. Navigation and screenshot methods share nothing except the underlying channel. Event handlers (route, download, dialog) each maintain their own Arc-wrapped handler vectors with identical registration patterns. The keyboard and mouse accessors return thin wrappers, but their 15 internal `keyboard_*` and `mouse_*` methods live inline.
 
-5. **JS evaluation strings duplicated**: Selector escaping logic repeated. JS snippets for coords extraction duplicated between `cmd_coords` and `cmd_coords_all`.
-
-6. **No error type hierarchy**: Uses `anyhow::Result` everywhere with no domain-specific errors.
-
----
-
-## Proposed Architecture
+Proposed split:
 
 ```
-src/
-├── main.rs           # Entry point, CLI parsing, dispatch
-├── lib.rs            # Re-exports for library usage
-├── cli.rs            # Clap structs (Cli, Commands)
-├── types.rs          # Output DTOs (NavigateResult, ElementCoords, etc.)
-├── error.rs          # Custom error types (thiserror)
-├── logging.rs        # Logger abstraction with verbosity levels
-├── browser/
-│   ├── mod.rs        # Browser session management
-│   ├── session.rs    # BrowserSession struct with RAII cleanup
-│   └── js.rs         # JS evaluation helpers, script templates
-└── commands/
-    ├── mod.rs        # Command trait, dispatch logic
-    ├── navigate.rs
-    ├── console.rs
-    ├── eval.rs
-    ├── html.rs
-    ├── coords.rs
-    ├── screenshot.rs
-    ├── click.rs
-    ├── text.rs
-    └── wait.rs
+protocol/page/
+├── mod.rs           # Page struct, ChannelOwner impl, core lifecycle
+├── navigation.rs    # goto(), reload(), GotoOptions, WaitUntil, Response
+├── content.rs       # query_selector variants, locator(), title()
+├── screenshot.rs    # screenshot(), screenshot_to_file()
+├── evaluate.rs      # evaluate(), evaluate_value()
+├── input.rs         # keyboard()/mouse() accessors plus internal methods
+├── events.rs        # route(), on_download(), on_dialog(), dispatch logic
+└── types.rs         # RouteHandlerEntry, handler type aliases
 ```
 
----
+The `Response` struct currently lives in `page.rs` but represents an HTTP response from navigation. It belongs with `GotoOptions` and `WaitUntil` in `navigation.rs`. The type aliases for handler futures (`RouteHandlerFuture`, `DownloadHandlerFuture`) move to `types.rs` where they can be imported by both `mod.rs` and `events.rs`.
 
-## Module Specifications
+`mod.rs` re-exports `GotoOptions`, `Response`, and `WaitUntil` to preserve the existing `use pw::protocol::page::Response` paths. The Page struct stays in `mod.rs` with its fields, constructor, and `ChannelOwner` implementation. Each method delegates to the appropriate submodule via `impl Page` blocks that import the submodule functions.
 
-### `cli.rs`
 
-Isolate clap derive macros. Export `Cli` and `Commands` only.
+## connection.rs
+
+The file opens with 180 lines of message type definitions (`Request`, `Response`, `Event`, `Message`, `Metadata`, error wrappers) before reaching the actual `Connection` struct. These types are pure data definitions with serde derives; they have no behavioral dependency on Connection.
+
+The dispatch logic starting at line 652 (`dispatch_internal`, `handle_create`, `handle_dispose`, `handle_adopt`) forms a coherent unit responsible for routing incoming messages to objects. It reads from the object registry but doesn't touch the callback map or transport.
+
+Proposed split:
+
+```
+server/connection/
+├── mod.rs       # Connection struct, ConnectionLike trait, run loop, send_message
+├── messages.rs  # Request, Response, Event, Message, Metadata, serde helpers
+├── dispatch.rs  # dispatch_internal, handle_create/dispose/adopt, parse_protocol_error
+└── tests.rs     # 265 lines of unit tests
+```
+
+The `serialize_arc_str` and `deserialize_arc_str` helpers are used by other modules (Frame's goto deserializes `ResponseReference` with `deserialize_arc_str`). These stay in `messages.rs` and get re-exported from `mod.rs`.
+
+Moving tests to `tests.rs` with `#[cfg(test)] mod tests;` keeps them discoverable while removing 265 lines from the implementation file. The test helper `create_test_connection()` can become `pub(super)` for use by dispatch tests if needed.
+
+
+## frame.rs
+
+Frame's 20+ `locator_*` methods follow an identical pattern: build a JSON params object, call `self.channel().send()` or `send_no_result()`, deserialize the response. The methods differ only in the RPC method name, parameter construction, and return type. They exist because `Locator` holds a `Frame` reference and delegates all operations to it.
 
 ```rust
-#[derive(Parser)]
-pub struct Cli {
-    #[arg(short, long, global = true)]
-    pub verbose: bool,
-    #[command(subcommand)]
-    pub command: Commands,
-}
-
-#[derive(Subcommand)]
-pub enum Commands { ... }
-```
-
-### `types.rs`
-
-All serde-annotated output structures. Consider using `#[serde(rename_all = "camelCase")]` at struct level instead of per-field `#[serde(rename)]`.
-
-```rust
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NavigateResult {
-    pub url: String,
-    pub title: String,
-    pub errors: Vec<String>,
-    pub warnings: Vec<String>,
-    pub has_errors: bool,
+// This pattern repeats ~20 times with minor variations
+pub(crate) async fn locator_is_visible(&self, selector: &str) -> Result<bool> {
+    #[derive(Deserialize)]
+    struct IsVisibleResponse { value: bool }
+    let response: IsVisibleResponse = self.channel()
+        .send("isVisible", serde_json::json!({
+            "selector": selector,
+            "strict": true,
+            "timeout": crate::DEFAULT_TIMEOUT_MS
+        }))
+        .await?;
+    Ok(response.value)
 }
 ```
 
-### `error.rs`
+Grouping by concern:
 
-Define domain errors with `thiserror`:
-
-```rust
-#[derive(thiserror::Error, Debug)]
-pub enum PwError {
-    #[error("browser launch failed: {0}")]
-    BrowserLaunch(String),
-
-    #[error("navigation failed: {url}")]
-    Navigation { url: String, #[source] source: anyhow::Error },
-
-    #[error("element not found: {selector}")]
-    ElementNotFound { selector: String },
-
-    #[error("javascript evaluation failed: {0}")]
-    JsEval(String),
-
-    #[error("screenshot failed: {path}")]
-    Screenshot { path: PathBuf, #[source] source: std::io::Error },
-
-    #[error("timeout after {ms}ms waiting for: {condition}")]
-    Timeout { ms: u64, condition: String },
-}
-
-pub type Result<T> = std::result::Result<T, PwError>;
+```
+protocol/frame/
+├── mod.rs              # Frame struct, ChannelOwner impl
+├── navigation.rs       # goto() with its Response extraction logic
+├── queries.rs          # query_selector(), query_selector_all(), title()
+├── evaluate.rs         # frame_evaluate_expression variants
+├── locator_state.rs    # locator_count, text_content, inner_text/html, get_attribute, is_* methods
+├── locator_actions.rs  # click, dblclick, fill, clear, press, check, uncheck, hover
+└── locator_input.rs    # input_value, select_option variants, set_input_files variants
 ```
 
-### `logging.rs`
-
-Abstract logger with configurable verbosity. Avoid global state; pass logger instance or use `tracing` crate.
-
-Option A: Simple struct
-```rust
-pub struct Logger {
-    verbose: bool,
-}
-
-impl Logger {
-    pub fn info(&self, msg: &str) { ... }
-    pub fn debug(&self, msg: &str) { if self.verbose { ... } }
-    pub fn error(&self, msg: &str) { ... }
-    pub fn success(&self, msg: &str) { ... }
-}
-```
-
-Option B: Replace with `tracing` crate for structured logging. Filter levels via `RUST_LOG` env var. Preferred for production.
-
-### `browser/session.rs`
-
-Encapsulate browser lifecycle with RAII pattern:
-
-```rust
-pub struct BrowserSession {
-    playwright: Playwright,
-    browser: Browser,
-    page: Page,
-}
-
-impl BrowserSession {
-    pub async fn new(url: &str, wait_until: WaitUntil) -> Result<Self> { ... }
-    pub fn page(&self) -> &Page { &self.page }
-    pub async fn close(self) -> Result<()> { ... }
-}
-
-// Or implement Drop for automatic cleanup (requires tokio runtime handle)
-```
-
-Usage in commands:
-```rust
-pub async fn execute(args: &ScreenshotArgs) -> Result<()> {
-    let session = BrowserSession::new(&args.url, WaitUntil::NetworkIdle).await?;
-    session.page().screenshot_to_file(&args.output, opts).await?;
-    session.close().await
-}
-```
-
-### `browser/js.rs`
-
-Centralize JS snippets and selector escaping:
-
-```rust
-pub fn escape_selector(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('\'', "\\'")
-}
-
-pub fn get_element_coords_js(selector: &str) -> String {
-    let escaped = escape_selector(selector);
-    format!(r#"(() => {{
-        const el = document.querySelector('{escaped}');
-        if (!el) return null;
-        const rect = el.getBoundingClientRect();
-        return {{
-            x: Math.round(rect.x + rect.width / 2),
-            y: Math.round(rect.y + rect.height / 2),
-            width: Math.round(rect.width),
-            height: Math.round(rect.height),
-            text: el.textContent?.trim().substring(0, 100) || null,
-            href: el.getAttribute('href')
-        }};
-    }})()"#)
-}
-
-pub fn get_all_element_coords_js(selector: &str) -> String { ... }
-pub fn console_capture_injection_js() -> &'static str { ... }
-```
-
-### `commands/mod.rs`
-
-Define command execution trait or use async fn dispatch:
-
-```rust
-use crate::browser::BrowserSession;
-use crate::error::Result;
-
-pub mod navigate;
-pub mod console;
-pub mod eval;
-// ...
-
-// Option: Trait-based dispatch
-#[async_trait::async_trait]
-pub trait Command {
-    async fn execute(&self, session: &BrowserSession) -> Result<()>;
-}
-
-// Option: Direct dispatch (simpler)
-pub async fn dispatch(cmd: Commands, verbose: bool) -> Result<()> {
-    match cmd {
-        Commands::Screenshot { url, output } => screenshot::execute(&url, &output, verbose).await,
-        // ...
-    }
-}
-```
+The `goto()` method at 100 lines deserves isolation. It constructs `GotoOptions`, sends the RPC, polls the connection for the Response object (with a retry loop that should become proper GUID replacement in a future refactor), and extracts response data from the initializer. This complexity shouldn't share a file with boilerplate state queries.
 
-### Individual Command Modules
+The `set_input_files` methods (4 variants for path/payload × single/multiple) read files, base64-encode them, and construct payloads. They share encoding logic that could be extracted to a helper, but at minimum they should be grouped together in `locator_input.rs` where their commonality is visible.
 
-Each command module exports an `execute` function. Example `commands/screenshot.rs`:
 
-```rust
-use crate::browser::BrowserSession;
-use crate::error::Result;
-use crate::logging::Logger;
-use std::path::Path;
+## Migration Order
 
-pub async fn execute(url: &str, output: &Path, logger: &Logger) -> Result<()> {
-    logger.info(&format!("Taking screenshot: {}", output.display()));
+Start with `connection.rs`. Its tests are self-contained and the message types have no dependencies on Connection internals. Extract `messages.rs` first, verify the build, then extract `dispatch.rs`, then move tests. Each step is independently verifiable.
 
-    let session = BrowserSession::new(url, WaitUntil::NetworkIdle).await?;
+`frame.rs` comes second. The locator methods are tedious but mechanical to move. Group them by the submodule they'll inhabit, move each group, update visibility. The Frame struct itself barely changes.
 
-    if let Some(parent) = output.parent() {
-        if !parent.as_os_str().is_empty() && !parent.exists() {
-            std::fs::create_dir_all(parent)?;
-        }
-    }
+`page.rs` is most complex because of the event handler closures and their type aliases. The `on_event` match arms dispatch to methods that live in `events.rs`, requiring careful import management. Save this for last when the pattern is established.
 
-    let opts = ScreenshotOptions { full_page: Some(true), ..Default::default() };
-    session.page().screenshot_to_file(output, Some(opts)).await?;
 
-    logger.success(&format!("Screenshot saved: {}", output.display()));
-    session.close().await
-}
-```
+## Visibility
 
-### `main.rs`
+Types currently `pub` stay `pub`. Methods marked `pub(crate)` (the locator delegates, keyboard/mouse internals) stay `pub(crate)`. Submodule functions become `pub(super)` when only called by the parent `mod.rs`, or `pub(crate)` when called from outside the module.
 
-Minimal entry point:
+The `ChannelOwner` trait implementation stays in `mod.rs` for each refactored type. Its `on_event` method dispatches to submodule handlers, so it needs visibility into `events.rs` internals. Using `pub(super)` for the handler functions keeps them hidden from the rest of the crate.
 
-```rust
-mod cli;
-mod commands;
-mod error;
-mod logging;
-mod types;
-mod browser;
 
-use clap::Parser;
-use cli::{Cli, Commands};
-use logging::Logger;
+## Verification
 
-#[tokio::main]
-async fn main() {
-    let cli = Cli::parse();
-    let logger = Logger::new(cli.verbose);
+After each file split:
 
-    if let Err(e) = commands::dispatch(cli.command, &logger).await {
-        logger.error(&format!("{:#}", e));
-        std::process::exit(1);
-    }
-}
-```
+1. `cargo build --package pw-core` must succeed
+2. `cargo test --package pw-core --lib` must pass (69 tests currently)
+3. `cargo test --package pw-cli` must pass (40 unit + 29 e2e tests)
+4. `cargo doc --package pw-core` must generate without warnings
 
-### `lib.rs`
+The public API paths (`pw::protocol::Page`, `pw::protocol::page::Response`, `pw::server::connection::Message`) must continue resolving. Add `pub use` re-exports in the module root files to preserve them.
 
-Export public API for library consumers:
 
-```rust
-pub mod browser;
-pub mod commands;
-pub mod error;
-pub mod types;
+## Target State
 
-pub use browser::BrowserSession;
-pub use error::{PwError, Result};
-```
+No implementation file exceeds 400 lines excluding tests. Each file has a single clear responsibility. Related code lives together: all navigation logic in one place, all locator state queries in another. Finding where route handlers are registered means opening `page/events.rs`, not scrolling through a 1200-line file.
 
----
-
-## Testing Strategy
-
-### Unit Tests
-
-Move to per-module `#[cfg(test)]` blocks:
-
-- `cli.rs` - Parsing tests (current tests migrate here)
-- `types.rs` - Serialization/deserialization tests
-- `browser/js.rs` - JS generation tests (pure functions, no browser needed)
-- `error.rs` - Error display format tests
-
-### Integration Tests
-
-Keep in `tests/e2e.rs`. Consider renaming to `tests/integration.rs` for clarity.
-
-Add `tests/browser_session.rs` for testing `BrowserSession` lifecycle if needed.
-
----
-
-## Migration Steps
-
-1. Create module files, move types and CLI structs
-2. Implement `BrowserSession` with existing boilerplate
-3. Extract JS helpers to `browser/js.rs`
-4. Implement `Logger` abstraction
-5. Refactor one command (e.g., `screenshot`) as template
-6. Migrate remaining commands
-7. Move tests to respective modules
-8. Delete redundant code from `main.rs`
-9. Run full test suite, fix breakages
-
----
-
-## Optional Enhancements
-
-### Browser Selection
-
-Add `--browser` flag to CLI:
-
-```rust
-#[arg(long, default_value = "chromium")]
-browser: BrowserType,
-
-enum BrowserType { Chromium, Firefox, Webkit }
-```
-
-### Output Format
-
-Add `--format` flag for structured output:
-
-```rust
-#[arg(long, default_value = "json")]
-format: OutputFormat,
-
-enum OutputFormat { Json, Text, Pretty }
-```
-
-### Configuration File
-
-Support `.pwrc` or `pw.toml` for default options (browser, timeout, viewport size).
-
-### Persistent Browser
-
-Add `--reuse` flag to keep browser open between invocations (requires IPC or socket-based session management). Out of scope for initial refactor.
-
----
-
-## Dependencies to Consider
-
-| Crate | Purpose |
-|-------|---------|
-| `tracing` | Structured logging replacement |
-| `async-trait` | If using trait-based command dispatch |
-| `derive_more` | Reduce boilerplate for Display/Error |
-
-Current deps are sufficient for the refactor. `tracing` is optional but recommended for production logging.
+The refactor changes zero public API signatures. Downstream code using `pw::protocol::Page` continues working. The improvement is entirely internal: maintainability, navigability, and the reduced cognitive load of smaller, focused files.
