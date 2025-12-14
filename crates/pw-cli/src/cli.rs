@@ -30,6 +30,26 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub no_project: bool,
 
+    /// Named context to load for this run
+    #[arg(long, global = true, value_name = "NAME")]
+    pub context: Option<String>,
+
+    /// Disable contextual inference/caching for this invocation
+    #[arg(long, global = true)]
+    pub no_context: bool,
+
+    /// Do not persist command results back to context store
+    #[arg(long, global = true)]
+    pub no_save_context: bool,
+
+    /// Clear cached context data before running
+    #[arg(long, global = true)]
+    pub refresh_context: bool,
+
+    /// Base URL used when URL argument is relative or omitted
+    #[arg(long, global = true, value_name = "URL")]
+    pub base_url: Option<String>,
+
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -38,58 +58,85 @@ pub struct Cli {
 pub enum Commands {
     /// Navigate to URL and check for console errors
     #[command(alias = "nav")]
-    Navigate { url: String },
+    Navigate {
+        /// Target URL (uses context when omitted)
+        url: Option<String>,
+    },
 
     /// Capture console messages and errors
     #[command(alias = "con")]
     Console {
-        url: String,
+        /// Target URL (uses context when omitted)
+        url: Option<String>,
         /// Time to wait for console messages (ms)
         #[arg(default_value = "3000")]
         timeout_ms: u64,
     },
 
     /// Evaluate JavaScript and return result
-    Eval { url: String, expression: String },
+    Eval {
+        /// JavaScript expression to evaluate
+        expression: String,
+        /// Target URL (uses context when omitted)
+        url: Option<String>,
+    },
 
     /// Get HTML content (full page or specific selector)
     Html {
-        url: String,
-        /// CSS selector (defaults to html)
-        #[arg(default_value = "html")]
-        selector: String,
+        /// Target URL (uses context when omitted)
+        url: Option<String>,
+        /// CSS selector (uses last selector or defaults to html)
+        selector: Option<String>,
     },
 
     /// Get coordinates for first matching element
-    Coords { url: String, selector: String },
+    Coords {
+        url: Option<String>,
+        selector: Option<String>,
+    },
 
     /// Get coordinates and info for all matching elements
-    CoordsAll { url: String, selector: String },
+    CoordsAll {
+        url: Option<String>,
+        selector: Option<String>,
+    },
 
     /// Take screenshot
     #[command(alias = "ss")]
     Screenshot {
-        url: String,
-        /// Output file path
-        #[arg(short, long, default_value = "screenshot.png")]
-        output: PathBuf,
+        /// Target URL (uses context when omitted)
+        url: Option<String>,
+        /// Output file path (uses context or defaults when omitted)
+        #[arg(short, long, value_name = "FILE")]
+        output: Option<PathBuf>,
         /// Capture the full scrollable page instead of just the viewport
         #[arg(long)]
         full_page: bool,
     },
 
     /// Click element and show resulting URL
-    Click { url: String, selector: String },
+    Click {
+        url: Option<String>,
+        selector: Option<String>,
+    },
 
     /// Get text content of element
-    Text { url: String, selector: String },
+    Text {
+        url: Option<String>,
+        selector: Option<String>,
+    },
 
     /// List interactive elements (buttons, links, inputs, selects)
     #[command(alias = "els")]
-    Elements { url: String },
+    Elements { url: Option<String> },
 
     /// Wait for condition (selector, timeout, or load state)
-    Wait { url: String, condition: String },
+    Wait {
+        url: Option<String>,
+        /// Condition to wait for (selector, timeout ms, or load state)
+        #[arg(default_value = "networkidle")]
+        condition: String,
+    },
 
     /// Authentication and session management
     Auth {
@@ -153,8 +200,8 @@ pub enum InitTemplate {
 pub enum AuthAction {
     /// Interactive login - opens browser for manual login, then saves session
     Login {
-        /// URL to navigate to for login
-        url: String,
+        /// URL to navigate to for login (uses context when omitted)
+        url: Option<String>,
         /// File to save authentication state to
         #[arg(short, long, default_value = "auth.json")]
         output: PathBuf,
@@ -166,7 +213,7 @@ pub enum AuthAction {
     /// Show cookies for a URL (uses saved auth if --auth provided)
     Cookies {
         /// URL to get cookies for
-        url: String,
+        url: Option<String>,
         /// Output format: json or table
         #[arg(short, long, default_value = "table")]
         format: String,
@@ -186,13 +233,23 @@ mod tests {
 
     #[test]
     fn parse_screenshot_command() {
-        let args = vec!["pw", "screenshot", "https://example.com", "-o", "/tmp/test.png"];
+        let args = vec![
+            "pw",
+            "screenshot",
+            "https://example.com",
+            "-o",
+            "/tmp/test.png",
+        ];
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            Commands::Screenshot { url, output, full_page } => {
-                assert_eq!(url, "https://example.com");
-                assert_eq!(output, PathBuf::from("/tmp/test.png"));
+            Commands::Screenshot {
+                url,
+                output,
+                full_page,
+            } => {
+                assert_eq!(url.as_deref(), Some("https://example.com"));
+                assert_eq!(output, Some(PathBuf::from("/tmp/test.png")));
                 assert!(!full_page);
             }
             _ => panic!("Expected Screenshot command"),
@@ -205,9 +262,13 @@ mod tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match cli.command {
-            Commands::Screenshot { url, output, full_page } => {
-                assert_eq!(url, "https://example.com");
-                assert_eq!(output, PathBuf::from("screenshot.png"));
+            Commands::Screenshot {
+                url,
+                output,
+                full_page,
+            } => {
+                assert_eq!(url.as_deref(), Some("https://example.com"));
+                assert_eq!(output, None);
                 assert!(!full_page);
             }
             _ => panic!("Expected Screenshot command"),
@@ -221,8 +282,8 @@ mod tests {
 
         match cli.command {
             Commands::Html { url, selector } => {
-                assert_eq!(url, "https://example.com");
-                assert_eq!(selector, "div.content");
+                assert_eq!(url.as_deref(), Some("https://example.com"));
+                assert_eq!(selector.as_deref(), Some("div.content"));
             }
             _ => panic!("Expected Html command"),
         }
@@ -235,7 +296,7 @@ mod tests {
 
         match cli.command {
             Commands::Wait { url, condition } => {
-                assert_eq!(url, "https://example.com");
+                assert_eq!(url.as_deref(), Some("https://example.com"));
                 assert_eq!(condition, "networkidle");
             }
             _ => panic!("Expected Wait command"),
@@ -251,7 +312,7 @@ mod tests {
         let long_args = vec!["pw", "--verbose", "screenshot", "https://example.com"];
         let long_cli = Cli::try_parse_from(long_args).unwrap();
         assert_eq!(long_cli.verbose, 1);
-        
+
         let double_v = vec!["pw", "-vv", "screenshot", "https://example.com"];
         let double_cli = Cli::try_parse_from(double_v).unwrap();
         assert_eq!(double_cli.verbose, 2);
@@ -267,7 +328,10 @@ mod tests {
             "https://example.com",
         ];
         let cli = Cli::try_parse_from(args).unwrap();
-        assert_eq!(cli.cdp_endpoint.as_deref(), Some("ws://localhost:19988/cdp"));
+        assert_eq!(
+            cli.cdp_endpoint.as_deref(),
+            Some("ws://localhost:19988/cdp")
+        );
     }
 
     #[test]

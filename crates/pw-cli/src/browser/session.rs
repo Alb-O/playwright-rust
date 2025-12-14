@@ -151,10 +151,16 @@ impl BrowserSession {
         browser_kind: BrowserKind,
         cdp_endpoint: Option<&str>,
     ) -> Result<Self> {
-        let storage_state = StorageState::from_file(auth_file).map_err(|e| {
-            PwError::BrowserLaunch(format!("Failed to load auth file: {}", e))
-        })?;
-        Self::with_options(wait_until, Some(storage_state), true, browser_kind, cdp_endpoint).await
+        let storage_state = StorageState::from_file(auth_file)
+            .map_err(|e| PwError::BrowserLaunch(format!("Failed to load auth file: {}", e)))?;
+        Self::with_options(
+            wait_until,
+            Some(storage_state),
+            true,
+            browser_kind,
+            cdp_endpoint,
+        )
+        .await
     }
 
     pub async fn goto(&self, url: &str) -> Result<()> {

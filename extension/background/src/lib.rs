@@ -3,8 +3,8 @@ use std::rc::Rc;
 use js_sys::{Array, Object, Reflect};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{CloseEvent, ErrorEvent, MessageEvent, WebSocket};
 
@@ -43,7 +43,11 @@ struct ForwardEvent<'a> {
 pub async fn start() {
     console_error_panic_hook::set_once();
     log(&format!("pw-ext-background starting; relay={RELAY_URL}"));
-    set_status("connecting", "pw-rs bridge (connecting)", [160, 160, 160, 255]);
+    set_status(
+        "connecting",
+        "pw-rs bridge (connecting)",
+        [160, 160, 160, 255],
+    );
 
     if let Err(err) = init().await {
         let msg = format!("pw-rs bridge error: {err:?}");
@@ -62,14 +66,14 @@ async fn init() -> Result<(), JsValue> {
     // Handle incoming messages (commands from relay)
     {
         let ws_inner = ws_rc.clone();
-        let onmessage_callback = Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
+        let onmessage_callback =
+            Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
                 if let Err(err) = handle_ws_message(event, tab_id, ws_inner.clone()) {
                     let msg = format!("ws message error: {:?}", err);
                     log(&msg);
                     push_log(&msg);
                 }
-
-        });
+            });
         ws_rc.set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
         onmessage_callback.forget();
     }
@@ -95,7 +99,11 @@ async fn init() -> Result<(), JsValue> {
         onerror.forget();
 
         let onclose = Closure::<dyn FnMut(CloseEvent)>::new(|e: CloseEvent| {
-            let msg = format!("relay websocket closed code={} reason={}", e.code(), e.reason());
+            let msg = format!(
+                "relay websocket closed code={} reason={}",
+                e.code(),
+                e.reason()
+            );
             log(&msg);
             set_status("disconnected", &msg, [120, 120, 120, 255]);
             push_log(&msg);
@@ -135,17 +143,19 @@ async fn init() -> Result<(), JsValue> {
 
     {
         let ws_inner = ws_rc.clone();
-        let on_detach = Closure::<dyn FnMut(JsValue, JsValue)>::new(move |_source: JsValue, reason: JsValue| {
-            let reason_str = reason.as_string().unwrap_or_default();
-            let msg = ForwardEvent {
-                method: "forwardCDPEvent",
-                params: json!({
-                    "method": "Target.detachedFromTarget",
-                    "params": json!({ "reason": reason_str })
-                }),
-            };
-            let _ = send_json(&ws_inner, &msg);
-        });
+        let on_detach = Closure::<dyn FnMut(JsValue, JsValue)>::new(
+            move |_source: JsValue, reason: JsValue| {
+                let reason_str = reason.as_string().unwrap_or_default();
+                let msg = ForwardEvent {
+                    method: "forwardCDPEvent",
+                    params: json!({
+                        "method": "Target.detachedFromTarget",
+                        "params": json!({ "reason": reason_str })
+                    }),
+                };
+                let _ = send_json(&ws_inner, &msg);
+            },
+        );
         debugger_on_detach_add_listener(&on_detach);
         on_detach.forget();
     }
@@ -177,7 +187,8 @@ fn handle_ws_message(event: MessageEvent, tab_id: i32, ws: Rc<WebSocket>) -> Res
     let method = cmd.params.method.clone();
 
     let future = async move {
-        let result = match JsFuture::from(debugger_send_command(&target, &method, &params_js)).await {
+        let result = match JsFuture::from(debugger_send_command(&target, &method, &params_js)).await
+        {
             Ok(val) => serde_wasm_bindgen::from_value(val).unwrap_or(json!({})),
             Err(err) => {
                 let msg = format!("sendCommand {} failed: {}", method, stringify_js_error(err));
@@ -228,15 +239,27 @@ async fn attach_debugger(tab_id: i32) -> Result<(), JsValue> {
 
 fn build_tab_object(tab_id: i32) -> Result<JsValue, JsValue> {
     let target = Object::new();
-    Reflect::set(&target, &JsValue::from_str("tabId"), &JsValue::from_f64(tab_id as f64))?;
+    Reflect::set(
+        &target,
+        &JsValue::from_str("tabId"),
+        &JsValue::from_f64(tab_id as f64),
+    )?;
     Ok(target.into())
 }
 
 fn build_debuggee(tab_id: i32, session_id: Option<&str>) -> Result<JsValue, JsValue> {
     let target = Object::new();
-    Reflect::set(&target, &JsValue::from_str("tabId"), &JsValue::from_f64(tab_id as f64))?;
+    Reflect::set(
+        &target,
+        &JsValue::from_str("tabId"),
+        &JsValue::from_f64(tab_id as f64),
+    )?;
     if let Some(session) = session_id {
-        Reflect::set(&target, &JsValue::from_str("sessionId"), &JsValue::from_str(session))?;
+        Reflect::set(
+            &target,
+            &JsValue::from_str("sessionId"),
+            &JsValue::from_str(session),
+        )?;
     }
     Ok(target.into())
 }
@@ -290,7 +313,11 @@ fn set_badge(text: &str, title: &str, rgba: [u8; 4]) {
     color.push(&JsValue::from_f64(rgba[3] as f64));
 
     let text_obj = Object::new();
-    let _ = Reflect::set(&text_obj, &JsValue::from_str("text"), &JsValue::from_str(text));
+    let _ = Reflect::set(
+        &text_obj,
+        &JsValue::from_str("text"),
+        &JsValue::from_str(text),
+    );
     action_set_badge_text(&text_obj);
 
     let color_obj = Object::new();
@@ -298,7 +325,11 @@ fn set_badge(text: &str, title: &str, rgba: [u8; 4]) {
     action_set_badge_background_color(&color_obj);
 
     let title_obj = Object::new();
-    let _ = Reflect::set(&title_obj, &JsValue::from_str("title"), &JsValue::from_str(title));
+    let _ = Reflect::set(
+        &title_obj,
+        &JsValue::from_str("title"),
+        &JsValue::from_str(title),
+    );
     action_set_title(&title_obj);
 }
 
@@ -318,13 +349,17 @@ fn push_log(line: &str) {
 fn persist_state(status: &str, message: &str) {
     let obj = Object::new();
     let state = Object::new();
-    let _ = Reflect::set(&state, &JsValue::from_str("status"), &JsValue::from_str(status));
-    let _ = Reflect::set(&state, &JsValue::from_str("message"), &JsValue::from_str(message));
     let _ = Reflect::set(
-        &obj,
-        &JsValue::from_str("pw_bridge_state"),
         &state,
+        &JsValue::from_str("status"),
+        &JsValue::from_str(status),
     );
+    let _ = Reflect::set(
+        &state,
+        &JsValue::from_str("message"),
+        &JsValue::from_str(message),
+    );
+    let _ = Reflect::set(&obj, &JsValue::from_str("pw_bridge_state"), &state);
     let _ = storage_local_set(&obj);
 }
 
@@ -340,9 +375,21 @@ fn persist_log(lines: &[String]) {
 
 fn send_state_message(status: &str, message: &str) {
     let payload = Object::new();
-    let _ = Reflect::set(&payload, &JsValue::from_str("type"), &JsValue::from_str("pw-bridge-state"));
-    let _ = Reflect::set(&payload, &JsValue::from_str("status"), &JsValue::from_str(status));
-    let _ = Reflect::set(&payload, &JsValue::from_str("message"), &JsValue::from_str(message));
+    let _ = Reflect::set(
+        &payload,
+        &JsValue::from_str("type"),
+        &JsValue::from_str("pw-bridge-state"),
+    );
+    let _ = Reflect::set(
+        &payload,
+        &JsValue::from_str("status"),
+        &JsValue::from_str(status),
+    );
+    let _ = Reflect::set(
+        &payload,
+        &JsValue::from_str("message"),
+        &JsValue::from_str(message),
+    );
     let _ = runtime_send_message(&payload);
 }
 
@@ -352,7 +399,11 @@ fn send_log_message(lines: &[String]) {
         array.push(&JsValue::from_str(line));
     }
     let payload = Object::new();
-    let _ = Reflect::set(&payload, &JsValue::from_str("type"), &JsValue::from_str("pw-bridge-log"));
+    let _ = Reflect::set(
+        &payload,
+        &JsValue::from_str("type"),
+        &JsValue::from_str("pw-bridge-log"),
+    );
     let _ = Reflect::set(&payload, &JsValue::from_str("lines"), &array);
     let _ = runtime_send_message(&payload);
 }

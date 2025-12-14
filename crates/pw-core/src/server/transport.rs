@@ -562,10 +562,12 @@ mod tests {
         // Run should error on incomplete read
         let result = transport.run().await;
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to read length prefix"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to read length prefix")
+        );
     }
 
     #[tokio::test]

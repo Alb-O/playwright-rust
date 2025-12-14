@@ -1,5 +1,5 @@
-use tracing_subscriber::fmt::writer::MakeWriterExt;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
 
 pub fn init_logging(verbosity: u8) {
     // 0 = silent (suppress pw-core protocol noise entirely)
@@ -10,9 +10,8 @@ pub fn init_logging(verbosity: u8) {
         1 => "info,pw_core=warn",
         _ => "debug",
     };
-    
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(filter));
+
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(filter));
 
     let stderr = std::io::stderr.with_max_level(tracing::Level::TRACE);
 

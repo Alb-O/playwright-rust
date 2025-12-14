@@ -172,7 +172,8 @@ pub async fn execute(url: &str, ctx: &CommandContext) -> Result<()> {
         ctx.auth_file(),
         ctx.browser,
         ctx.cdp_endpoint(),
-    ).await?;
+    )
+    .await?;
     session.goto(url).await?;
 
     let js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
@@ -186,7 +187,12 @@ pub async fn execute(url: &str, ctx: &CommandContext) -> Result<()> {
 
     // Calculate column widths
     let max_kind = elements.iter().map(|e| e.kind.len()).max().unwrap_or(6);
-    let max_label = elements.iter().map(|e| e.label.len()).max().unwrap_or(20).min(40);
+    let max_label = elements
+        .iter()
+        .map(|e| e.label.len())
+        .max()
+        .unwrap_or(20)
+        .min(40);
 
     for el in &elements {
         let kind = format!("[{}]", el.kind);
@@ -195,9 +201,13 @@ pub async fn execute(url: &str, ctx: &CommandContext) -> Result<()> {
         } else {
             el.label.clone()
         };
-        
-        let extra = el.extra.as_ref().map(|e| format!(" ({})", e)).unwrap_or_default();
-        
+
+        let extra = el
+            .extra
+            .as_ref()
+            .map(|e| format!(" ({})", e))
+            .unwrap_or_default();
+
         println!(
             "{:<width_k$} {:<width_l$}{} → {}",
             kind,

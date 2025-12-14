@@ -56,6 +56,7 @@ Nix's `playwright-driver.browsers` pins to a specific Chromium revision (1181 at
 - `@playwright/test` 1.57 expects revision 1200
 
 Additionally, Playwright 1.57+ changed the internal directory structure for headless shell:
+
 - Old (1181): `chromium_headless_shell-1181/chrome-linux/headless_shell`
 - New (1200): `chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell`
 
@@ -115,13 +116,14 @@ The script detects Nix-provided browsers and creates symlinks for the revisions 
 
 Nix's `playwright-driver.browsers` pins to a specific Chromium revision (1181 at time of writing). Different Playwright versions expect different revisions:
 
-| Playwright Version | Expected Browser Revision |
-|-------------------|---------------------------|
+| Playwright Version             | Expected Browser Revision   |
+| ------------------------------ | --------------------------- |
 | nixpkgs playwright-test 1.54.1 | 1181 (matches Nix browsers) |
-| pw-core (playwright-rs 1.56.1) | 1194 |
-| npm @playwright/test 1.57+ | 1200+ |
+| pw-core (playwright-rs 1.56.1) | 1194                        |
+| npm @playwright/test 1.57+     | 1200+                       |
 
 Additionally, Playwright 1.57+ changed the internal directory structure for headless shell:
+
 - Old (1181): `chromium_headless_shell-1181/chrome-linux/headless_shell`
 - New (1200): `chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell`
 

@@ -8,7 +8,7 @@
 
 use pw::server::{playwright_server::PlaywrightServer, transport::PipeTransport};
 use serde_json::json;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 /// Test that we can launch a real Playwright server and create a transport
 #[tokio::test]

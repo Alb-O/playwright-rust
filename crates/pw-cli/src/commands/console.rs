@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::browser::{js::console_capture_injection_js, BrowserSession};
+use crate::browser::{BrowserSession, js::console_capture_injection_js};
 use crate::context::CommandContext;
 use crate::error::Result;
 use crate::types::ConsoleMessage;
@@ -14,9 +14,14 @@ pub async fn execute(url: &str, timeout_ms: u64, ctx: &CommandContext) -> Result
         ctx.auth_file(),
         ctx.browser,
         ctx.cdp_endpoint(),
-    ).await?;
+    )
+    .await?;
 
-    if let Err(err) = session.page().evaluate(console_capture_injection_js()).await {
+    if let Err(err) = session
+        .page()
+        .evaluate(console_capture_injection_js())
+        .await
+    {
         warn!(target = "pw.browser.console", error = %err, "failed to inject console capture");
     }
 

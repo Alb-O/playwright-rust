@@ -30,11 +30,7 @@ impl CommandContext {
         auth_file: Option<PathBuf>,
         cdp_endpoint: Option<String>,
     ) -> Self {
-        let project = if no_project {
-            None
-        } else {
-            Project::detect()
-        };
+        let project = if no_project { None } else { Project::detect() };
 
         // Resolve auth file path based on project
         let resolved_auth = auth_file.map(|auth| {
@@ -76,7 +72,8 @@ impl CommandContext {
 
         // If just a filename and we have a project, put it in screenshots dir
         if let Some(ref proj) = self.project {
-            proj.paths.screenshot_path(output.to_string_lossy().as_ref())
+            proj.paths
+                .screenshot_path(output.to_string_lossy().as_ref())
         } else {
             output.to_path_buf()
         }

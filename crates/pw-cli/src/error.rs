@@ -35,6 +35,9 @@ pub enum PwError {
     #[error("timeout after {ms}ms waiting for: {condition}")]
     Timeout { ms: u64, condition: String },
 
+    #[error("context resolution failed: {0}")]
+    Context(String),
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 

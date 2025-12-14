@@ -103,6 +103,13 @@ cargo nextest run  # faster, install with: cargo install cargo-nextest
 
 Integration tests require browsers to be installed. The `crates/pw-core/tests/` directory contains tests for specific features; `crates/pw-core/examples/` demonstrates common patterns.
 
+## Nix & tooling
+
+- `nix develop` drops you into a Playwright-ready shell (Node.js, playwright-driver, browser compatibility symlinks, OpenSSL env vars) plus `rust-analyzer` and formatter wiring.
+- `nix fmt` runs the repo formatter (treefmt → cargo fmt, etc.).
+- `nix flake check` runs formatting plus the `pw-cli` package build (tests off for sandboxed browsers).
+- After changing `nix/outputs/**`, regenerate flake inputs with `nix run .#imp-flake`.
+
 ## Project structure
 
 The `crates/` directory contains two crates: `pw-core` (the library: Playwright client, protocol types, browser/context/page abstractions) and `pw-cli` (the command-line tool). The separation keeps dependencies minimal if you only need one or the other.

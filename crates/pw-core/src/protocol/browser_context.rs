@@ -5,8 +5,8 @@
 // cache, and local storage.
 
 use crate::error::Result;
-use crate::protocol::cookie::{ClearCookiesOptions, Cookie, StorageState, StorageStateOptions};
 use crate::protocol::Page;
+use crate::protocol::cookie::{ClearCookiesOptions, Cookie, StorageState, StorageStateOptions};
 use crate::server::channel::Channel;
 use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use serde::{Deserialize, Serialize};
@@ -331,7 +331,10 @@ impl BrowserContext {
     /// - File write fails (if path is specified)
     ///
     /// See: <https://playwright.dev/docs/api/class-browsercontext#browser-context-storage-state>
-    pub async fn storage_state(&self, options: Option<StorageStateOptions>) -> Result<StorageState> {
+    pub async fn storage_state(
+        &self,
+        options: Option<StorageStateOptions>,
+    ) -> Result<StorageState> {
         let params = match &options {
             Some(opts) => serde_json::to_value(opts).unwrap_or_default(),
             None => serde_json::json!({}),

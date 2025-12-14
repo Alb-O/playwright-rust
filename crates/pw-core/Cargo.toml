@@ -16,32 +16,32 @@ name = "pw"
 doctest = false  # Disable doc-tests by default (run with: cargo test --doc)
 
 [dependencies]
-tokio.workspace = true
+base64 = "0.22"
+glob = "0.3"
+parking_lot = "0.12"
+regex = "1.12"
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
 tracing = "0.1"
-parking_lot = "0.12"
-base64 = "0.22"
-regex = "1.12"
-glob = "0.3"
+
+[build-dependencies]
+dirs = "6.0"
+reqwest = { version = "0.12", features = ["blocking"] }
+zip = "6.0"
 
 [dev-dependencies]
 anyhow.workspace = true
 axum = "0.8"
+criterion = { version = "0.7", features = ["html_reports", "async_tokio"] }
 tower = "0.5"
 tower-http = "0.6"
 tracing-subscriber = { version = "0.3", features = ["fmt"] }
-criterion = { version = "0.7", features = ["html_reports", "async_tokio"] }
 urlencoding = "2.1"
 
 [target.'cfg(windows)'.dev-dependencies]
 winapi = { version = "0.3", features = ["processthreadsapi", "psapi", "minwindef"] }
-
-[build-dependencies]
-reqwest = { version = "0.12", features = ["blocking"] }
-zip = "6.0"
-dirs = "6.0"
 
 [[bench]]
 name = "browser_operations"

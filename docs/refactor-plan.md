@@ -10,7 +10,6 @@ Three files in `pw-core` have grown past 1100 lines. Each conflates multiple res
 
 `frame.rs` at 1147 lines has 20+ `locator_*` methods that exist solely to delegate from `Locator` to the Frame's channel. These occupy 600 lines of nearly identical boilerplate, burying the actual frame logic.
 
-
 ## page.rs
 
 The Page struct coordinates too many concerns. Navigation and screenshot methods share nothing except the underlying channel. Event handlers (route, download, dialog) each maintain their own Arc-wrapped handler vectors with identical registration patterns. The keyboard and mouse accessors return thin wrappers, but their 15 internal `keyboard_*` and `mouse_*` methods live inline.
@@ -33,7 +32,6 @@ The `Response` struct currently lives in `page.rs` but represents an HTTP respon
 
 `mod.rs` re-exports `GotoOptions`, `Response`, and `WaitUntil` to preserve the existing `use pw::protocol::page::Response` paths. The Page struct stays in `mod.rs` with its fields, constructor, and `ChannelOwner` implementation. Each method delegates to the appropriate submodule via `impl Page` blocks that import the submodule functions.
 
-
 ## connection.rs
 
 The file opens with 180 lines of message type definitions (`Request`, `Response`, `Event`, `Message`, `Metadata`, error wrappers) before reaching the actual `Connection` struct. These types are pure data definitions with serde derives; they have no behavioral dependency on Connection.
@@ -53,7 +51,6 @@ server/connection/
 The `serialize_arc_str` and `deserialize_arc_str` helpers are used by other modules (Frame's goto deserializes `ResponseReference` with `deserialize_arc_str`). These stay in `messages.rs` and get re-exported from `mod.rs`.
 
 Moving tests to `tests.rs` with `#[cfg(test)] mod tests;` keeps them discoverable while removing 265 lines from the implementation file. The test helper `create_test_connection()` can become `pub(super)` for use by dispatch tests if needed.
-
 
 ## frame.rs
 
@@ -92,7 +89,6 @@ The `goto()` method at 100 lines deserves isolation. It constructs `GotoOptions`
 
 The `set_input_files` methods (4 variants for path/payload × single/multiple) read files, base64-encode them, and construct payloads. They share encoding logic that could be extracted to a helper, but at minimum they should be grouped together in `locator_input.rs` where their commonality is visible.
 
-
 ## Migration Order
 
 Start with `connection.rs`. Its tests are self-contained and the message types have no dependencies on Connection internals. Extract `messages.rs` first, verify the build, then extract `dispatch.rs`, then move tests. Each step is independently verifiable.
@@ -101,25 +97,22 @@ Start with `connection.rs`. Its tests are self-contained and the message types h
 
 `page.rs` is most complex because of the event handler closures and their type aliases. The `on_event` match arms dispatch to methods that live in `events.rs`, requiring careful import management. Save this for last when the pattern is established.
 
-
 ## Visibility
 
 Types currently `pub` stay `pub`. Methods marked `pub(crate)` (the locator delegates, keyboard/mouse internals) stay `pub(crate)`. Submodule functions become `pub(super)` when only called by the parent `mod.rs`, or `pub(crate)` when called from outside the module.
 
 The `ChannelOwner` trait implementation stays in `mod.rs` for each refactored type. Its `on_event` method dispatches to submodule handlers, so it needs visibility into `events.rs` internals. Using `pub(super)` for the handler functions keeps them hidden from the rest of the crate.
 
-
 ## Verification
 
 After each file split:
 
 1. `cargo build --package pw-core` must succeed
-2. `cargo test --package pw-core --lib` must pass (69 tests currently)
-3. `cargo test --package pw-cli` must pass (40 unit + 29 e2e tests)
-4. `cargo doc --package pw-core` must generate without warnings
+1. `cargo test --package pw-core --lib` must pass (69 tests currently)
+1. `cargo test --package pw-cli` must pass (40 unit + 29 e2e tests)
+1. `cargo doc --package pw-core` must generate without warnings
 
 The public API paths (`pw::protocol::Page`, `pw::protocol::page::Response`, `pw::server::connection::Message`) must continue resolving. Add `pub use` re-exports in the module root files to preserve them.
-
 
 ## Target State
 

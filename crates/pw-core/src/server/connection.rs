@@ -60,8 +60,8 @@ use parking_lot::Mutex as ParkingLotMutex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::sync::Mutex as TokioMutex;
 use tokio::sync::{mpsc, oneshot};
 
@@ -727,7 +727,9 @@ where
 
         tracing::debug!(
             "__create__: type={}, guid={}, parent_guid={}",
-            type_name, object_guid, event.guid
+            type_name,
+            object_guid,
+            event.guid
         );
 
         let initializer = event.params["initializer"].clone();
@@ -741,7 +743,8 @@ where
             .ok_or_else(|| {
                 tracing::debug!(
                     "Parent object not found for type={}, parent_guid={}",
-                    type_name, event.guid
+                    type_name,
+                    event.guid
                 );
                 Error::ProtocolError(format!("Parent object not found: {}", event.guid))
             })?;
@@ -766,7 +769,9 @@ where
             Err(e) => {
                 tracing::debug!(
                     "Failed to create object type={}, guid={}, error={}",
-                    type_name, object_guid, e
+                    type_name,
+                    object_guid,
+                    e
                 );
                 return Err(e);
             }

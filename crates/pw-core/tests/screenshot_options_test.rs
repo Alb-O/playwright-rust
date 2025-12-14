@@ -13,8 +13,8 @@
 
 mod test_server;
 
-use pw::protocol::screenshot::{ScreenshotClip, ScreenshotOptions, ScreenshotType};
 use pw::protocol::Playwright;
+use pw::protocol::screenshot::{ScreenshotClip, ScreenshotOptions, ScreenshotType};
 use test_server::TestServer;
 
 #[tokio::test]

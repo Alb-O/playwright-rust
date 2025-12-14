@@ -13,7 +13,8 @@ pub async fn execute(url: &str, expression: &str, ctx: &CommandContext) -> Resul
         ctx.auth_file(),
         ctx.browser,
         ctx.cdp_endpoint(),
-    ).await?;
+    )
+    .await?;
     session.goto(url).await?;
 
     let result = session

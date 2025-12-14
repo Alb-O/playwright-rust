@@ -267,8 +267,7 @@ impl BrowserType {
             ))
         })?;
 
-        let response: ConnectResponse =
-            self.channel().send("connectOverCDP", params_json).await?;
+        let response: ConnectResponse = self.channel().send("connectOverCDP", params_json).await?;
 
         let browser_arc = self.connection().get_object(&response.browser.guid).await?;
         let browser = browser_arc

@@ -13,8 +13,8 @@ This writes `dist/background.js` and `dist/background_bg.wasm` consumed by the m
 ## Load
 
 1. Start the relay: `pw relay` (default `ws://127.0.0.1:19988`).
-2. In Chromium/Chrome, open `chrome://extensions`, enable Developer Mode.
-3. "Load unpacked" and select the `extension` directory.
+1. In Chromium/Chrome, open `chrome://extensions`, enable Developer Mode.
+1. "Load unpacked" and select the `extension` directory.
 
 ## UI / status
 

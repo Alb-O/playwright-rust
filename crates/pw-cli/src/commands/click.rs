@@ -14,7 +14,8 @@ pub async fn execute(url: &str, selector: &str, ctx: &CommandContext) -> Result<
         ctx.auth_file(),
         ctx.browser,
         ctx.cdp_endpoint(),
-    ).await?;
+    )
+    .await?;
     session.goto(url).await?;
 
     let locator = session.page().locator(selector).await;

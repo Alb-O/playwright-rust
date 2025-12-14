@@ -14,7 +14,8 @@ pub async fn execute(url: &str, ctx: &CommandContext) -> Result<()> {
         ctx.auth_file(),
         ctx.browser,
         ctx.cdp_endpoint(),
-    ).await?;
+    )
+    .await?;
     session.goto(url).await?;
 
     tokio::time::sleep(Duration::from_millis(2000)).await;
@@ -31,7 +32,11 @@ pub async fn execute(url: &str, ctx: &CommandContext) -> Result<()> {
     let errors: Vec<String> = serde_json::from_str(&errors_json).unwrap_or_default();
 
     if !errors.is_empty() {
-        warn!(target = "pw.browser", count = errors.len(), "page reported errors");
+        warn!(
+            target = "pw.browser",
+            count = errors.len(),
+            "page reported errors"
+        );
     }
 
     let result = NavigateResult {

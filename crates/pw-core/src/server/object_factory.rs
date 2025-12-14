@@ -14,8 +14,8 @@
 
 use crate::error::{Error, Result};
 use crate::protocol::{
-    artifact::Artifact, Browser, BrowserContext, BrowserType, Dialog, Frame, Page, Playwright,
-    Request, ResponseObject, Route,
+    Browser, BrowserContext, BrowserType, Dialog, Frame, Page, Playwright, Request, ResponseObject,
+    Route, artifact::Artifact,
 };
 use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use serde_json::Value;
@@ -80,7 +80,7 @@ pub async fn create_object(
                 ParentOrConnection::Parent(_) => {
                     return Err(Error::ProtocolError(
                         "Playwright must have Connection as parent".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -94,7 +94,7 @@ pub async fn create_object(
                 ParentOrConnection::Connection(_) => {
                     return Err(Error::ProtocolError(
                         "BrowserType must have Playwright as parent".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -113,7 +113,7 @@ pub async fn create_object(
                 ParentOrConnection::Connection(_) => {
                     return Err(Error::ProtocolError(
                         "Browser must have BrowserType as parent".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -127,7 +127,7 @@ pub async fn create_object(
                 ParentOrConnection::Connection(_) => {
                     return Err(Error::ProtocolError(
                         "BrowserContext must have Browser as parent".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -146,7 +146,7 @@ pub async fn create_object(
                 ParentOrConnection::Connection(_) => {
                     return Err(Error::ProtocolError(
                         "Page must have BrowserContext as parent".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -160,7 +160,7 @@ pub async fn create_object(
                 ParentOrConnection::Connection(_) => {
                     return Err(Error::ProtocolError(
                         "Frame must have Page as parent".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -174,7 +174,7 @@ pub async fn create_object(
                 ParentOrConnection::Connection(_) => {
                     return Err(Error::ProtocolError(
                         "Request must have Frame as parent".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -188,7 +188,7 @@ pub async fn create_object(
                 ParentOrConnection::Connection(_) => {
                     return Err(Error::ProtocolError(
                         "Route must have Frame as parent".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -202,7 +202,7 @@ pub async fn create_object(
                 ParentOrConnection::Connection(_) => {
                     return Err(Error::ProtocolError(
                         "Response must have Request as parent".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -221,7 +221,7 @@ pub async fn create_object(
                 ParentOrConnection::Connection(_) => {
                     return Err(Error::ProtocolError(
                         "ElementHandle must have Frame as parent".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -240,7 +240,7 @@ pub async fn create_object(
                 ParentOrConnection::Connection(_) => {
                     return Err(Error::ProtocolError(
                         "Artifact must have BrowserContext as parent".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -254,7 +254,7 @@ pub async fn create_object(
                 ParentOrConnection::Connection(_) => {
                     return Err(Error::ProtocolError(
                         "Dialog must have Page as parent".to_string(),
-                    ))
+                    ));
                 }
             };
 
@@ -276,7 +276,12 @@ struct UnknownObject {
 }
 
 impl UnknownObject {
-    fn new(parent: ParentOrConnection, type_name: String, guid: Arc<str>, initializer: Value) -> Self {
+    fn new(
+        parent: ParentOrConnection,
+        type_name: String,
+        guid: Arc<str>,
+        initializer: Value,
+    ) -> Self {
         let base = ChannelOwnerImpl::new(parent, type_name, guid, initializer);
         Self { base }
     }

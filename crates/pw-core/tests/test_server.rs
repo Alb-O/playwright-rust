@@ -8,10 +8,10 @@
 #![allow(dead_code)]
 
 use axum::{
+    Router,
     body::Body,
     http::{Response, StatusCode},
     routing::get,
-    Router,
 };
 use std::net::SocketAddr;
 use tokio::task::JoinHandle;

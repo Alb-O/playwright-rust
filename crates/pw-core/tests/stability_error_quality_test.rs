@@ -355,15 +355,21 @@ async fn test_error_quality_audit() {
     println!();
     println!("2. LaunchFailed:");
     println!("   Current: 'Failed to launch Playwright server: <details>'");
-    println!("   Improved: 'Failed to launch Playwright server: <details>. Check that Node.js is installed.'");
+    println!(
+        "   Improved: 'Failed to launch Playwright server: <details>. Check that Node.js is installed.'"
+    );
     println!();
     println!("3. ElementNotFound:");
     println!("   Current: 'Element not found: <selector>'");
-    println!("   Improved: 'Element not found: <selector>. Waited for <timeout>. Retry with longer timeout or check selector.'");
+    println!(
+        "   Improved: 'Element not found: <selector>. Waited for <timeout>. Retry with longer timeout or check selector.'"
+    );
     println!();
     println!("4. Timeout:");
     println!("   Current: 'Timeout: <message>'");
-    println!("   Improved: 'Timeout after <duration>: <operation> (<url>). Increase timeout or check network.'");
+    println!(
+        "   Improved: 'Timeout after <duration>: <operation> (<url>). Increase timeout or check network.'"
+    );
     println!();
     println!("5. TargetClosed:");
     println!("   Current: 'Target closed: <message>'");

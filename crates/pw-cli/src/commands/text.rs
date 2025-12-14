@@ -7,61 +7,62 @@ use tracing::info;
 /// Heuristically detect if a line looks like minified JavaScript or garbage
 fn is_garbage_line(line: &str) -> bool {
     let trimmed = line.trim();
-    
+
     // Skip empty lines (not garbage, just empty)
     if trimmed.is_empty() {
         return false;
     }
-    
+
     // Long lines with few spaces suggest minified code
     if trimmed.len() > 200 {
-        let space_ratio = trimmed.chars().filter(|c| c.is_whitespace()).count() as f32 
-            / trimmed.len() as f32;
+        let space_ratio =
+            trimmed.chars().filter(|c| c.is_whitespace()).count() as f32 / trimmed.len() as f32;
         if space_ratio < 0.05 {
             return true;
         }
     }
-    
+
     // High density of JS syntax characters
-    let js_chars = trimmed.chars().filter(|c| matches!(c, '{' | '}' | ';' | '(' | ')' | '=' | ',' | ':' | '[' | ']')).count();
+    let js_chars = trimmed
+        .chars()
+        .filter(|c| matches!(c, '{' | '}' | ';' | '(' | ')' | '=' | ',' | ':' | '[' | ']'))
+        .count();
     if trimmed.len() > 50 && js_chars as f32 / trimmed.len() as f32 > 0.15 {
         return true;
     }
-    
+
     // Common JS/CSS patterns
     let lower = trimmed.to_lowercase();
-    if lower.starts_with("function(") 
+    if lower.starts_with("function(")
         || lower.starts_with("!function")
         || lower.starts_with("(function")
         || lower.contains("use strict")
         || lower.contains("sourcemappingurl")
         || lower.contains("data:image/")
         || lower.contains("data:application/")
-        || lower.starts_with("var ")  && trimmed.contains("function")
+        || lower.starts_with("var ") && trimmed.contains("function")
         || lower.starts_with("const ") && trimmed.contains("=>")
         || (trimmed.contains("&&") && trimmed.contains("||") && trimmed.len() > 100)
     {
         return true;
     }
-    
+
     // Base64-like long strings (no spaces, alphanumeric heavy)
     if trimmed.len() > 100 && !trimmed.contains(' ') {
-        let alnum_ratio = trimmed.chars().filter(|c| c.is_alphanumeric()).count() as f32 
-            / trimmed.len() as f32;
+        let alnum_ratio =
+            trimmed.chars().filter(|c| c.is_alphanumeric()).count() as f32 / trimmed.len() as f32;
         if alnum_ratio > 0.9 {
             return true;
         }
     }
-    
+
     false
 }
 
 /// Filter out garbage lines from extracted text, collapsing multiple blank lines
 fn filter_garbage(text: &str) -> String {
-    let filtered: Vec<&str> = text.lines()
-        .filter(|line| !is_garbage_line(line))
-        .collect();
-    
+    let filtered: Vec<&str> = text.lines().filter(|line| !is_garbage_line(line)).collect();
+
     // Collapse runs of empty lines into single blank lines
     let mut result = Vec::new();
     let mut prev_empty = false;
@@ -73,7 +74,7 @@ fn filter_garbage(text: &str) -> String {
         result.push(line);
         prev_empty = is_empty;
     }
-    
+
     result.join("\n")
 }
 
@@ -85,7 +86,8 @@ pub async fn execute(url: &str, selector: &str, ctx: &CommandContext) -> Result<
         ctx.auth_file(),
         ctx.browser,
         ctx.cdp_endpoint(),
-    ).await?;
+    )
+    .await?;
     session.goto(url).await?;
 
     let locator = session.page().locator(selector).await;
@@ -127,7 +129,9 @@ mod tests {
     #[test]
     fn preserves_normal_text() {
         assert!(!is_garbage_line("Welcome to our website"));
-        assert!(!is_garbage_line("Click here to learn more about our products."));
+        assert!(!is_garbage_line(
+            "Click here to learn more about our products."
+        ));
         assert!(!is_garbage_line("Copyright 2024 Company Inc."));
         assert!(!is_garbage_line(""));
     }

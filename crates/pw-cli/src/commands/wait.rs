@@ -14,7 +14,8 @@ pub async fn execute(url: &str, condition: &str, ctx: &CommandContext) -> Result
         ctx.auth_file(),
         ctx.browser,
         ctx.cdp_endpoint(),
-    ).await?;
+    )
+    .await?;
     session.goto(url).await?;
 
     if let Ok(ms) = condition.parse::<u64>() {

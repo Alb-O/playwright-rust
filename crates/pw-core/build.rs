@@ -114,7 +114,9 @@ fn get_drivers_dir() -> PathBuf {
         "cargo:warning=No workspace found, using cache directory: {}",
         cache_dir.display()
     );
-    println!("cargo:warning=This matches playwright-python's approach for system-wide driver installation");
+    println!(
+        "cargo:warning=This matches playwright-python's approach for system-wide driver installation"
+    );
 
     cache_dir
 }
@@ -125,7 +127,7 @@ fn get_drivers_dir() -> PathBuf {
 /// otherwise falls back to `drivers/` at the project root.
 fn select_drivers_dir(project_root: &Path) -> PathBuf {
     let playwright_dir = project_root.join(dir_names::PLAYWRIGHT);
-    
+
     // If playwright/ directory exists, put drivers inside it
     if playwright_dir.exists() && playwright_dir.is_dir() {
         let drivers_dir = playwright_dir.join(dir_names::DRIVERS);

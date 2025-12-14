@@ -1,6 +1,6 @@
 //! CLI help output styling to match cargo's visual style.
 
-use clap::builder::{styling::AnsiColor, Styles};
+use clap::builder::{Styles, styling::AnsiColor};
 
 /// Returns clap Styles configured to match cargo's help output colors.
 ///

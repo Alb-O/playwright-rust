@@ -37,8 +37,7 @@ async fn test_connection_lifecycle_with_real_server() {
     let stdout = server.process.stdout.take().expect("Failed to get stdout");
 
     // Create transport
-    let (transport, message_rx) =
-        pw::server::transport::PipeTransport::new(stdin, stdout);
+    let (transport, message_rx) = pw::server::transport::PipeTransport::new(stdin, stdout);
 
     // Create connection
     let connection = Arc::new(Connection::new(transport, message_rx));
@@ -92,8 +91,7 @@ async fn test_connection_detects_server_crash_on_send() {
     let stdin = server.process.stdin.take().expect("Failed to get stdin");
     let stdout = server.process.stdout.take().expect("Failed to get stdout");
 
-    let (transport, message_rx) =
-        pw::server::transport::PipeTransport::new(stdin, stdout);
+    let (transport, message_rx) = pw::server::transport::PipeTransport::new(stdin, stdout);
 
     let connection = Arc::new(Connection::new(transport, message_rx));
 

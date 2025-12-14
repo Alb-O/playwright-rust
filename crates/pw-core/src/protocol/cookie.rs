@@ -87,7 +87,11 @@ impl Cookie {
     /// * `name` - Cookie name
     /// * `value` - Cookie value
     /// * `domain` - Domain for the cookie (e.g., ".example.com")
-    pub fn new(name: impl Into<String>, value: impl Into<String>, domain: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        value: impl Into<String>,
+        domain: impl Into<String>,
+    ) -> Self {
         Self {
             name: name.into(),
             value: value.into(),
@@ -108,7 +112,11 @@ impl Cookie {
     /// * `name` - Cookie name
     /// * `value` - Cookie value
     /// * `url` - URL to infer domain and path from
-    pub fn from_url(name: impl Into<String>, value: impl Into<String>, url: impl Into<String>) -> Self {
+    pub fn from_url(
+        name: impl Into<String>,
+        value: impl Into<String>,
+        url: impl Into<String>,
+    ) -> Self {
         Self {
             name: name.into(),
             value: value.into(),
@@ -271,16 +279,14 @@ impl StorageState {
     /// Loads storage state from a JSON file
     pub fn from_file(path: impl AsRef<std::path::Path>) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(path)?;
-        serde_json::from_str(&content).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-        })
+        serde_json::from_str(&content)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
 
     /// Saves storage state to a JSON file
     pub fn to_file(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
-        let content = serde_json::to_string_pretty(self).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-        })?;
+        let content = serde_json::to_string_pretty(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         std::fs::write(path, content)
     }
 }
@@ -358,7 +364,10 @@ mod tests {
     fn test_same_site_serialization() {
         assert_eq!(serde_json::to_string(&SameSite::None).unwrap(), "\"None\"");
         assert_eq!(serde_json::to_string(&SameSite::Lax).unwrap(), "\"Lax\"");
-        assert_eq!(serde_json::to_string(&SameSite::Strict).unwrap(), "\"Strict\"");
+        assert_eq!(
+            serde_json::to_string(&SameSite::Strict).unwrap(),
+            "\"Strict\""
+        );
     }
 
     #[test]

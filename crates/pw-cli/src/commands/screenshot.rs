@@ -6,10 +6,14 @@ use crate::error::Result;
 use pw::{ScreenshotOptions, WaitUntil};
 use tracing::info;
 
-pub async fn execute(url: &str, output: &Path, full_page: bool, ctx: &CommandContext) -> Result<()> {
-    // Resolve output path using project context
-    let output = ctx.screenshot_path(output);
-    
+pub async fn execute(
+    url: &str,
+    output: &Path,
+    full_page: bool,
+    ctx: &CommandContext,
+) -> Result<()> {
+    let output = output.to_path_buf();
+
     info!(target = "pw", %url, path = %output.display(), full_page, browser = %ctx.browser, "screenshot");
 
     let session = BrowserSession::with_auth_and_browser(
@@ -17,7 +21,8 @@ pub async fn execute(url: &str, output: &Path, full_page: bool, ctx: &CommandCon
         ctx.auth_file(),
         ctx.browser,
         ctx.cdp_endpoint(),
-    ).await?;
+    )
+    .await?;
     session.goto(url).await?;
 
     if let Some(parent) = output.parent() {

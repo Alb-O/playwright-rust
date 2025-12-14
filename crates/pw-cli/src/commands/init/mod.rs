@@ -48,14 +48,23 @@ pub fn execute(options: InitOptions) -> Result<()> {
     let result = scaffold_project(options)?;
 
     // Print summary as tree
-    println!("Initialized playwright project at: {}", result.project_root.display());
+    println!(
+        "Initialized playwright project at: {}",
+        result.project_root.display()
+    );
     println!();
-    print_tree(&result.project_root, &result.files_created, &result.directories_created);
+    print_tree(
+        &result.project_root,
+        &result.files_created,
+        &result.directories_created,
+    );
     println!();
 
     println!("Next steps:");
     if nix_mode {
-        println!("  1. Run tests: nix shell nixpkgs#playwright-test nixpkgs#playwright-driver.browsers \\");
+        println!(
+            "  1. Run tests: nix shell nixpkgs#playwright-test nixpkgs#playwright-driver.browsers \\"
+        );
         println!("                -c playwright test");
         println!();
         println!("  Or if using npm (requires setup-browsers.sh for version compatibility):");
@@ -78,7 +87,7 @@ fn print_tree(root: &Path, files: &[PathBuf], dirs: &[PathBuf]) {
 
     // Build a simple tree: path -> is_directory
     let mut all_paths: BTreeMap<PathBuf, bool> = BTreeMap::new();
-    
+
     for d in dirs {
         if let Ok(rel) = d.strip_prefix(root) {
             all_paths.insert(rel.to_path_buf(), true);
@@ -92,21 +101,23 @@ fn print_tree(root: &Path, files: &[PathBuf], dirs: &[PathBuf]) {
 
     // Group by parent directory for tree rendering
     fn print_level(paths: &BTreeMap<PathBuf, bool>, parent: &Path, prefix: &str) {
-        let children: Vec<_> = paths.iter()
+        let children: Vec<_> = paths
+            .iter()
             .filter(|(p, _)| {
-                p.parent() == Some(parent) || (parent.as_os_str().is_empty() && p.components().count() == 1)
+                p.parent() == Some(parent)
+                    || (parent.as_os_str().is_empty() && p.components().count() == 1)
             })
             .collect();
-        
+
         let count = children.len();
         for (i, (path, is_dir)) in children.iter().enumerate() {
             let is_last = i == count - 1;
             let connector = if is_last { "└── " } else { "├── " };
             let name = path.file_name().unwrap_or_default().to_string_lossy();
             let suffix = if **is_dir { "/" } else { "" };
-            
+
             println!("{}{}{}{}", prefix, connector, name, suffix);
-            
+
             if **is_dir {
                 let new_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
                 print_level(paths, path, &new_prefix);
@@ -167,7 +178,12 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
         create_dir_if_missing(&scripts_dir, &mut directories_created)?;
 
         let common_sh = scripts_dir.join("common.sh");
-        write_file_if_missing(&common_sh, templates::COMMON_SH, options.force, &mut files_created)?;
+        write_file_if_missing(
+            &common_sh,
+            templates::COMMON_SH,
+            options.force,
+            &mut files_created,
+        )?;
 
         // Make common.sh executable
         #[cfg(unix)]
@@ -189,7 +205,12 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
 
     // Create .gitignore for playwright directory
     let gitignore = playwright_dir.join(".gitignore");
-    write_file_if_missing(&gitignore, templates::PLAYWRIGHT_GITIGNORE, options.force, &mut files_created)?;
+    write_file_if_missing(
+        &gitignore,
+        templates::PLAYWRIGHT_GITIGNORE,
+        options.force,
+        &mut files_created,
+    )?;
 
     // Create Nix browser setup script if requested
     if options.nix {
@@ -198,7 +219,12 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
         create_dir_if_missing(&scripts_dir, &mut directories_created)?;
 
         let setup_browsers = scripts_dir.join("setup-browsers.sh");
-        write_file_if_missing(&setup_browsers, templates::SETUP_BROWSERS_SH, options.force, &mut files_created)?;
+        write_file_if_missing(
+            &setup_browsers,
+            templates::SETUP_BROWSERS_SH,
+            options.force,
+            &mut files_created,
+        )?;
 
         // Make setup-browsers.sh executable
         #[cfg(unix)]
@@ -220,7 +246,12 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
             (dirs::CONFIG_JS, templates::PLAYWRIGHT_CONFIG_JS)
         };
         let config_file = project_root.join(config_filename);
-        write_file_if_missing(&config_file, config_content, options.force, &mut files_created)?;
+        write_file_if_missing(
+            &config_file,
+            config_content,
+            options.force,
+            &mut files_created,
+        )?;
     }
 
     Ok(InitResult {
@@ -348,7 +379,14 @@ mod tests {
         let result = scaffold_project(options).unwrap();
 
         assert!(result.project_root.join(dirs::CONFIG_TS).exists());
-        assert!(result.project_root.join(dirs::PLAYWRIGHT).join(dirs::TESTS).join("example.spec.ts").exists());
+        assert!(
+            result
+                .project_root
+                .join(dirs::PLAYWRIGHT)
+                .join(dirs::TESTS)
+                .join("example.spec.ts")
+                .exists()
+        );
     }
 
     #[test]
@@ -450,7 +488,12 @@ mod tests {
         let pw_dir = result.project_root.join(dirs::PLAYWRIGHT);
         // --nix should create scripts dir even with minimal template
         assert!(pw_dir.join(dirs::SCRIPTS).exists());
-        assert!(pw_dir.join(dirs::SCRIPTS).join("setup-browsers.sh").exists());
+        assert!(
+            pw_dir
+                .join(dirs::SCRIPTS)
+                .join("setup-browsers.sh")
+                .exists()
+        );
 
         // Verify the script is executable
         #[cfg(unix)]
@@ -478,7 +521,10 @@ mod tests {
 
         let result = scaffold_project(options).unwrap();
 
-        let scripts_dir = result.project_root.join(dirs::PLAYWRIGHT).join(dirs::SCRIPTS);
+        let scripts_dir = result
+            .project_root
+            .join(dirs::PLAYWRIGHT)
+            .join(dirs::SCRIPTS);
         // Should have both common.sh and setup-browsers.sh
         assert!(scripts_dir.join("common.sh").exists());
         assert!(scripts_dir.join("setup-browsers.sh").exists());

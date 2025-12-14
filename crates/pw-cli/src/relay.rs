@@ -3,15 +3,15 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
+use axum::Router;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{Path, State, WebSocketUpgrade};
 use axum::routing::get;
-use axum::Router;
 use futures::{SinkExt, StreamExt};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::net::TcpListener;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{Mutex, mpsc, oneshot};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::{debug, error, info, warn};
 
@@ -59,20 +59,28 @@ pub async fn run_relay_server(host: &str, port: u16) -> Result<()> {
         .route("/", get(|| async { "OK" }))
         .route(
             "/extension",
-            get(|ws: WebSocketUpgrade, State(state): State<SharedState>| async move {
-                ws.on_upgrade(|socket| handle_extension_socket(socket, state))
-            }),
+            get(
+                |ws: WebSocketUpgrade, State(state): State<SharedState>| async move {
+                    ws.on_upgrade(|socket| handle_extension_socket(socket, state))
+                },
+            ),
         )
         .route(
             "/cdp",
-            get(|ws: WebSocketUpgrade, State(state): State<SharedState>| async move {
-                ws.on_upgrade(|socket| handle_client_socket(socket, state, "default".to_string()))
-            }),
+            get(
+                |ws: WebSocketUpgrade, State(state): State<SharedState>| async move {
+                    ws.on_upgrade(|socket| {
+                        handle_client_socket(socket, state, "default".to_string())
+                    })
+                },
+            ),
         )
         .route(
             "/cdp/:client_id",
             get(
-                |Path(client_id): Path<String>, ws: WebSocketUpgrade, State(state): State<SharedState>| async move {
+                |Path(client_id): Path<String>,
+                 ws: WebSocketUpgrade,
+                 State(state): State<SharedState>| async move {
                     ws.on_upgrade(|socket| handle_client_socket(socket, state, client_id))
                 },
             ),
@@ -168,7 +176,10 @@ async fn handle_extension_message(state: &SharedState, raw: &str) -> Result<()> 
         if let Some(sender) = pending {
             let _ = sender.send(result);
         } else {
-            warn!(target = "pw", id, "Received response with unknown id from extension");
+            warn!(
+                target = "pw",
+                id, "Received response with unknown id from extension"
+            );
         }
         return Ok(());
     }
@@ -237,7 +248,9 @@ async fn handle_extension_message(state: &SharedState, raw: &str) -> Result<()> 
     } else if event_method == "Target.targetInfoChanged" {
         if let (Some(target_info), Some(target_id)) = (
             params.get("targetInfo"),
-            params.get("targetInfo").and_then(|t| t.get("targetId").and_then(|v| v.as_str())),
+            params
+                .get("targetInfo")
+                .and_then(|t| t.get("targetId").and_then(|v| v.as_str())),
         ) {
             let mut st = state.lock().await;
             for target in st.connected_targets.values_mut() {
@@ -438,7 +451,9 @@ async fn route_cdp_command(
             if let Some(session) = session_id {
                 let info = {
                     let st = state.lock().await;
-                    st.connected_targets.get(session).map(|t| t.target_info.clone())
+                    st.connected_targets
+                        .get(session)
+                        .map(|t| t.target_info.clone())
                 };
 
                 if let Some(target_info) = info {
@@ -448,7 +463,10 @@ async fn route_cdp_command(
 
             let first = {
                 let st = state.lock().await;
-                st.connected_targets.values().next().map(|t| t.target_info.clone())
+                st.connected_targets
+                    .values()
+                    .next()
+                    .map(|t| t.target_info.clone())
             };
             return Ok(json!({"targetInfo": first}));
         }
@@ -527,11 +545,7 @@ async fn send_to_clients(state: &SharedState, client_id: Option<&str>, message: 
     let targets: Vec<mpsc::UnboundedSender<Message>> = {
         let st = state.lock().await;
         if let Some(id) = client_id {
-            st.clients
-                .get(id)
-                .cloned()
-                .into_iter()
-                .collect()
+            st.clients.get(id).cloned().into_iter().collect()
         } else {
             st.clients.values().cloned().collect()
         }

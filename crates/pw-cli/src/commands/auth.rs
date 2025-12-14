@@ -7,21 +7,33 @@ use pw::{StorageState, WaitUntil};
 use tracing::info;
 
 /// Interactive login - opens browser for manual login, then saves session
-pub async fn login(url: &str, output: &Path, timeout_secs: u64, ctx: &CommandContext) -> Result<()> {
+pub async fn login(
+    url: &str,
+    output: &Path,
+    timeout_secs: u64,
+    ctx: &CommandContext,
+) -> Result<()> {
     // Resolve output path using project context (into auth/ directory)
-    let output = if output.is_absolute() || output.parent().map_or(false, |p| !p.as_os_str().is_empty()) {
-        output.to_path_buf()
-    } else if let Some(ref proj) = ctx.project {
-        proj.paths.auth_file(output.to_string_lossy().as_ref())
-    } else {
-        output.to_path_buf()
-    };
+    let output =
+        if output.is_absolute() || output.parent().map_or(false, |p| !p.as_os_str().is_empty()) {
+            output.to_path_buf()
+        } else if let Some(ref proj) = ctx.project {
+            proj.paths.auth_file(output.to_string_lossy().as_ref())
+        } else {
+            output.to_path_buf()
+        };
 
     info!(target = "pw", %url, path = %output.display(), browser = %ctx.browser, "starting interactive login");
 
     // Launch in headed mode (not headless) for manual login
-    let session = BrowserSession::with_options(WaitUntil::Load, None, false, ctx.browser, ctx.cdp_endpoint())
-        .await?;
+    let session = BrowserSession::with_options(
+        WaitUntil::Load,
+        None,
+        false,
+        ctx.browser,
+        ctx.cdp_endpoint(),
+    )
+    .await?;
     session.goto(url).await?;
 
     println!("Browser opened at: {}", url);
@@ -66,7 +78,10 @@ pub async fn login(url: &str, output: &Path, timeout_secs: u64, ctx: &CommandCon
     println!("  Cookies: {}", cookie_count);
     println!("  Origins with localStorage: {}", origin_count);
     println!();
-    println!("Use with other commands: pw --auth {} <command>", output.display());
+    println!(
+        "Use with other commands: pw --auth {} <command>",
+        output.display()
+    );
 
     session.close().await
 }
@@ -80,7 +95,8 @@ pub async fn cookies(url: &str, format: &str, ctx: &CommandContext) -> Result<()
         ctx.auth_file(),
         ctx.browser,
         ctx.cdp_endpoint(),
-    ).await?;
+    )
+    .await?;
 
     session.goto(url).await?;
 

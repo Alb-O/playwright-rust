@@ -1,4 +1,4 @@
-use crate::browser::{js, BrowserSession};
+use crate::browser::{BrowserSession, js};
 use crate::context::CommandContext;
 use crate::error::Result;
 use crate::types::{ElementCoords, IndexedElementCoords};
@@ -12,7 +12,8 @@ pub async fn execute_single(url: &str, selector: &str, ctx: &CommandContext) -> 
         ctx.auth_file(),
         ctx.browser,
         ctx.cdp_endpoint(),
-    ).await?;
+    )
+    .await?;
     session.goto(url).await?;
 
     let result_json = session
@@ -37,7 +38,8 @@ pub async fn execute_all(url: &str, selector: &str, ctx: &CommandContext) -> Res
         ctx.auth_file(),
         ctx.browser,
         ctx.cdp_endpoint(),
-    ).await?;
+    )
+    .await?;
     session.goto(url).await?;
 
     let results_json = session

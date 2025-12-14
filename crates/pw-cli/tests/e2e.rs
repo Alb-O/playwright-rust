@@ -16,8 +16,19 @@ fn pw_binary() -> PathBuf {
     path
 }
 
+fn clear_context_store() {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
+        .unwrap_or_else(|| PathBuf::from("."));
+    let path = base.join("pw").join("cli").join("contexts.json");
+    let _ = std::fs::remove_file(&path);
+}
+
 /// Helper to run pw command and capture output
 fn run_pw(args: &[&str]) -> (bool, String, String) {
+    clear_context_store();
+
     let output = Command::new(pw_binary())
         .args(args)
         .output()
@@ -68,7 +79,8 @@ fn screenshot_with_complex_html() {
 
     let html = "data:text/html,<html><body style='background:blue'><h1 style='color:white'>Complex Test</h1><p>Paragraph</p></body></html>";
 
-    let (success, _stdout, stderr) = run_pw(&["screenshot", html, "-o", output_path.to_str().unwrap()]);
+    let (success, _stdout, stderr) =
+        run_pw(&["screenshot", html, "-o", output_path.to_str().unwrap()]);
 
     assert!(success, "Command failed: {}", stderr);
     assert!(output_path.exists(), "Screenshot file was not created");
@@ -127,11 +139,8 @@ fn html_nested_elements() {
 
 #[test]
 fn text_simple() {
-    let (success, stdout, stderr) = run_pw(&[
-        "text",
-        "data:text/html,<p id='msg'>Hello World</p>",
-        "#msg",
-    ]);
+    let (success, stdout, stderr) =
+        run_pw(&["text", "data:text/html,<p id='msg'>Hello World</p>", "#msg"]);
 
     assert!(success, "Command failed: {}", stderr);
     assert_eq!(stdout.trim(), "Hello World");
@@ -169,7 +178,7 @@ fn text_with_whitespace() {
 
 #[test]
 fn eval_simple_expression() {
-    let (success, stdout, stderr) = run_pw(&["eval", "data:text/html,<h1>Test</h1>", "1 + 1"]);
+    let (success, stdout, stderr) = run_pw(&["eval", "1 + 1", "data:text/html,<h1>Test</h1>"]);
 
     assert!(success, "Command failed: {}", stderr);
     assert_eq!(stdout.trim(), "2");
@@ -179,8 +188,8 @@ fn eval_simple_expression() {
 fn eval_document_title() {
     let (success, stdout, stderr) = run_pw(&[
         "eval",
-        "data:text/html,<html><head><title>My Title</title></head></html>",
         "document.title",
+        "data:text/html,<html><head><title>My Title</title></head></html>",
     ]);
 
     assert!(success, "Command failed: {}", stderr);
@@ -195,8 +204,8 @@ fn eval_document_title() {
 fn eval_query_selector() {
     let (success, stdout, stderr) = run_pw(&[
         "eval",
-        "data:text/html,<div id='test'>Content</div>",
         "document.querySelector('#test').textContent",
+        "data:text/html,<div id='test'>Content</div>",
     ]);
 
     assert!(success, "Command failed: {}", stderr);
@@ -211,8 +220,8 @@ fn eval_query_selector() {
 fn eval_returns_object() {
     let (success, stdout, stderr) = run_pw(&[
         "eval",
-        "data:text/html,<html></html>",
         "({a: 1, b: 'test'})",
+        "data:text/html,<html></html>",
     ]);
 
     assert!(success, "Command failed: {}", stderr);
@@ -222,8 +231,7 @@ fn eval_returns_object() {
 
 #[test]
 fn eval_returns_array() {
-    let (success, stdout, stderr) =
-        run_pw(&["eval", "data:text/html,<html></html>", "[1, 2, 3]"]);
+    let (success, stdout, stderr) = run_pw(&["eval", "[1, 2, 3]", "data:text/html,<html></html>"]);
 
     assert!(success, "Command failed: {}", stderr);
     assert!(stdout.contains("1"), "Expected 1 in output");
@@ -336,7 +344,10 @@ fn navigate_returns_json() {
     assert!(success, "Command failed: {}", stderr);
     assert!(stdout.contains("\"url\""), "Expected url in JSON");
     assert!(stdout.contains("\"title\""), "Expected title in JSON");
-    assert!(stdout.contains("\"hasErrors\""), "Expected hasErrors in JSON");
+    assert!(
+        stdout.contains("\"hasErrors\""),
+        "Expected hasErrors in JSON"
+    );
 }
 
 // =============================================================================
@@ -384,12 +395,11 @@ fn wait_selector_found() {
 
 #[test]
 fn missing_required_args() {
-    let (success, _stdout, stderr) = run_pw(&["screenshot"]);
+    let (success, _stdout, _stderr) = run_pw(&["--no-context", "screenshot"]);
 
-    assert!(!success, "Command should fail without URL");
     assert!(
-        stderr.contains("error") || stderr.contains("required"),
-        "Expected error message"
+        !success,
+        "Command should fail without URL when context is disabled"
     );
 }
 

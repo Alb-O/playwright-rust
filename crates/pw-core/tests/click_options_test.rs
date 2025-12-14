@@ -15,8 +15,8 @@
 
 mod test_server;
 
-use pw::protocol::click::{ClickOptions, KeyboardModifier, MouseButton, Position};
 use pw::protocol::Playwright;
+use pw::protocol::click::{ClickOptions, KeyboardModifier, MouseButton, Position};
 use test_server::TestServer;
 
 #[tokio::test]

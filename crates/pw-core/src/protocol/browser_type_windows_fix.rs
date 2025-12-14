@@ -30,7 +30,7 @@ pub fn get_windows_ci_args() -> Vec<String> {
         "--disable-accelerated-2d-canvas".to_string(),
         "--no-first-run".to_string(),
         "--no-zygote".to_string(),
-        "--single-process".to_string(),  // Run everything in one process
+        "--single-process".to_string(), // Run everything in one process
         "--disable-gpu".to_string(),
         "--disable-web-security".to_string(),
         "--disable-features=IsolateOrigins,site-per-process".to_string(),
@@ -50,9 +50,9 @@ pub fn get_windows_ci_args() -> Vec<String> {
 #[cfg(windows)]
 pub fn prepare_windows_launch_environment() {
     // Set environment variables that might help
-    std::env::set_var("PLAYWRIGHT_BROWSERS_PATH", "0");  // Use default path
+    std::env::set_var("PLAYWRIGHT_BROWSERS_PATH", "0"); // Use default path
     std::env::set_var("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "0");
-    std::env::set_var("DEBUG", "pw:api,pw:browser,pw:protocol");  // Enable debug logs
+    std::env::set_var("DEBUG", "pw:api,pw:browser,pw:protocol"); // Enable debug logs
 
     // Kill any existing browser processes
     kill_browser_processes();

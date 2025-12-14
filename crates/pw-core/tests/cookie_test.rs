@@ -5,11 +5,13 @@
 
 mod test_server;
 
-use pw::{Cookie, ClearCookiesOptions, SameSite, StorageState, Playwright};
+use pw::{ClearCookiesOptions, Cookie, Playwright, SameSite, StorageState};
 use test_server::TestServer;
 
 async fn setup() -> (Playwright, TestServer) {
-    let playwright = Playwright::launch().await.expect("Failed to launch Playwright");
+    let playwright = Playwright::launch()
+        .await
+        .expect("Failed to launch Playwright");
     let server = TestServer::start().await;
     (playwright, server)
 }
@@ -26,15 +28,22 @@ async fn test_add_and_retrieve_cookies() {
 
     // Add cookies using URL (required for IP-based origins)
     // Don't mix url with path - use one or the other
-    context.add_cookies(vec![
-        Cookie::from_url("session", "abc123", &server.url()),
-        Cookie::from_url("user_id", "42", &server.url()),
-    ]).await.unwrap();
+    context
+        .add_cookies(vec![
+            Cookie::from_url("session", "abc123", &server.url()),
+            Cookie::from_url("user_id", "42", &server.url()),
+        ])
+        .await
+        .unwrap();
 
     // Retrieve cookies
     let cookies = context.cookies(None).await.unwrap();
 
-    assert!(cookies.len() >= 2, "Expected at least 2 cookies, got {}", cookies.len());
+    assert!(
+        cookies.len() >= 2,
+        "Expected at least 2 cookies, got {}",
+        cookies.len()
+    );
 
     let session_cookie = cookies.iter().find(|c| c.name == "session");
     assert!(session_cookie.is_some(), "session cookie not found");
@@ -58,9 +67,14 @@ async fn test_cookies_filtered_by_url() {
     page.goto(&server.url(), None).await.unwrap();
 
     // Add cookie for local server using URL
-    context.add_cookies(vec![
-        Cookie::from_url("local_cookie", "value1", &server.url()),
-    ]).await.unwrap();
+    context
+        .add_cookies(vec![Cookie::from_url(
+            "local_cookie",
+            "value1",
+            &server.url(),
+        )])
+        .await
+        .unwrap();
 
     // Filter by URL should return matching cookies
     let local_cookies = context.cookies(Some(vec![&server.url()])).await.unwrap();
@@ -82,10 +96,13 @@ async fn test_clear_all_cookies() {
     page.goto(&server.url(), None).await.unwrap();
 
     // Add cookies using URL
-    context.add_cookies(vec![
-        Cookie::from_url("cookie1", "value1", &server.url()),
-        Cookie::from_url("cookie2", "value2", &server.url()),
-    ]).await.unwrap();
+    context
+        .add_cookies(vec![
+            Cookie::from_url("cookie1", "value1", &server.url()),
+            Cookie::from_url("cookie2", "value2", &server.url()),
+        ])
+        .await
+        .unwrap();
 
     // Verify they exist
     let before = context.cookies(None).await.unwrap();
@@ -96,7 +113,11 @@ async fn test_clear_all_cookies() {
 
     // Verify empty
     let after = context.cookies(None).await.unwrap();
-    assert!(after.is_empty(), "Expected no cookies after clear, got {}", after.len());
+    assert!(
+        after.is_empty(),
+        "Expected no cookies after clear, got {}",
+        after.len()
+    );
 
     browser.close().await.unwrap();
     server.shutdown();
@@ -112,15 +133,19 @@ async fn test_clear_cookies_by_name() {
     page.goto(&server.url(), None).await.unwrap();
 
     // Add multiple cookies using URL
-    context.add_cookies(vec![
-        Cookie::from_url("keep_me", "value1", &server.url()),
-        Cookie::from_url("delete_me", "value2", &server.url()),
-    ]).await.unwrap();
+    context
+        .add_cookies(vec![
+            Cookie::from_url("keep_me", "value1", &server.url()),
+            Cookie::from_url("delete_me", "value2", &server.url()),
+        ])
+        .await
+        .unwrap();
 
     // Clear only specific cookie
-    context.clear_cookies(Some(
-        ClearCookiesOptions::new().name("delete_me")
-    )).await.unwrap();
+    context
+        .clear_cookies(Some(ClearCookiesOptions::new().name("delete_me")))
+        .await
+        .unwrap();
 
     let remaining = context.cookies(None).await.unwrap();
 
@@ -144,17 +169,28 @@ async fn test_storage_state_roundtrip() {
     let page1 = context1.new_page().await.unwrap();
     page1.goto(&server.url(), None).await.unwrap();
 
-    context1.add_cookies(vec![
-        Cookie::from_url("auth_token", "secret123", &server.url()),
-    ]).await.unwrap();
+    context1
+        .add_cookies(vec![Cookie::from_url(
+            "auth_token",
+            "secret123",
+            &server.url(),
+        )])
+        .await
+        .unwrap();
 
     // Get storage state
     let state = context1.storage_state(None).await.unwrap();
 
     // Verify state contains our cookie
-    assert!(!state.cookies.is_empty(), "Storage state should contain cookies");
+    assert!(
+        !state.cookies.is_empty(),
+        "Storage state should contain cookies"
+    );
     let auth_cookie = state.cookies.iter().find(|c| c.name == "auth_token");
-    assert!(auth_cookie.is_some(), "auth_token cookie should be in storage state");
+    assert!(
+        auth_cookie.is_some(),
+        "auth_token cookie should be in storage state"
+    );
 
     // Close first context
     context1.close().await.unwrap();
@@ -171,7 +207,10 @@ async fn test_storage_state_roundtrip() {
     // Verify cookies were restored
     let restored_cookies = context2.cookies(None).await.unwrap();
     let restored_auth = restored_cookies.iter().find(|c| c.name == "auth_token");
-    assert!(restored_auth.is_some(), "auth_token should be restored in new context");
+    assert!(
+        restored_auth.is_some(),
+        "auth_token should be restored in new context"
+    );
     assert_eq!(restored_auth.unwrap().value, "secret123");
 
     browser.close().await.unwrap();
@@ -191,24 +230,21 @@ async fn test_storage_state_file_io() {
                 .http_only(true)
                 .secure(true)
                 .same_site(SameSite::Strict),
-            Cookie::new("tracking", "xyz", ".example.com")
-                .expires(1735689600.0), // Some future timestamp
+            Cookie::new("tracking", "xyz", ".example.com").expires(1735689600.0), // Some future timestamp
         ],
-        origins: vec![
-            pw::OriginState {
-                origin: "https://example.com".to_string(),
-                local_storage: vec![
-                    pw::LocalStorageEntry {
-                        name: "user_prefs".to_string(),
-                        value: r#"{"theme":"dark","lang":"en"}"#.to_string(),
-                    },
-                ],
-            },
-        ],
+        origins: vec![pw::OriginState {
+            origin: "https://example.com".to_string(),
+            local_storage: vec![pw::LocalStorageEntry {
+                name: "user_prefs".to_string(),
+                value: r#"{"theme":"dark","lang":"en"}"#.to_string(),
+            }],
+        }],
     };
 
     // Save to file
-    original.to_file(&temp_file).expect("Failed to save storage state");
+    original
+        .to_file(&temp_file)
+        .expect("Failed to save storage state");
 
     // Load from file
     let loaded = StorageState::from_file(&temp_file).expect("Failed to load storage state");
@@ -222,7 +258,11 @@ async fn test_storage_state_file_io() {
     assert_eq!(session.secure, Some(true));
     assert_eq!(session.same_site, Some(SameSite::Strict));
 
-    let tracking = loaded.cookies.iter().find(|c| c.name == "tracking").unwrap();
+    let tracking = loaded
+        .cookies
+        .iter()
+        .find(|c| c.name == "tracking")
+        .unwrap();
     assert_eq!(tracking.expires, Some(1735689600.0));
 
     // Verify origins/localStorage
@@ -245,12 +285,13 @@ async fn test_cookie_same_site_values() {
     page.goto(&server.url(), None).await.unwrap();
 
     // Add cookies with different SameSite values using URL
-    context.add_cookies(vec![
-        Cookie::from_url("strict_cookie", "1", &server.url())
-            .same_site(SameSite::Strict),
-        Cookie::from_url("lax_cookie", "2", &server.url())
-            .same_site(SameSite::Lax),
-    ]).await.unwrap();
+    context
+        .add_cookies(vec![
+            Cookie::from_url("strict_cookie", "1", &server.url()).same_site(SameSite::Strict),
+            Cookie::from_url("lax_cookie", "2", &server.url()).same_site(SameSite::Lax),
+        ])
+        .await
+        .unwrap();
 
     let cookies = context.cookies(None).await.unwrap();
 
@@ -276,13 +317,21 @@ async fn test_cookies_persist_across_pages() {
     page1.goto(&server.url(), None).await.unwrap();
 
     // Add cookie using URL after navigation
-    context.add_cookies(vec![
-        Cookie::from_url("page1_cookie", "from_page1", &server.url()),
-    ]).await.unwrap();
+    context
+        .add_cookies(vec![Cookie::from_url(
+            "page1_cookie",
+            "from_page1",
+            &server.url(),
+        )])
+        .await
+        .unwrap();
 
     // Create second page in same context
     let page2 = context.new_page().await.unwrap();
-    page2.goto(&format!("{}/button.html", server.url()), None).await.unwrap();
+    page2
+        .goto(&format!("{}/button.html", server.url()), None)
+        .await
+        .unwrap();
 
     // Cookie should be available
     let cookies = context.cookies(None).await.unwrap();
@@ -310,13 +359,23 @@ async fn test_separate_contexts_have_isolated_cookies() {
     page2.goto(&server.url(), None).await.unwrap();
 
     // Add different cookies to each context using URL
-    context1.add_cookies(vec![
-        Cookie::from_url("context1_only", "value1", &server.url()),
-    ]).await.unwrap();
+    context1
+        .add_cookies(vec![Cookie::from_url(
+            "context1_only",
+            "value1",
+            &server.url(),
+        )])
+        .await
+        .unwrap();
 
-    context2.add_cookies(vec![
-        Cookie::from_url("context2_only", "value2", &server.url()),
-    ]).await.unwrap();
+    context2
+        .add_cookies(vec![Cookie::from_url(
+            "context2_only",
+            "value2",
+            &server.url(),
+        )])
+        .await
+        .unwrap();
 
     // Verify isolation
     let cookies1 = context1.cookies(None).await.unwrap();
