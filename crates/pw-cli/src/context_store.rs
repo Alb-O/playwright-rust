@@ -207,6 +207,27 @@ impl ContextState {
         self.selected.as_ref().map(|s| s.name.as_str())
     }
 
+    pub fn session_descriptor_path(&self) -> Option<PathBuf> {
+        if self.no_context {
+            return None;
+        }
+
+        let selected = self.selected.as_ref()?;
+        let dir = match selected.scope {
+            ContextScope::Project => {
+                let root = self.project_root.as_ref()?;
+                project_sessions_dir(root)
+            }
+            ContextScope::Global => global_sessions_dir(),
+        };
+
+        Some(dir.join(format!("{}.json", selected.name)))
+    }
+
+    pub fn refresh_requested(&self) -> bool {
+        self.refresh
+    }
+
     pub fn resolve_url(&self, provided: Option<String>) -> Result<String> {
         if let Some(url) = provided {
             return Ok(apply_base_url(url, self.base_url()));
@@ -464,10 +485,21 @@ fn global_store_path() -> PathBuf {
     base.join("pw").join("cli").join("contexts.json")
 }
 
+fn global_sessions_dir() -> PathBuf {
+    global_store_path()
+        .parent()
+        .map(|p| p.join("sessions"))
+        .unwrap_or_else(|| PathBuf::from("sessions"))
+}
+
 fn project_store_path(root: &Path) -> PathBuf {
     root.join(dirs::PLAYWRIGHT)
         .join(".pw-cli")
         .join("contexts.json")
+}
+
+fn project_sessions_dir(root: &Path) -> PathBuf {
+    root.join(dirs::PLAYWRIGHT).join(".pw-cli").join("sessions")
 }
 
 fn now_ts() -> u64 {

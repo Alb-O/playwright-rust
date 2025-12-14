@@ -50,7 +50,11 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
                 refresh_context,
             )?;
 
-            let mut broker = SessionBroker::new(&ctx);
+            let mut broker = SessionBroker::new(
+                &ctx,
+                ctx_state.session_descriptor_path(),
+                ctx_state.refresh_requested(),
+            );
             let result = dispatch_command(command, &ctx, &mut ctx_state, &mut broker).await;
 
             if result.is_ok() {

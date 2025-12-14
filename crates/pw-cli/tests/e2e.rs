@@ -21,8 +21,10 @@ fn clear_context_store() {
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
         .unwrap_or_else(|| PathBuf::from("."));
-    let path = base.join("pw").join("cli").join("contexts.json");
+    let base_dir = base.join("pw").join("cli");
+    let path = base_dir.join("contexts.json");
     let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_dir_all(base_dir.join("sessions"));
 }
 
 /// Helper to run pw command and capture output

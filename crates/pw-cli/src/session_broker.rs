@@ -1,10 +1,64 @@
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::browser::BrowserSession;
 use crate::context::CommandContext;
 use crate::error::{PwError, Result};
 use crate::types::BrowserKind;
 use pw::{StorageState, WaitUntil};
+use serde::{Deserialize, Serialize};
+use tracing::debug;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SessionDescriptor {
+    pid: u32,
+    browser: BrowserKind,
+    headless: bool,
+    cdp_endpoint: Option<String>,
+    created_at: u64,
+}
+
+impl SessionDescriptor {
+    fn load(path: &Path) -> Result<Option<Self>> {
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(err) => return Err(PwError::Io(err)),
+        };
+
+        let parsed: Self = serde_json::from_str(&content)?;
+        Ok(Some(parsed))
+    }
+
+    fn save(&self, path: &Path) -> Result<()> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let content = serde_json::to_string_pretty(self)?;
+        fs::write(path, content)?;
+        Ok(())
+    }
+
+    fn matches(&self, request: &SessionRequest<'_>) -> bool {
+        self.browser == request.browser
+            && self.headless == request.headless
+            && self.cdp_endpoint.is_some()
+            && self.cdp_endpoint.as_deref() == request.cdp_endpoint
+    }
+
+    fn is_alive(&self) -> bool {
+        // Best-effort: on Linux, check /proc; otherwise assume alive if pid matches current process
+        let proc_path = PathBuf::from("/proc").join(self.pid.to_string());
+        proc_path.exists()
+    }
+}
+
+fn now_ts() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
 
 /// Request for a browser session; future reuse/daemon logic will live here.
 pub struct SessionRequest<'a> {
@@ -49,19 +103,50 @@ impl<'a> SessionRequest<'a> {
 
 pub struct SessionBroker<'a> {
     ctx: &'a CommandContext,
+    descriptor_path: Option<PathBuf>,
+    refresh: bool,
 }
 
 impl<'a> SessionBroker<'a> {
-    pub fn new(ctx: &'a CommandContext) -> Self {
-        Self { ctx }
+    pub fn new(ctx: &'a CommandContext, descriptor_path: Option<PathBuf>, refresh: bool) -> Self {
+        Self {
+            ctx,
+            descriptor_path,
+            refresh,
+        }
     }
 
     pub async fn session(&mut self, request: SessionRequest<'_>) -> Result<SessionHandle> {
-        // TODO: reuse live sessions when available.
         let storage_state = match request.auth_file {
             Some(path) => Some(load_storage_state(path)?),
             None => None,
         };
+
+        if let Some(path) = &self.descriptor_path {
+            if self.refresh {
+                let _ = fs::remove_file(path);
+            } else if let Some(descriptor) = SessionDescriptor::load(path)? {
+                if descriptor.matches(&request) && descriptor.is_alive() {
+                    if let Some(endpoint) = descriptor.cdp_endpoint.as_deref() {
+                        debug!(
+                            target = "pw.session",
+                            %endpoint,
+                            pid = descriptor.pid,
+                            "reusing existing browser via cdp"
+                        );
+                        let session = BrowserSession::with_options(
+                            request.wait_until,
+                            storage_state.clone(),
+                            request.headless,
+                            request.browser,
+                            Some(endpoint),
+                        )
+                        .await?;
+                        return Ok(SessionHandle { session });
+                    }
+                }
+            }
+        }
 
         let session = BrowserSession::with_options(
             request.wait_until,
@@ -71,6 +156,17 @@ impl<'a> SessionBroker<'a> {
             request.cdp_endpoint,
         )
         .await?;
+
+        if let Some(path) = &self.descriptor_path {
+            let descriptor = SessionDescriptor {
+                pid: std::process::id(),
+                browser: request.browser,
+                headless: request.headless,
+                cdp_endpoint: request.cdp_endpoint.map(|c| c.to_string()),
+                created_at: now_ts(),
+            };
+            let _ = descriptor.save(path);
+        }
 
         Ok(SessionHandle { session })
     }
