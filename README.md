@@ -74,6 +74,23 @@ Subsequent commands can load that session state:
 pw --auth auth.json screenshot https://app.example.com/dashboard -o dash.png
 ```
 
+Reusable local sessions are opt-in so the default pipe launch stays unchanged. When you pass `--launch-server`, `pw` starts a Playwright launch server, captures its WebSocket endpoint, and reconnects across commands until you stop it. The broker writes a descriptor with the ws endpoint, browser kind, headless setting, pid, and driver version hash; if any of those drift or the endpoint is dead, it deletes the descriptor and relaunches.
+
+```bash
+pw --launch-server screenshot https://example.com -o first.png
+pw screenshot https://example.com/about -o second.png   # reuses the same browser
+pw session stop                                         # closes server and removes descriptor
+```
+
+If you want to pin a browser for a while, start it explicitly, then run arbitrary commands against it until you stop it:
+
+```bash
+pw session start --headful
+pw text https://example.com "h1"
+pw session status
+pw session stop
+```
+
 ## Session persistence
 
 `BrowserContext` exposes methods for cookie and storage management. `add_cookies()` injects cookies, `cookies()` retrieves them, `storage_state()` exports everything (cookies plus localStorage per origin) to a struct you can serialize to disk.
