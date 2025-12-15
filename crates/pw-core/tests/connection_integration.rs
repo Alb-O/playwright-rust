@@ -38,9 +38,10 @@ async fn test_connection_lifecycle_with_real_server() {
 
     // Create transport
     let (transport, message_rx) = pw::server::transport::PipeTransport::new(stdin, stdout);
+    let parts = transport.into_transport_parts(message_rx);
 
     // Create connection
-    let connection = Arc::new(Connection::new(transport, message_rx));
+    let connection = Arc::new(Connection::new(parts));
 
     // Spawn connection message loop
     let conn = Arc::clone(&connection);
@@ -92,8 +93,9 @@ async fn test_connection_detects_server_crash_on_send() {
     let stdout = server.process.stdout.take().expect("Failed to get stdout");
 
     let (transport, message_rx) = pw::server::transport::PipeTransport::new(stdin, stdout);
+    let parts = transport.into_transport_parts(message_rx);
 
-    let connection = Arc::new(Connection::new(transport, message_rx));
+    let connection = Arc::new(Connection::new(parts));
 
     // Spawn connection loop
     let conn = Arc::clone(&connection);

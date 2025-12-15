@@ -110,10 +110,11 @@ impl Playwright {
         // 3. Create transport and connection
         tracing::debug!("Creating transport and connection");
         let (transport, message_rx) = PipeTransport::new(stdin, stdout);
-        let connection: Arc<Connection<_, _>> = Arc::new(Connection::new(transport, message_rx));
+        let parts = transport.into_transport_parts(message_rx);
+        let connection: Arc<Connection> = Arc::new(Connection::new(parts));
 
         // 4. Spawn connection message loop in background
-        let conn_for_loop: Arc<Connection<_, _>> = Arc::clone(&connection);
+        let conn_for_loop: Arc<Connection> = Arc::clone(&connection);
         tokio::spawn(async move {
             conn_for_loop.run().await;
         });
@@ -141,6 +142,41 @@ impl Playwright {
             firefox: Arc::clone(&playwright.firefox),
             webkit: Arc::clone(&playwright.webkit),
             server: Arc::new(Mutex::new(Some(server))),
+        })
+    }
+
+    /// Connect to a running Playwright driver over WebSocket.
+    pub async fn connect_ws(ws_url: &str) -> Result<Self> {
+        use crate::server::connection::Connection;
+        use crate::server::transport::WebSocketTransport;
+
+        tracing::debug!(%ws_url, "Connecting to Playwright driver via websocket");
+        let (transport, message_rx) = WebSocketTransport::connect(ws_url).await?;
+        let parts = transport.into_transport_parts(message_rx);
+        let connection: Arc<Connection> = Arc::new(Connection::new(parts));
+
+        let conn_for_loop: Arc<Connection> = Arc::clone(&connection);
+        tokio::spawn(async move {
+            conn_for_loop.run().await;
+        });
+
+        let playwright_obj = connection.initialize_playwright().await?;
+
+        let playwright = playwright_obj
+            .as_any()
+            .downcast_ref::<Playwright>()
+            .ok_or_else(|| {
+                crate::error::Error::ProtocolError(
+                    "Initialized object is not Playwright type".to_string(),
+                )
+            })?;
+
+        Ok(Self {
+            base: playwright.base.clone(),
+            chromium: Arc::clone(&playwright.chromium),
+            firefox: Arc::clone(&playwright.firefox),
+            webkit: Arc::clone(&playwright.webkit),
+            server: Arc::new(Mutex::new(None)),
         })
     }
 

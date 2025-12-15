@@ -231,6 +231,44 @@ impl BrowserType {
         Ok(browser.clone())
     }
 
+    /// Launches a browser server and returns its websocket endpoint.
+    pub async fn launch_server(&self) -> Result<LaunchedServer> {
+        self.launch_server_with_options(LaunchOptions::default())
+            .await
+    }
+
+    /// Launches a browser server with custom options and returns a handle.
+    pub async fn launch_server_with_options(
+        &self,
+        options: LaunchOptions,
+    ) -> Result<LaunchedServer> {
+        #[derive(Deserialize)]
+        struct LaunchServerResponse {
+            #[serde(rename = "wsEndpoint")]
+            ws_endpoint: String,
+            browser: BrowserRef,
+        }
+
+        let params = options.normalize();
+        let response: LaunchServerResponse = self.channel().send("launchServer", params).await?;
+
+        let browser_arc = self.connection().get_object(&response.browser.guid).await?;
+        let browser = browser_arc
+            .as_any()
+            .downcast_ref::<Browser>()
+            .ok_or_else(|| {
+                crate::error::Error::ProtocolError(format!(
+                    "Expected Browser object, got {}",
+                    browser_arc.type_name()
+                ))
+            })?;
+
+        Ok(LaunchedServer {
+            ws_endpoint: response.ws_endpoint,
+            browser: browser.clone(),
+        })
+    }
+
     /// Connects to an existing browser over the Chrome DevTools Protocol.
     ///
     /// This keeps the standard Playwright driver in the loop while reusing a
@@ -334,6 +372,26 @@ struct BrowserContextRef {
 pub struct ConnectOverCDPResult {
     pub browser: Browser,
     pub default_context: Option<BrowserContext>,
+}
+
+#[derive(Clone, Debug)]
+pub struct LaunchedServer {
+    ws_endpoint: String,
+    browser: Browser,
+}
+
+impl LaunchedServer {
+    pub fn ws_endpoint(&self) -> &str {
+        &self.ws_endpoint
+    }
+
+    pub fn browser(&self) -> &Browser {
+        &self.browser
+    }
+
+    pub async fn close(self) -> Result<()> {
+        self.browser.close().await
+    }
 }
 
 impl ChannelOwner for BrowserType {

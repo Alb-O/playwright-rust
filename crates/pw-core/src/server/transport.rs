@@ -4,9 +4,15 @@
 // Follows the same architecture as playwright-python's PipeTransport.
 
 use crate::{Error, Result};
+use futures_util::stream::{SplitSink, SplitStream};
+use futures_util::{SinkExt, StreamExt};
 use serde_json::Value as JsonValue;
+use std::future::Future;
+use std::pin::Pin;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tokio::sync::mpsc;
+use tokio_tungstenite::{connect_async, tungstenite::protocol::Message, MaybeTlsStream, WebSocketStream};
 
 /// Send a JSON message using length-prefixed framing
 ///
@@ -53,7 +59,21 @@ where
 /// length-prefixed JSON messages.
 pub trait Transport: Send + Sync {
     /// Send a JSON message to the server
-    fn send(&mut self, message: JsonValue) -> impl std::future::Future<Output = Result<()>> + Send;
+    fn send(
+        &mut self,
+        message: JsonValue,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+}
+
+pub trait TransportReceiver: Send {
+    /// Run the receive loop for this transport
+    fn run(self: Box<Self>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>>;
+}
+
+pub struct TransportParts {
+    pub sender: Box<dyn Transport>,
+    pub receiver: Box<dyn TransportReceiver>,
+    pub message_rx: mpsc::UnboundedReceiver<JsonValue>,
 }
 
 /// Pipe-based transport for communicating with Playwright server
@@ -113,16 +133,24 @@ where
 /// This solves the deadlock issue by separating send and receive.
 pub struct PipeTransportReceiver<R>
 where
-    R: AsyncRead + Unpin + Send,
+    R: AsyncRead + Unpin + Send + Sync,
 {
     stdout: R,
     message_tx: mpsc::UnboundedSender<JsonValue>,
 }
 
+pub struct PipeTransportSender<W>
+where
+    W: AsyncWrite + Unpin + Send + Sync,
+{
+    stdin: W,
+}
+
 impl<R> PipeTransportReceiver<R>
 where
-    R: AsyncRead + Unpin + Send,
+    R: AsyncRead + Unpin + Send + Sync + 'static,
 {
+
     /// Run the message read loop
     ///
     /// This continuously reads messages from stdout and sends them
@@ -189,8 +217,8 @@ where
 
 impl<W, R> PipeTransport<W, R>
 where
-    W: AsyncWrite + Unpin + Send,
-    R: AsyncRead + Unpin + Send,
+    W: AsyncWrite + Unpin + Send + Sync + 'static,
+    R: AsyncRead + Unpin + Send + Sync + 'static,
 {
     /// Create a new pipe transport from child process stdio handles
     ///
@@ -252,14 +280,26 @@ where
     ///
     /// Returns (stdin, self_without_stdin) where self_without_stdin
     /// can still run the receive loop but cannot send.
-    pub fn into_parts(self) -> (W, PipeTransportReceiver<R>) {
+    pub fn into_parts(self) -> (PipeTransportSender<W>, PipeTransportReceiver<R>) {
         (
-            self.stdin,
+            PipeTransportSender { stdin: self.stdin },
             PipeTransportReceiver {
                 stdout: self.stdout,
                 message_tx: self.message_tx,
             },
         )
+    }
+
+    pub fn into_transport_parts(
+        self,
+        message_rx: mpsc::UnboundedReceiver<JsonValue>,
+    ) -> TransportParts {
+        let (sender, receiver) = self.into_parts();
+        TransportParts {
+            sender: Box::new(sender),
+            receiver: Box::new(receiver),
+            message_rx,
+        }
     }
 
     /// Run the message read loop
@@ -339,41 +379,29 @@ where
         Ok(())
     }
 
-    /// Send a message to the server
-    ///
-    /// Messages are framed with a 4-byte little-endian length prefix
-    /// followed by the JSON payload.
-    ///
-    /// Matches playwright-python's `send()` method:
-    /// ```python
-    /// data = json.dumps(message).encode("utf-8")
-    /// self._output.write(len(data).to_bytes(4, byteorder="little") + data)
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if serialization or writing fails.
+}
+
+impl<W> PipeTransportSender<W>
+where
+    W: AsyncWrite + Unpin + Send + Sync + 'static,
+{
+    /// Send a message to the server using length-prefixed framing
     async fn send_internal(&mut self, message: JsonValue) -> Result<()> {
-        // Serialize to JSON
         let json_bytes = serde_json::to_vec(&message)
             .map_err(|e| Error::TransportError(format!("Failed to serialize JSON: {}", e)))?;
 
         let length = json_bytes.len() as u32;
 
-        // Write 4-byte little-endian length prefix
-        // Matches: len(data).to_bytes(4, byteorder="little")
         self.stdin
             .write_all(&length.to_le_bytes())
             .await
             .map_err(|e| Error::TransportError(format!("Failed to write length: {}", e)))?;
 
-        // Write JSON payload
         self.stdin
             .write_all(&json_bytes)
             .await
             .map_err(|e| Error::TransportError(format!("Failed to write message: {}", e)))?;
 
-        // Flush to ensure message is sent
         self.stdin
             .flush()
             .await
@@ -383,13 +411,144 @@ where
     }
 }
 
-impl<W, R> Transport for PipeTransport<W, R>
+impl<W> Transport for PipeTransportSender<W>
 where
-    W: AsyncWrite + Unpin + Send + Sync,
-    R: AsyncRead + Unpin + Send + Sync,
+    W: AsyncWrite + Unpin + Send + Sync + 'static,
 {
-    async fn send(&mut self, message: JsonValue) -> Result<()> {
-        self.send_internal(message).await
+    fn send(
+        &mut self,
+        message: JsonValue,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>> {
+        Box::pin(self.send_internal(message))
+    }
+}
+
+impl<R> TransportReceiver for PipeTransportReceiver<R>
+where
+    R: AsyncRead + Unpin + Send + Sync + 'static,
+{
+    fn run(self: Box<Self>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> {
+        Box::pin(async move { PipeTransportReceiver::run(*self).await })
+    }
+}
+
+type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
+
+pub struct WebSocketTransport {
+    sender: WebSocketTransportSender,
+    receiver: WebSocketTransportReceiver,
+}
+
+pub struct WebSocketTransportSender {
+    sink: SplitSink<WsStream, Message>,
+}
+
+pub struct WebSocketTransportReceiver {
+    stream: SplitStream<WsStream>,
+    message_tx: mpsc::UnboundedSender<JsonValue>,
+}
+
+impl WebSocketTransport {
+    pub async fn connect(url: &str) -> Result<(Self, mpsc::UnboundedReceiver<JsonValue>)> {
+        let (stream, _) = connect_async(url)
+            .await
+            .map_err(|e| Error::TransportError(format!("Failed to connect websocket: {}", e)))?;
+
+        let (sink, stream) = stream.split();
+        let (message_tx, message_rx) = mpsc::unbounded_channel();
+
+        Ok((
+            Self {
+                sender: WebSocketTransportSender { sink },
+                receiver: WebSocketTransportReceiver {
+                    stream,
+                    message_tx,
+                },
+            },
+            message_rx,
+        ))
+    }
+
+    pub fn into_parts(self) -> (WebSocketTransportSender, WebSocketTransportReceiver) {
+        (self.sender, self.receiver)
+    }
+
+    pub fn into_transport_parts(
+        self,
+        message_rx: mpsc::UnboundedReceiver<JsonValue>,
+    ) -> TransportParts {
+        let (sender, receiver) = self.into_parts();
+        TransportParts {
+            sender: Box::new(sender),
+            receiver: Box::new(receiver),
+            message_rx,
+        }
+    }
+}
+
+impl Transport for WebSocketTransportSender {
+    fn send(
+        &mut self,
+        message: JsonValue,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>> {
+        Box::pin(async move {
+            let payload = serde_json::to_string(&message).map_err(|e| {
+                Error::TransportError(format!("Failed to serialize JSON: {}", e))
+            })?;
+
+            self.sink
+                .send(Message::Text(payload))
+                .await
+                .map_err(|e| Error::TransportError(format!("Failed to send websocket message: {}", e)))?;
+
+            self.sink
+                .flush()
+                .await
+                .map_err(|e| Error::TransportError(format!("Failed to flush websocket sink: {}", e)))?;
+
+            Ok(())
+        })
+    }
+}
+
+impl TransportReceiver for WebSocketTransportReceiver {
+    fn run(self: Box<Self>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> {
+        Box::pin(async move {
+            let Self {
+                mut stream,
+                message_tx,
+            } = *self;
+
+            while let Some(frame) = stream.next().await {
+                let frame = frame
+                    .map_err(|e| Error::TransportError(format!("WebSocket read error: {}", e)))?;
+
+                let value = match frame {
+                    Message::Text(text) => serde_json::from_str::<JsonValue>(&text).map_err(|e| {
+                        Error::ProtocolError(format!("Failed to parse websocket text: {}", e))
+                    })?,
+                    Message::Binary(bin) => serde_json::from_slice::<JsonValue>(&bin).map_err(|e| {
+                        Error::ProtocolError(format!("Failed to parse websocket binary: {}", e))
+                    })?,
+                    Message::Close(_) => break,
+                    Message::Ping(_) | Message::Pong(_) => {
+                        continue;
+                    }
+                    other => {
+                        return Err(Error::TransportError(format!(
+                            "Unexpected websocket message: {:?}",
+                            other
+                        )))
+                    }
+                };
+
+                if message_tx.send(value).is_err() {
+                    break;
+                }
+            }
+
+            Ok(())
+        })
     }
 }
 
@@ -444,7 +603,8 @@ mod tests {
 
         // Give transport the write end of stdin pipe and read end of stdout pipe
         let (_stdin_read, mut _stdout_write) = (stdin_read, stdout_write);
-        let (mut transport, _rx) = PipeTransport::new(stdin_write, stdout_read);
+        let (transport, _rx) = PipeTransport::new(stdin_write, stdout_read);
+        let (mut sender, _receiver) = transport.into_parts();
 
         // Test message
         let test_message = serde_json::json!({
@@ -454,7 +614,7 @@ mod tests {
         });
 
         // Send message
-        transport.send(test_message.clone()).await.unwrap();
+        sender.send(test_message.clone()).await.unwrap();
 
         // Read what transport wrote to stdin from our read end
         let (mut read_half, _write_half) = tokio::io::split(_stdin_read);

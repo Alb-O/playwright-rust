@@ -55,7 +55,7 @@
 //! - .NET: `Microsoft.Playwright/Core/Connection.cs`
 
 use crate::error::{Error, Result};
-use crate::server::transport::PipeTransport;
+use crate::server::transport::{TransportParts, TransportReceiver, Transport};
 use parking_lot::Mutex as ParkingLotMutex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -321,33 +321,22 @@ type ObjectRegistry = HashMap<Arc<str>, Arc<dyn ChannelOwner>>;
 /// - `AtomicU32` for thread-safe ID generation
 /// - `Arc<Mutex<HashMap>>` for callback storage
 /// - `tokio::sync::oneshot` for request/response correlation
-pub struct Connection<W, R>
-where
-    W: tokio::io::AsyncWrite + Unpin + Send + Sync + 'static,
-    R: tokio::io::AsyncRead + Unpin + Send + Sync + 'static,
-{
+pub struct Connection {
     /// Sequential request ID counter (atomic for thread safety)
     last_id: AtomicU32,
     /// Pending request callbacks keyed by request ID
     callbacks: Arc<TokioMutex<HashMap<u32, oneshot::Sender<Result<Value>>>>>,
-    /// Stdin for sending messages (mutex-wrapped for concurrent sends)
-    stdin: Arc<TokioMutex<W>>,
+    /// Transport used for sending messages (mutex-wrapped for concurrent sends)
+    transport_sender: Arc<TokioMutex<Box<dyn Transport>>>,
     /// Receiver for incoming messages from transport
     message_rx: Arc<TokioMutex<Option<mpsc::UnboundedReceiver<Value>>>>,
     /// Receiver half of transport (owned by run loop, only needed once)
-    transport_receiver: Arc<TokioMutex<Option<crate::server::transport::PipeTransportReceiver<R>>>>,
+    transport_receiver: Arc<TokioMutex<Option<Box<dyn TransportReceiver>>>>,
     /// Registry of all protocol objects by GUID (parking_lot for sync+async access)
     objects: Arc<ParkingLotMutex<ObjectRegistry>>,
 }
 
-// Type alias for Connection using concrete transport (most common case)
-pub type RealConnection = Connection<tokio::process::ChildStdin, tokio::process::ChildStdout>;
-
-impl<W, R> Connection<W, R>
-where
-    W: tokio::io::AsyncWrite + Unpin + Send + Sync + 'static,
-    R: tokio::io::AsyncRead + Unpin + Send + Sync + 'static,
-{
+impl Connection {
     /// Create a new Connection with the given transport
     ///
     /// # Arguments
@@ -371,18 +360,19 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(transport: PipeTransport<W, R>, message_rx: mpsc::UnboundedReceiver<Value>) -> Self {
-        // Split transport into send and receive parts
-        // This prevents deadlock: stdin can be locked for sends while
-        // the transport receiver runs independently
-        let (stdin, transport_receiver) = transport.into_parts();
+    pub fn new(parts: TransportParts) -> Self {
+        let TransportParts {
+            sender,
+            receiver,
+            message_rx,
+        } = parts;
 
         Self {
             last_id: AtomicU32::new(0),
             callbacks: Arc::new(TokioMutex::new(HashMap::new())),
-            stdin: Arc::new(TokioMutex::new(stdin)),
+            transport_sender: Arc::new(TokioMutex::new(sender)),
             message_rx: Arc::new(TokioMutex::new(Some(message_rx))),
-            transport_receiver: Arc::new(TokioMutex::new(Some(transport_receiver))),
+            transport_receiver: Arc::new(TokioMutex::new(Some(receiver))),
             objects: Arc::new(ParkingLotMutex::new(HashMap::new())),
         }
     }
@@ -436,11 +426,15 @@ where
             metadata: Metadata::now(),
         };
 
-        // Send via stdin using the helper function
+        // Send via transport
         let request_value = serde_json::to_value(&request)?;
         tracing::debug!("Request JSON: {}", request_value);
 
-        match crate::server::transport::send_message(&mut *self.stdin.lock().await, request_value)
+        match self
+            .transport_sender
+            .lock()
+            .await
+            .send(request_value)
             .await
         {
             Ok(()) => tracing::debug!("Message sent successfully, awaiting response"),
@@ -864,11 +858,7 @@ fn parse_protocol_error(error: ErrorPayload) -> Error {
 }
 
 // Implement ConnectionLike trait for Connection
-impl<W, R> ConnectionLike for Connection<W, R>
-where
-    W: tokio::io::AsyncWrite + Unpin + Send + Sync + 'static,
-    R: tokio::io::AsyncRead + Unpin + Send + Sync + 'static,
-{
+impl ConnectionLike for Connection {
     fn send_message(
         &self,
         guid: &str,
@@ -933,7 +923,7 @@ mod tests {
 
     // Helper to create test connection with mock transport
     fn create_test_connection() -> (
-        Connection<tokio::io::DuplexStream, tokio::io::DuplexStream>,
+        Connection,
         tokio::io::DuplexStream,
         tokio::io::DuplexStream,
     ) {
@@ -941,7 +931,8 @@ mod tests {
         let (stdout_read, stdout_write) = duplex(1024);
 
         let (transport, message_rx) = PipeTransport::new(stdin_write, stdout_read);
-        let connection = Connection::new(transport, message_rx);
+        let parts = transport.into_transport_parts(message_rx);
+        let connection = Connection::new(parts);
 
         (connection, stdin_read, stdout_write)
     }
