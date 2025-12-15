@@ -12,6 +12,7 @@ use std::pin::Pin;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
+use tokio_tungstenite::tungstenite::Error as WsError;
 use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream, connect_async, tungstenite::protocol::Message,
 };
@@ -512,8 +513,16 @@ impl TransportReceiver for WebSocketTransportReceiver {
             } = *self;
 
             while let Some(frame) = stream.next().await {
-                let frame = frame
-                    .map_err(|e| Error::TransportError(format!("WebSocket read error: {}", e)))?;
+                let frame = match frame {
+                    Ok(frame) => frame,
+                    Err(WsError::ConnectionClosed) | Err(WsError::AlreadyClosed) => break,
+                    Err(e) => {
+                        return Err(Error::TransportError(format!(
+                            "WebSocket read error: {}",
+                            e
+                        )));
+                    }
+                };
 
                 let value = match frame {
                     Message::Text(text) => {

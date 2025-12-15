@@ -913,6 +913,7 @@ impl ConnectionLike for Connection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::server::transport::PipeTransport;
     use tokio::io::duplex;
 
     // Helper to create test connection with mock transport

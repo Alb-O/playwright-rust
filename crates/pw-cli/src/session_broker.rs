@@ -319,4 +319,28 @@ mod tests {
 
         assert!(!desc.matches(&req, Some(DRIVER_HASH)));
     }
+
+    #[test]
+    fn descriptor_invalidated_by_driver_hash_change() {
+        let desc = SessionDescriptor {
+            pid: std::process::id(),
+            browser: BrowserKind::Chromium,
+            headless: true,
+            cdp_endpoint: Some("ws://localhost:1234".into()),
+            ws_endpoint: Some("ws://localhost:1234".into()),
+            driver_hash: Some("old-hash".into()),
+            created_at: 42,
+        };
+
+        let req = SessionRequest {
+            wait_until: WaitUntil::NetworkIdle,
+            headless: true,
+            auth_file: None,
+            browser: BrowserKind::Chromium,
+            cdp_endpoint: Some("ws://localhost:1234"),
+            launch_server: true,
+        };
+
+        assert!(!desc.matches(&req, Some(DRIVER_HASH)));
+    }
 }
