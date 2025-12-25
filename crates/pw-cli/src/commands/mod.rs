@@ -35,6 +35,7 @@ pub async fn dispatch(cli: Cli, format: OutputFormat) -> Result<()> {
         no_save_context,
         refresh_context,
         base_url,
+        artifacts_dir,
         command,
     } = cli;
 
@@ -61,7 +62,15 @@ pub async fn dispatch(cli: Cli, format: OutputFormat) -> Result<()> {
                 ctx_state.session_descriptor_path(),
                 ctx_state.refresh_requested(),
             );
-            let result = dispatch_command(command, &ctx, &mut ctx_state, &mut broker, format).await;
+            let result = dispatch_command(
+                command,
+                &ctx,
+                &mut ctx_state,
+                &mut broker,
+                format,
+                artifacts_dir.as_deref(),
+            )
+            .await;
 
             if result.is_ok() {
                 ctx_state.persist()?;
@@ -78,6 +87,18 @@ async fn dispatch_command(
     ctx_state: &mut ContextState,
     broker: &mut SessionBroker<'_>,
     format: OutputFormat,
+    artifacts_dir: Option<&Path>,
+) -> Result<()> {
+    dispatch_command_inner(command, ctx, ctx_state, broker, format, artifacts_dir).await
+}
+
+async fn dispatch_command_inner(
+    command: Commands,
+    ctx: &CommandContext,
+    ctx_state: &mut ContextState,
+    broker: &mut SessionBroker<'_>,
+    format: OutputFormat,
+    artifacts_dir: Option<&Path>,
 ) -> Result<()> {
     match command {
         Commands::Navigate { url } => {
@@ -173,7 +194,7 @@ async fn dispatch_command(
         Commands::Click { url, selector } => {
             let final_url = ctx_state.resolve_url(url)?;
             let final_selector = ctx_state.resolve_selector(selector, None)?;
-            let outcome = click::execute(&final_url, &final_selector, ctx, broker, format).await;
+            let outcome = click::execute(&final_url, &final_selector, ctx, broker, format, artifacts_dir).await;
             if outcome.is_ok() {
                 ctx_state.record(ContextUpdate {
                     url: Some(&final_url),
@@ -186,7 +207,7 @@ async fn dispatch_command(
         Commands::Text { url, selector } => {
             let final_url = ctx_state.resolve_url(url)?;
             let final_selector = ctx_state.resolve_selector(selector, None)?;
-            let outcome = text::execute(&final_url, &final_selector, ctx, broker, format).await;
+            let outcome = text::execute(&final_url, &final_selector, ctx, broker, format, artifacts_dir).await;
             if outcome.is_ok() {
                 ctx_state.record(ContextUpdate {
                     url: Some(&final_url),
@@ -198,7 +219,7 @@ async fn dispatch_command(
         }
         Commands::Elements { url, wait, timeout_ms } => {
             let final_url = ctx_state.resolve_url(url)?;
-            let outcome = elements::execute(&final_url, wait, timeout_ms, ctx, broker, format).await;
+            let outcome = elements::execute(&final_url, wait, timeout_ms, ctx, broker, format, artifacts_dir).await;
             if outcome.is_ok() {
                 ctx_state.record(ContextUpdate {
                     url: Some(&final_url),

@@ -131,7 +131,7 @@ pub struct CommandInputs {
 }
 
 /// Error information for failed commands
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandError {
     /// Error code (e.g., "NAVIGATION_FAILED", "SELECTOR_NOT_FOUND", "TIMEOUT")
@@ -221,7 +221,7 @@ impl From<Duration> for Timings {
 }
 
 /// Artifact produced by a command (file, screenshot, etc.)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Artifact {
     /// Type of artifact
@@ -512,6 +512,61 @@ pub type EmptyResult = CommandResult<()>;
 
 /// A command result with a simple string value
 pub type StringResult = CommandResult<String>;
+
+// ============================================================================
+// Failure result with artifacts (for commands that collect artifacts on error)
+// ============================================================================
+
+/// A command failure that includes collected artifacts.
+///
+/// This is used when a command fails but we want to include diagnostic artifacts
+/// (screenshot, HTML) in the error response.
+#[derive(Debug)]
+pub struct FailureWithArtifacts {
+    pub error: CommandError,
+    pub artifacts: Vec<Artifact>,
+}
+
+impl FailureWithArtifacts {
+    pub fn new(error: CommandError) -> Self {
+        Self {
+            error,
+            artifacts: Vec::new(),
+        }
+    }
+
+    pub fn with_artifacts(mut self, artifacts: Vec<Artifact>) -> Self {
+        self.artifacts = artifacts;
+        self
+    }
+}
+
+/// Print a failure result with artifacts to stdout
+pub fn print_failure_with_artifacts(
+    command: &str,
+    failure: &FailureWithArtifacts,
+    format: OutputFormat,
+) {
+    let result: CommandResult<()> = ResultBuilder::new(command)
+        .error(failure.error.code, &failure.error.message)
+        .build();
+
+    // We need to manually add artifacts since ResultBuilder doesn't support
+    // adding artifacts to error results. Create a modified result.
+    let result_with_artifacts = CommandResult {
+        ok: false,
+        command: result.command,
+        inputs: result.inputs,
+        data: None::<()>,
+        error: Some(failure.error.clone()),
+        timings: result.timings,
+        artifacts: failure.artifacts.clone(),
+        diagnostics: result.diagnostics,
+        config: result.config,
+    };
+
+    print_result(&result_with_artifacts, format);
+}
 
 // ============================================================================
 // Command-specific data types

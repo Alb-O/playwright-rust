@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::artifact_collector::{collect_failure_artifacts, CollectedArtifacts};
 use crate::browser::BrowserSession;
 use crate::context::CommandContext;
 use crate::error::{PwError, Result};
@@ -253,6 +254,21 @@ impl SessionHandle {
 
     pub async fn shutdown_server(self) -> Result<()> {
         self.session.shutdown_server().await
+    }
+
+    /// Collect failure artifacts (screenshot, HTML) from the current page state.
+    ///
+    /// This should be called when a command fails after navigation to capture
+    /// diagnostic information. Returns empty if artifacts_dir is None.
+    pub async fn collect_failure_artifacts(
+        &self,
+        artifacts_dir: Option<&Path>,
+        command_name: &str,
+    ) -> CollectedArtifacts {
+        match artifacts_dir {
+            Some(dir) => collect_failure_artifacts(self.page(), dir, command_name).await,
+            None => CollectedArtifacts::default(),
+        }
     }
 }
 

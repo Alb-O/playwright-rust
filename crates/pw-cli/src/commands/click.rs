@@ -1,11 +1,13 @@
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use crate::context::CommandContext;
-use crate::error::Result;
+use crate::error::{PwError, Result};
 use crate::output::{
-    ClickData, CommandInputs, OutputFormat, ResultBuilder, print_result,
+    ClickData, CommandInputs, FailureWithArtifacts, OutputFormat, ResultBuilder,
+    print_failure_with_artifacts, print_result,
 };
-use crate::session_broker::{SessionBroker, SessionRequest};
+use crate::session_broker::{SessionBroker, SessionHandle, SessionRequest};
 use pw::WaitUntil;
 use tracing::info;
 
@@ -15,6 +17,7 @@ pub async fn execute(
     ctx: &CommandContext,
     broker: &mut SessionBroker<'_>,
     format: OutputFormat,
+    artifacts_dir: Option<&Path>,
 ) -> Result<()> {
     let _start = Instant::now();
     info!(target = "pw", %url, %selector, browser = %ctx.browser, "click element");
@@ -22,6 +25,39 @@ pub async fn execute(
     let session = broker
         .session(SessionRequest::from_context(WaitUntil::NetworkIdle, ctx))
         .await?;
+
+    match execute_inner(&session, url, selector, format).await {
+        Ok(()) => session.close().await,
+        Err(e) => {
+            // Collect artifacts on failure if artifacts_dir is set
+            let artifacts = session
+                .collect_failure_artifacts(artifacts_dir, "click")
+                .await;
+
+            if !artifacts.is_empty() {
+                // Print failure with artifacts and don't propagate error
+                // (the failure envelope is the output)
+                let failure = FailureWithArtifacts::new(e.to_command_error())
+                    .with_artifacts(artifacts.artifacts);
+                print_failure_with_artifacts("click", &failure, format);
+                let _ = session.close().await;
+                // Return a generic error to signal failure exit code
+                return Err(PwError::Anyhow(anyhow::anyhow!("command failed (see output)")));
+            }
+
+            // No artifacts collected, propagate original error
+            let _ = session.close().await;
+            Err(e)
+        }
+    }
+}
+
+async fn execute_inner(
+    session: &SessionHandle,
+    url: &str,
+    selector: &str,
+    format: OutputFormat,
+) -> Result<()> {
     session.goto(url).await?;
 
     // Record URL before click
@@ -54,6 +90,5 @@ pub async fn execute(
         .build();
 
     print_result(&result, format);
-
-    session.close().await
+    Ok(())
 }

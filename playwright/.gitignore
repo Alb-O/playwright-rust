@@ -1,0 +1,22 @@
+# Test outputs (regenerated on each run)
+/results/
+/reports/
+
+# Manual screenshots (e.g., from pw-cli)
+/screenshots/
+
+# Trace files (for playwright show-trace)
+*.zip
+
+# Auth state files (may contain sensitive data)
+/auth/
+
+# Playwright driver (downloaded by pw-core build.rs)
+/drivers/
+
+# Browser symlinks (created by setup-browsers.sh for Nix compatibility)
+/browsers/
+
+# MCP server outputs (if using playwright MCP)
+/mcp-output/
+/mcp-user-data/

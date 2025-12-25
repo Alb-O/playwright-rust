@@ -1,11 +1,13 @@
+use std::path::Path;
 use std::time::Instant;
 
 use crate::context::CommandContext;
 use crate::error::{PwError, Result};
 use crate::output::{
-    CommandInputs, ErrorCode, OutputFormat, ResultBuilder, TextData, print_result,
+    CommandInputs, ErrorCode, FailureWithArtifacts, OutputFormat, ResultBuilder, TextData,
+    print_failure_with_artifacts, print_result,
 };
-use crate::session_broker::{SessionBroker, SessionRequest};
+use crate::session_broker::{SessionBroker, SessionHandle, SessionRequest};
 use pw::WaitUntil;
 use tracing::info;
 
@@ -89,6 +91,7 @@ pub async fn execute(
     ctx: &CommandContext,
     broker: &mut SessionBroker<'_>,
     format: OutputFormat,
+    artifacts_dir: Option<&Path>,
 ) -> Result<()> {
     let _start = Instant::now();
     info!(target = "pw", %url, %selector, browser = %ctx.browser, "get text");
@@ -96,6 +99,35 @@ pub async fn execute(
     let session = broker
         .session(SessionRequest::from_context(WaitUntil::NetworkIdle, ctx))
         .await?;
+
+    match execute_inner(&session, url, selector, format).await {
+        Ok(()) => session.close().await,
+        Err(e) => {
+            // Collect artifacts on failure if artifacts_dir is set
+            let artifacts = session
+                .collect_failure_artifacts(artifacts_dir, "text")
+                .await;
+
+            if !artifacts.is_empty() {
+                let failure = FailureWithArtifacts::new(e.to_command_error())
+                    .with_artifacts(artifacts.artifacts);
+                print_failure_with_artifacts("text", &failure, format);
+                let _ = session.close().await;
+                return Err(PwError::Anyhow(anyhow::anyhow!("command failed (see output)")));
+            }
+
+            let _ = session.close().await;
+            Err(e)
+        }
+    }
+}
+
+async fn execute_inner(
+    session: &SessionHandle,
+    url: &str,
+    selector: &str,
+    format: OutputFormat,
+) -> Result<()> {
     session.goto(url).await?;
 
     let locator = session.page().locator(selector).await;
@@ -118,7 +150,6 @@ pub async fn execute(
             .build();
 
         print_result(&result, format);
-        session.close().await?;
 
         return Err(PwError::ElementNotFound {
             selector: selector.to_string(),
@@ -144,7 +175,7 @@ pub async fn execute(
         .build();
 
     print_result(&result, format);
-    session.close().await
+    Ok(())
 }
 
 #[cfg(test)]

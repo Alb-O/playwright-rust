@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "active": {
+    "global": null,
+    "projects": {}
+  },
+  "contexts": {
+    "default": {
+      "scope": "project",
+      "projectRoot": "/home/albert/@/pw-rs",
+      "baseUrl": null,
+      "lastUrl": "data:text/html,<div>Test</div>",
+      "lastSelector": "#msg",
+      "lastOutput": "/tmp/pw-test-verbose.png",
+      "browser": null,
+      "headless": null,
+      "authFile": null,
+      "cdpEndpoint": null,
+      "lastUsedAt": 1766702087
+    }
+  }
+}
