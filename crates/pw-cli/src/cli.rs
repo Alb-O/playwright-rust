@@ -59,6 +59,10 @@ pub struct Cli {
     #[arg(long, global = true, value_name = "URL")]
     pub base_url: Option<String>,
 
+    /// Directory to save artifacts (screenshot, HTML) on command failure
+    #[arg(long, global = true, value_name = "DIR")]
+    pub artifacts_dir: Option<std::path::PathBuf>,
+
     #[command(subcommand)]
     pub command: Commands,
 }

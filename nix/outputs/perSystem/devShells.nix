@@ -70,9 +70,12 @@
 
         shellHook = ''
           ${playwrightCompat}
-          echo "pw dev shell"
-          echo "  Rust: $(rustc --version)"
-          echo "  Cargo: $(cargo --version)"
+          # Only print banner in interactive shells (not `nix develop -c`)
+          if [[ -t 1 && -z "''${BASH_EXECUTION_STRING:-}" ]]; then
+            echo "pw dev shell"
+            echo "  Rust: $(rustc --version)"
+            echo "  Cargo: $(cargo --version)"
+          fi
         '';
       };
     };

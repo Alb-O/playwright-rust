@@ -1,7 +1,12 @@
+use std::path::Path;
+
 use crate::context::CommandContext;
-use crate::error::Result;
-use crate::output::{CommandInputs, ElementsData, InteractiveElement, OutputFormat, ResultBuilder, print_result};
-use crate::session_broker::{SessionBroker, SessionRequest};
+use crate::error::{PwError, Result};
+use crate::output::{
+    CommandInputs, ElementsData, FailureWithArtifacts, InteractiveElement, OutputFormat,
+    ResultBuilder, print_failure_with_artifacts, print_result,
+};
+use crate::session_broker::{SessionBroker, SessionHandle, SessionRequest};
 use pw::WaitUntil;
 use serde::Deserialize;
 use tracing::info;
@@ -185,12 +190,42 @@ pub async fn execute(
     ctx: &CommandContext,
     broker: &mut SessionBroker<'_>,
     format: OutputFormat,
+    artifacts_dir: Option<&Path>,
 ) -> Result<()> {
     info!(target = "pw", %url, %wait, %timeout_ms, browser = %ctx.browser, "list elements");
 
     let session = broker
         .session(SessionRequest::from_context(WaitUntil::NetworkIdle, ctx))
         .await?;
+
+    match execute_inner(&session, url, wait, timeout_ms, format).await {
+        Ok(()) => session.close().await,
+        Err(e) => {
+            let artifacts = session
+                .collect_failure_artifacts(artifacts_dir, "elements")
+                .await;
+
+            if !artifacts.is_empty() {
+                let failure = FailureWithArtifacts::new(e.to_command_error())
+                    .with_artifacts(artifacts.artifacts);
+                print_failure_with_artifacts("elements", &failure, format);
+                let _ = session.close().await;
+                return Err(PwError::Anyhow(anyhow::anyhow!("command failed (see output)")));
+            }
+
+            let _ = session.close().await;
+            Err(e)
+        }
+    }
+}
+
+async fn execute_inner(
+    session: &SessionHandle,
+    url: &str,
+    wait: bool,
+    timeout_ms: u64,
+    format: OutputFormat,
+) -> Result<()> {
     session.goto(url).await?;
 
     let js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
@@ -253,5 +288,5 @@ pub async fn execute(
         .build();
 
     print_result(&result, format);
-    session.close().await
+    Ok(())
 }

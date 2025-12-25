@@ -288,6 +288,7 @@ pub struct Event {
 /// Uses serde's `untagged` to distinguish based on presence of `id` field:
 /// - Messages with `id` are responses
 /// - Messages without `id` are events
+/// - Unknown messages are captured for forward-compatibility
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Message {
@@ -295,6 +296,11 @@ pub enum Message {
     Response(Response),
     /// Event message (no `id` field)
     Event(Event),
+    /// Unknown message type (forward-compatible catch-all)
+    ///
+    /// This variant allows the protocol layer to handle new message types
+    /// that may be added in future Playwright versions without crashing.
+    Unknown(Value),
 }
 
 /// Type alias for the object registry mapping GUIDs to ChannelOwner objects
@@ -597,7 +603,7 @@ impl Connection {
             .expect("run() can only be called once - message receiver already taken");
 
         while let Some(message_value) = message_rx.recv().await {
-            // Parse message as Response or Event
+            // Parse message as Response, Event, or Unknown
             match serde_json::from_value::<Message>(message_value) {
                 Ok(message) => {
                     if let Err(e) = self.dispatch_internal(message).await {
@@ -605,6 +611,7 @@ impl Connection {
                     }
                 }
                 Err(e) => {
+                    // This should rarely happen since Message::Unknown catches everything
                     tracing::error!("Failed to parse message: {}", e);
                 }
             }
@@ -690,6 +697,15 @@ impl Connection {
                         }
                     }
                 }
+            }
+            Message::Unknown(value) => {
+                // Forward-compatibility: log unknown message types at debug level
+                // This allows Playwright to add new message types without breaking clients
+                tracing::debug!(
+                    "Unknown message type (forward-compatible, ignored): {}",
+                    serde_json::to_string(&value).unwrap_or_else(|_| "<serialization failed>".to_string())
+                );
+                Ok(())
             }
         }
     }
@@ -1171,5 +1187,36 @@ mod tests {
             stack: None,
         });
         assert!(matches!(error, Error::ProtocolError(_)));
+    }
+
+    #[test]
+    fn test_message_deserialization_unknown() {
+        // Future Playwright message type that doesn't match Response or Event
+        let json = r#"{"newField": "value", "anotherField": 123}"#;
+        let message: Message = serde_json::from_str(json).unwrap();
+
+        match message {
+            Message::Unknown(value) => {
+                assert_eq!(value["newField"], "value");
+                assert_eq!(value["anotherField"], 123);
+            }
+            _ => panic!("Expected Unknown"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dispatch_unknown_message() {
+        let (connection, _, _) = create_test_connection();
+        let connection = Arc::new(connection);
+
+        // Create an unknown message that doesn't match Response or Event patterns
+        let unknown = Message::Unknown(serde_json::json!({
+            "futureMessageType": "someNewType",
+            "data": { "foo": "bar" }
+        }));
+
+        // Dispatch should succeed without error (forward-compatible)
+        let result = connection.dispatch(unknown).await;
+        assert!(result.is_ok());
     }
 }
