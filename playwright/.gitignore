@@ -20,3 +20,6 @@
 # MCP server outputs (if using playwright MCP)
 /mcp-output/
 /mcp-user-data/
+
+# pw-cli context cache (session state, last URL/selector)
+/.pw-cli/
