@@ -229,6 +229,9 @@ pub const PLAYWRIGHT_GITIGNORE: &str = r#"# Test outputs (regenerated on each ru
 # MCP server outputs (if using playwright MCP)
 /mcp-output/
 /mcp-user-data/
+
+# pw-cli context cache (session state, last URL/selector)
+/.pw-cli/
 "#;
 
 /// Common shell utilities script
