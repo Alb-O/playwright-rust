@@ -319,6 +319,10 @@ pub enum Commands {
         #[arg(long)]
         clear: bool,
     },
+
+    /// Manage browser tabs
+    #[command(subcommand)]
+    Tabs(TabsAction),
 }
 
 /// Project template type for init command
@@ -388,6 +392,27 @@ pub enum SessionAction {
     },
     /// Stop the reusable local browser session and remove descriptor
     Stop,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum TabsAction {
+    /// List all open tabs
+    List,
+    /// Switch to a tab by index or URL pattern
+    Switch {
+        /// Tab index (0-based) or URL/title pattern to match
+        target: String,
+    },
+    /// Close a tab by index or URL pattern
+    Close {
+        /// Tab index (0-based) or URL/title pattern to match
+        target: String,
+    },
+    /// Open a new tab, optionally with a URL
+    New {
+        /// URL to open in the new tab
+        url: Option<String>,
+    },
 }
 
 #[cfg(test)]
