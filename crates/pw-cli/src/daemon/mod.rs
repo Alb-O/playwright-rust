@@ -53,15 +53,15 @@ pub async fn request_browser(
 
     match response {
         DaemonResponse::Browser { cdp_endpoint, .. } => Ok(cdp_endpoint),
-        DaemonResponse::Error { code, message } => {
-            Err(anyhow!("daemon error {code}: {message}"))
-        }
+        DaemonResponse::Error { code, message } => Err(anyhow!("daemon error {code}: {message}")),
         other => Err(anyhow!("unexpected daemon response: {other:?}")),
     }
 }
 
 async fn send_request(request: DaemonRequest) -> Result<DaemonResponse> {
-    let stream = connect_daemon().await.context("Failed to connect to daemon")?;
+    let stream = connect_daemon()
+        .await
+        .context("Failed to connect to daemon")?;
     send_request_stream(stream, request).await
 }
 
@@ -91,7 +91,10 @@ where
         .write_all(format!("{}\n", payload).as_bytes())
         .await
         .context("Failed writing daemon request")?;
-    stream.flush().await.context("Failed flushing daemon request")?;
+    stream
+        .flush()
+        .await
+        .context("Failed flushing daemon request")?;
 
     let mut reader = BufReader::new(stream);
     let mut line = String::new();

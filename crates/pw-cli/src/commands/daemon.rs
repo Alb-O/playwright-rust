@@ -6,11 +6,11 @@ use tokio::net::TcpStream;
 #[cfg(unix)]
 use tokio::net::UnixStream;
 
-use crate::daemon::{Daemon, DaemonRequest, DaemonResponse};
 #[cfg(unix)]
 use crate::daemon::DAEMON_SOCKET;
 #[cfg(windows)]
 use crate::daemon::DAEMON_TCP_PORT;
+use crate::daemon::{Daemon, DaemonRequest, DaemonResponse};
 use crate::error::{PwError, Result};
 use crate::output::{OutputFormat, ResultBuilder, print_result};
 
@@ -104,9 +104,9 @@ pub async fn stop(format: OutputFormat) -> Result<()> {
             print_result(&result, format);
             Ok(())
         }
-        Some(DaemonResponse::Error { code, message }) => Err(PwError::Anyhow(anyhow!(
-            "daemon error {code}: {message}"
-        ))),
+        Some(DaemonResponse::Error { code, message }) => {
+            Err(PwError::Anyhow(anyhow!("daemon error {code}: {message}")))
+        }
         Some(other) => Err(PwError::Anyhow(anyhow!(
             "unexpected daemon response: {other:?}"
         ))),
@@ -141,9 +141,9 @@ pub async fn status(format: OutputFormat) -> Result<()> {
             print_result(&result, format);
             Ok(())
         }
-        DaemonResponse::Error { code, message } => Err(PwError::Anyhow(anyhow!(
-            "daemon error {code}: {message}"
-        ))),
+        DaemonResponse::Error { code, message } => {
+            Err(PwError::Anyhow(anyhow!("daemon error {code}: {message}")))
+        }
         other => Err(PwError::Anyhow(anyhow!(
             "unexpected daemon response: {other:?}"
         ))),
@@ -187,7 +187,10 @@ where
         .write_all(format!("{}\n", payload).as_bytes())
         .await
         .context("Failed writing daemon request")?;
-    stream.flush().await.context("Failed flushing daemon request")?;
+    stream
+        .flush()
+        .await
+        .context("Failed flushing daemon request")?;
 
     let mut reader = BufReader::new(stream);
     let mut line = String::new();

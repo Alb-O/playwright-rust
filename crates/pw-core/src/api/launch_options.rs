@@ -419,9 +419,10 @@ mod tests {
         let args = normalized["args"].as_array().unwrap();
         assert_eq!(args.len(), 2);
         assert!(args.iter().any(|a| a.as_str() == Some("--no-sandbox")));
-        assert!(args
-            .iter()
-            .any(|a| a.as_str() == Some("--remote-debugging-port=9333")));
+        assert!(
+            args.iter()
+                .any(|a| a.as_str() == Some("--remote-debugging-port=9333"))
+        );
     }
 
     #[test]

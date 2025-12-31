@@ -48,16 +48,21 @@ pub async fn execute_single(
                 selector: Some(selector.to_string()),
                 ..Default::default()
             })
-            .error(ErrorCode::SelectorNotFound, format!("Element not found or not visible: {selector}"))
+            .error(
+                ErrorCode::SelectorNotFound,
+                format!("Element not found or not visible: {selector}"),
+            )
             .build();
 
         print_result(&result, format);
         session.close().await?;
-        return Err(PwError::ElementNotFound { selector: selector.to_string() });
+        return Err(PwError::ElementNotFound {
+            selector: selector.to_string(),
+        });
     }
 
     let coords: ElementCoords = serde_json::from_str(&result_json)?;
-    
+
     let result = ResultBuilder::new("coords")
         .inputs(CommandInputs {
             url: Some(url.to_string()),

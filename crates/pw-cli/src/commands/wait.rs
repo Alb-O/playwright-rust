@@ -34,7 +34,7 @@ pub async fn execute(
 
     if let Ok(ms) = condition.parse::<u64>() {
         tokio::time::sleep(Duration::from_millis(ms)).await;
-        
+
         let result = ResultBuilder::new("wait")
             .inputs(CommandInputs {
                 url: Some(url.to_string()),
@@ -47,7 +47,7 @@ pub async fn execute(
                 selector_found: None,
             })
             .build();
-        
+
         print_result(&result, format);
     } else if matches!(condition, "load" | "domcontentloaded" | "networkidle") {
         let result = ResultBuilder::new("wait")
@@ -62,7 +62,7 @@ pub async fn execute(
                 selector_found: None,
             })
             .build();
-        
+
         print_result(&result, format);
     } else {
         let escaped = condition.replace('\\', "\\\\").replace('\'', "\\'");
@@ -89,7 +89,7 @@ pub async fn execute(
                         selector_found: Some(true),
                     })
                     .build();
-                
+
                 print_result(&result, format);
                 break;
             }
@@ -104,13 +104,16 @@ pub async fn execute(
                     })
                     .error(
                         ErrorCode::Timeout,
-                        format!("Timeout after {}ms waiting for selector: {condition}", max_attempts * 1000),
+                        format!(
+                            "Timeout after {}ms waiting for selector: {condition}",
+                            max_attempts * 1000
+                        ),
                     )
                     .build();
-                
+
                 print_result(&result, format);
                 session.close().await?;
-                
+
                 return Err(PwError::Timeout {
                     ms: max_attempts * 1000,
                     condition: condition.to_string(),

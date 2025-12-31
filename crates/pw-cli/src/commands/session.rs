@@ -47,9 +47,7 @@ pub async fn status(ctx_state: &ContextState, format: OutputFormat) -> Result<()
                 "alive": alive,
             });
 
-            let result = ResultBuilder::new("session status")
-                .data(payload)
-                .build();
+            let result = ResultBuilder::new("session status").data(payload).build();
             print_result(&result, format);
         }
         None => {

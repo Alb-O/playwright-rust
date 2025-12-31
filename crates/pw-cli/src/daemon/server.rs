@@ -13,11 +13,11 @@ use tokio::net::UnixListener;
 use tokio::sync::{Mutex, watch};
 use tracing::{debug, info, warn};
 
-use super::protocol::{BrowserInfo, DaemonRequest, DaemonResponse};
 #[cfg(unix)]
 use super::DAEMON_SOCKET;
 #[cfg(windows)]
 use super::DAEMON_TCP_PORT;
+use super::protocol::{BrowserInfo, DaemonRequest, DaemonResponse};
 use crate::types::BrowserKind;
 use pw::{LaunchOptions, Playwright};
 
@@ -62,12 +62,17 @@ impl Daemon {
         #[cfg(unix)]
         {
             if Path::new(DAEMON_SOCKET).exists() {
-                std::fs::remove_file(DAEMON_SOCKET)
-                    .with_context(|| format!("Failed to remove existing socket: {}", DAEMON_SOCKET))?;
+                std::fs::remove_file(DAEMON_SOCKET).with_context(|| {
+                    format!("Failed to remove existing socket: {}", DAEMON_SOCKET)
+                })?;
             }
             let listener = UnixListener::bind(DAEMON_SOCKET)
                 .with_context(|| format!("Failed to bind daemon socket: {}", DAEMON_SOCKET))?;
-            info!(target = "pw.daemon", socket = DAEMON_SOCKET, "daemon listening");
+            info!(
+                target = "pw.daemon",
+                socket = DAEMON_SOCKET,
+                "daemon listening"
+            );
             Ok(Self {
                 state: Arc::new(Mutex::new(state)),
                 shutdown_tx,
@@ -95,12 +100,24 @@ impl Daemon {
     pub async fn run(mut self) -> Result<()> {
         #[cfg(unix)]
         {
-            run_unix(self.listener, self.state, self.shutdown_tx, &mut self.shutdown_rx).await
+            run_unix(
+                self.listener,
+                self.state,
+                self.shutdown_tx,
+                &mut self.shutdown_rx,
+            )
+            .await
         }
 
         #[cfg(windows)]
         {
-            run_tcp(self.listener, self.state, self.shutdown_tx, &mut self.shutdown_rx).await
+            run_tcp(
+                self.listener,
+                self.state,
+                self.shutdown_tx,
+                &mut self.shutdown_rx,
+            )
+            .await
         }
     }
 }
@@ -215,7 +232,10 @@ where
         .write_all(format!("{}\n", payload).as_bytes())
         .await
         .context("Failed writing daemon response")?;
-    writer.flush().await.context("Failed flushing daemon response")?;
+    writer
+        .flush()
+        .await
+        .context("Failed flushing daemon response")?;
     Ok(())
 }
 
@@ -320,7 +340,8 @@ impl DaemonState {
         }
 
         // No existing browser found, spawn a new one
-        self.spawn_browser(browser_kind, headless, None, reuse_key).await
+        self.spawn_browser(browser_kind, headless, None, reuse_key)
+            .await
     }
 
     /// Spawn a new browser with optional reuse_key.
@@ -439,9 +460,8 @@ impl DaemonState {
     }
 
     fn find_available_port(&self) -> Option<u16> {
-        (PORT_RANGE_START..=PORT_RANGE_END).find(|port| {
-            !self.browsers.contains_key(port) && port_available(*port)
-        })
+        (PORT_RANGE_START..=PORT_RANGE_END)
+            .find(|port| !self.browsers.contains_key(port) && port_available(*port))
     }
 }
 

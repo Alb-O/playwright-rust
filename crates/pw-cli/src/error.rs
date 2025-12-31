@@ -84,11 +84,7 @@ impl PwError {
                 format!("No elements matched selector: {selector}"),
                 Some(serde_json::json!({ "selector": selector })),
             ),
-            PwError::JsEval(msg) => (
-                ErrorCode::JsEvalFailed,
-                msg.clone(),
-                None,
-            ),
+            PwError::JsEval(msg) => (ErrorCode::JsEvalFailed, msg.clone(), None),
             PwError::Screenshot { path, source } => (
                 ErrorCode::ScreenshotFailed,
                 format!("Screenshot failed at {}: {source}", path.display()),
@@ -100,16 +96,8 @@ impl PwError {
                 Some(serde_json::json!({ "timeout_ms": ms, "condition": condition })),
             ),
             PwError::Context(msg) => (ErrorCode::InvalidInput, msg.clone(), None),
-            PwError::Io(err) => (
-                ErrorCode::IoError,
-                err.to_string(),
-                None,
-            ),
-            PwError::Json(err) => (
-                ErrorCode::InternalError,
-                format!("JSON error: {err}"),
-                None,
-            ),
+            PwError::Io(err) => (ErrorCode::IoError, err.to_string(), None),
+            PwError::Json(err) => (ErrorCode::InternalError, format!("JSON error: {err}"), None),
             PwError::Playwright(err) => {
                 // Map Playwright errors to appropriate codes
                 let msg = err.to_string();
@@ -124,11 +112,7 @@ impl PwError {
                 };
                 (code, msg, None)
             }
-            PwError::Anyhow(err) => (
-                ErrorCode::InternalError,
-                err.to_string(),
-                None,
-            ),
+            PwError::Anyhow(err) => (ErrorCode::InternalError, err.to_string(), None),
         };
 
         CommandError {

@@ -411,10 +411,9 @@ impl<T: Serialize> ResultBuilder<T> {
     pub fn build(self) -> CommandResult<T> {
         let ok = self.error.is_none() && self.data.is_some();
 
-        let timings = self.timings.or_else(|| {
-            self.start_time
-                .map(|start| Timings::from(start.elapsed()))
-        });
+        let timings = self
+            .timings
+            .or_else(|| self.start_time.map(|start| Timings::from(start.elapsed())));
 
         CommandResult {
             ok,
@@ -489,7 +488,12 @@ fn print_result_text<T: Serialize>(result: &CommandResult<T>) {
 
     // Print artifacts
     for artifact in &result.artifacts {
-        let _ = writeln!(stdout, "Saved {:?}: {}", artifact.artifact_type, artifact.path.display());
+        let _ = writeln!(
+            stdout,
+            "Saved {:?}: {}",
+            artifact.artifact_type,
+            artifact.path.display()
+        );
     }
 
     // Print timing in verbose/debug scenarios
@@ -699,13 +703,19 @@ mod tests {
         assert!(!result.ok);
         assert!(result.data.is_none());
         assert!(result.error.is_some());
-        assert_eq!(result.error.as_ref().unwrap().code, ErrorCode::NavigationFailed);
+        assert_eq!(
+            result.error.as_ref().unwrap().code,
+            ErrorCode::NavigationFailed
+        );
     }
 
     #[test]
     fn error_code_display() {
         assert_eq!(ErrorCode::NavigationFailed.to_string(), "NAVIGATION_FAILED");
-        assert_eq!(ErrorCode::SelectorNotFound.to_string(), "SELECTOR_NOT_FOUND");
+        assert_eq!(
+            ErrorCode::SelectorNotFound.to_string(),
+            "SELECTOR_NOT_FOUND"
+        );
     }
 
     #[test]

@@ -703,7 +703,8 @@ impl Connection {
                 // This allows Playwright to add new message types without breaking clients
                 tracing::debug!(
                     "Unknown message type (forward-compatible, ignored): {}",
-                    serde_json::to_string(&value).unwrap_or_else(|_| "<serialization failed>".to_string())
+                    serde_json::to_string(&value)
+                        .unwrap_or_else(|_| "<serialization failed>".to_string())
                 );
                 Ok(())
             }

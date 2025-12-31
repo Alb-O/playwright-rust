@@ -57,7 +57,7 @@ pub async fn execute(
         .data(ScreenshotData {
             path: output.clone(),
             full_page,
-            width: None,  // TODO: Could extract from screenshot metadata
+            width: None, // TODO: Could extract from screenshot metadata
             height: None,
         })
         .artifact(Artifact {

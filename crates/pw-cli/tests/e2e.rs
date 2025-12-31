@@ -168,9 +168,15 @@ fn text_simple() {
 
     assert!(success, "Command failed: {}", stderr);
     // JSON envelope contains the text
-    assert!(stdout.contains("Hello World"), "Expected 'Hello World' in output");
+    assert!(
+        stdout.contains("Hello World"),
+        "Expected 'Hello World' in output"
+    );
     assert!(stdout.contains("\"ok\": true"), "Expected success in JSON");
-    assert!(stdout.contains("\"matchCount\": 1"), "Expected matchCount in output");
+    assert!(
+        stdout.contains("\"matchCount\": 1"),
+        "Expected matchCount in output"
+    );
 }
 
 #[test]

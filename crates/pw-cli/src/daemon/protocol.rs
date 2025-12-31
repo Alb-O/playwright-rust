@@ -21,10 +21,16 @@ pub enum DaemonRequest {
         headless: bool,
         port: Option<u16>,
     },
-    GetBrowser { port: u16 },
-    KillBrowser { port: u16 },
+    GetBrowser {
+        port: u16,
+    },
+    KillBrowser {
+        port: u16,
+    },
     /// Release a browser by reuse_key (marks it available but doesn't close it).
-    ReleaseBrowser { reuse_key: String },
+    ReleaseBrowser {
+        reuse_key: String,
+    },
     ListBrowsers,
     Shutdown,
 }

@@ -21,15 +21,17 @@ pw daemon stop
 ## Why Use the Daemon?
 
 Without the daemon, each `pw` command:
+
 1. Spawns a new Playwright driver (~200ms)
-2. Launches a new browser (~300ms)
-3. Executes the command
-4. Tears everything down
+1. Launches a new browser (~300ms)
+1. Executes the command
+1. Tears everything down
 
 With the daemon running:
+
 1. Command connects to existing daemon via Unix socket (~5ms)
-2. Reuses existing browser instance
-3. Executes immediately
+1. Reuses existing browser instance
+1. Executes immediately
 
 For agents making multiple browser calls, the daemon reduces latency from ~500ms to ~50ms per command.
 
@@ -128,19 +130,19 @@ The daemon spawns browsers on ports 9222-10221. Currently only Chromium is suppo
 
 ## Flags Reference
 
-| Flag | Description |
-|------|-------------|
-| `--no-daemon` | Don't use daemon even if running |
-| `--no-context` | Don't read/write context cache |
-| `--auth <file>` | Use saved authentication state |
-| `--headful` | Run browser with visible window |
+| Flag               | Description                         |
+| ------------------ | ----------------------------------- |
+| `--no-daemon`      | Don't use daemon even if running    |
+| `--no-context`     | Don't read/write context cache      |
+| `--auth <file>`    | Use saved authentication state      |
+| `--headful`        | Run browser with visible window     |
 | `--browser <kind>` | chromium (default), firefox, webkit |
-| `-v` / `-vv` | Verbose / debug output |
+| `-v` / `-vv`       | Verbose / debug output              |
 
 ## Best Practices for Agents
 
 1. **Start daemon at session begin**: Run `pw daemon start` once, then make many commands
-2. **Use context caching**: Let URLs and selectors carry over between related commands
-3. **Parse JSON output**: All commands return structured JSON for reliable parsing
-4. **Handle errors gracefully**: Check `ok` field before accessing `data`
-5. **Stop daemon when done**: Run `pw daemon stop` to clean up browser processes
+1. **Use context caching**: Let URLs and selectors carry over between related commands
+1. **Parse JSON output**: All commands return structured JSON for reliable parsing
+1. **Handle errors gracefully**: Check `ok` field before accessing `data`
+1. **Stop daemon when done**: Run `pw daemon stop` to clean up browser processes

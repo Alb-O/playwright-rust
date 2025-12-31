@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::artifact_collector::{collect_failure_artifacts, CollectedArtifacts};
+use crate::artifact_collector::{CollectedArtifacts, collect_failure_artifacts};
 use crate::browser::BrowserSession;
 use crate::context::CommandContext;
 use crate::daemon;
@@ -205,8 +205,18 @@ impl<'a> SessionBroker<'a> {
         {
             if let Some(client) = daemon::try_connect().await {
                 // Use descriptor path as reuse_key for consistent browser reuse per context
-                let reuse_key = self.descriptor_path.as_ref().map(|p| p.to_string_lossy().to_string());
-                match daemon::request_browser(&client, request.browser, request.headless, reuse_key.as_deref()).await {
+                let reuse_key = self
+                    .descriptor_path
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().to_string());
+                match daemon::request_browser(
+                    &client,
+                    request.browser,
+                    request.headless,
+                    reuse_key.as_deref(),
+                )
+                .await
+                {
                     Ok(endpoint) => {
                         debug!(target = "pw.session", %endpoint, reuse_key = ?reuse_key, "using daemon browser");
                         daemon_endpoint = Some(endpoint);
