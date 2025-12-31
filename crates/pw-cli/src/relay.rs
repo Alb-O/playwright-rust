@@ -76,7 +76,7 @@ pub async fn run_relay_server(host: &str, port: u16) -> Result<()> {
             ),
         )
         .route(
-            "/cdp/:client_id",
+            "/cdp/{client_id}",
             get(
                 |Path(client_id): Path<String>,
                  ws: WebSocketUpgrade,
@@ -487,6 +487,7 @@ async fn route_cdp_command(
             return Ok(json!({"targetInfos": targets}));
         }
         "Target.createTarget" | "Target.closeTarget" => {
+            // Forward to extension - it handles tab creation/closing
             return send_to_extension(state, method, params, None).await;
         }
         _ => {}

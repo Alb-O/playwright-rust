@@ -2,9 +2,9 @@
   "manifest_version": 3,
   "name": "pw-rs Bridge",
   "description": "Rust-based Playwright CDP bridge for pw-cli",
-  "version": "0.0.1",
+  "version": "0.0.6",
   "background": {
-    "service_worker": "dist/background.js",
+    "service_worker": "dist/init.js",
     "type": "module"
   },
   "permissions": [
@@ -15,8 +15,17 @@
   "host_permissions": [
     "<all_urls>"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
   "action": {
     "default_title": "pw-rs bridge",
     "default_popup": "popup.html"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["dist/background_bg.wasm"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
