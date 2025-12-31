@@ -15,8 +15,8 @@ pub struct Cli {
     #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     pub verbose: u8,
 
-    /// Output format: json (default), ndjson, or text
-    #[arg(short = 'f', long, global = true, value_enum, default_value = "json")]
+    /// Output format: toon (default), json, ndjson, or text
+    #[arg(short = 'f', long, global = true, value_enum, default_value = "toon")]
     pub format: CliOutputFormat,
 
     /// Load authentication state from file (cookies, localStorage)
@@ -74,8 +74,10 @@ pub struct Cli {
 /// CLI output format (clap-compatible enum)
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum)]
 pub enum CliOutputFormat {
-    /// JSON output (default, best for agents)
+    /// TOON output (default, token-efficient for LLMs)
     #[default]
+    Toon,
+    /// JSON output
     Json,
     /// Newline-delimited JSON (streaming)
     Ndjson,
@@ -86,6 +88,7 @@ pub enum CliOutputFormat {
 impl From<CliOutputFormat> for OutputFormat {
     fn from(f: CliOutputFormat) -> Self {
         match f {
+            CliOutputFormat::Toon => OutputFormat::Toon,
             CliOutputFormat::Json => OutputFormat::Json,
             CliOutputFormat::Ndjson => OutputFormat::Ndjson,
             CliOutputFormat::Text => OutputFormat::Text,

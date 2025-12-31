@@ -133,26 +133,28 @@ This prevents agents from accidentally navigating away from your important apps.
 
 ## Output Format
 
-All commands output JSON to stdout:
+All commands output TOON (Token-Oriented Object Notation) by default, a compact format optimized for LLM token efficiency:
 
-```json
-{
-  "ok": true,
-  "command": "text",
-  "inputs": {"url": "https://example.com", "selector": "h1"},
-  "data": {"text": "Example Domain", "selector": "h1", "matchCount": 1},
-  "timings": {"durationMs": 0}
-}
+```
+command: text
+data:
+  matchCount: 1
+  selector: h1
+  text: Example Domain
+inputs:
+  selector: h1
+  url: "https://example.com"
+ok: true
 ```
 
-Errors include structured error info:
+Use `-f json` for traditional JSON output. Errors include structured error info:
 
-```json
-{
-  "ok": false,
-  "command": "text",
-  "error": {"code": "ELEMENT_NOT_FOUND", "message": "No elements match selector: .missing"}
-}
+```
+ok: false
+command: text
+error:
+  code: ELEMENT_NOT_FOUND
+  message: "No elements match selector: .missing"
 ```
 
 ## Context Caching

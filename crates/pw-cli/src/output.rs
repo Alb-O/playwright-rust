@@ -38,8 +38,10 @@ use std::time::{Duration, Instant};
 /// Output format for CLI results
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum OutputFormat {
-    /// JSON output (default, best for agents)
+    /// TOON output (default, token-efficient for LLMs)
     #[default]
+    Toon,
+    /// JSON output
     Json,
     /// Newline-delimited JSON (streaming)
     Ndjson,
@@ -52,6 +54,7 @@ impl std::str::FromStr for OutputFormat {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
+            "toon" => Ok(OutputFormat::Toon),
             "json" => Ok(OutputFormat::Json),
             "ndjson" => Ok(OutputFormat::Ndjson),
             "text" => Ok(OutputFormat::Text),
@@ -63,6 +66,7 @@ impl std::str::FromStr for OutputFormat {
 impl std::fmt::Display for OutputFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            OutputFormat::Toon => write!(f, "toon"),
             OutputFormat::Json => write!(f, "json"),
             OutputFormat::Ndjson => write!(f, "ndjson"),
             OutputFormat::Text => write!(f, "text"),
@@ -436,6 +440,11 @@ impl<T: Serialize> ResultBuilder<T> {
 /// Print a command result to stdout in the specified format
 pub fn print_result<T: Serialize>(result: &CommandResult<T>, format: OutputFormat) {
     match format {
+        OutputFormat::Toon => {
+            if let Ok(json_value) = serde_json::to_value(result) {
+                println!("{}", toon::encode(&json_value, None));
+            }
+        }
         OutputFormat::Json => {
             if let Ok(json) = serde_json::to_string_pretty(result) {
                 println!("{json}");
