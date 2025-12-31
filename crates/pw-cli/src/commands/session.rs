@@ -180,7 +180,7 @@ pub async fn stop(
     let endpoint = descriptor
         .cdp_endpoint
         .as_deref()
-        .or_else(|| descriptor.ws_endpoint.as_deref());
+        .or(descriptor.ws_endpoint.as_deref());
 
     let Some(endpoint) = endpoint else {
         fs::remove_file(&path)?;

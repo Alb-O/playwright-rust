@@ -16,7 +16,9 @@ mod tabs;
 mod text;
 mod wait;
 
-use crate::cli::{AuthAction, Cli, Commands, DaemonAction, ProtectAction, SessionAction, TabsAction};
+use crate::cli::{
+    AuthAction, Cli, Commands, DaemonAction, ProtectAction, SessionAction, TabsAction,
+};
 use crate::context::CommandContext;
 use crate::context_store::{ContextState, ContextUpdate};
 use crate::error::{PwError, Result};
@@ -423,7 +425,7 @@ async fn dispatch_command_inner(
 }
 
 fn resolve_auth_output(ctx: &CommandContext, output: &Path) -> std::path::PathBuf {
-    if output.is_absolute() || output.parent().map_or(false, |p| !p.as_os_str().is_empty()) {
+    if output.is_absolute() || output.parent().is_some_and(|p| !p.as_os_str().is_empty()) {
         return output.to_path_buf();
     }
 

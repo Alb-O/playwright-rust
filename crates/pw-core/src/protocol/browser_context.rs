@@ -119,12 +119,7 @@ impl BrowserContext {
         self.base
             .children()
             .into_iter()
-            .filter_map(|child| {
-                child
-                    .as_any()
-                    .downcast_ref::<Page>()
-                    .cloned()
-            })
+            .filter_map(|child| child.as_any().downcast_ref::<Page>().cloned())
             .collect()
     }
 

@@ -5,8 +5,8 @@ use std::rc::Rc;
 use js_sys::{Array, Object, Reflect};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{CloseEvent, ErrorEvent, MessageEvent, WebSocket};
 
@@ -44,7 +44,11 @@ struct ForwardEvent<'a> {
 #[wasm_bindgen(start)]
 pub async fn start() {
     console_error_panic_hook::set_once();
-    set_status("connecting", "pw-rs bridge (connecting)", [160, 160, 160, 255]);
+    set_status(
+        "connecting",
+        "pw-rs bridge (connecting)",
+        [160, 160, 160, 255],
+    );
 
     // Clear any existing debugger sessions
     let _ = reset_debugger().await;
@@ -226,7 +230,10 @@ async fn handle_message(event: MessageEvent, ws: Rc<WebSocket>) -> Result<(), Js
         "Page.createIsolatedWorld",
     ];
     if unsupported.contains(&method.as_str()) {
-        return send_raw_json(&ws, &json!({"id": cmd_id, "sessionId": session_id, "result": {}}));
+        return send_raw_json(
+            &ws,
+            &json!({"id": cmd_id, "sessionId": session_id, "result": {}}),
+        );
     }
 
     // Find tab for session
@@ -325,7 +332,11 @@ async fn find_active_tab() -> Result<(i32, String, String), JsValue> {
 
 fn build_tab_object(tab_id: i32) -> Result<JsValue, JsValue> {
     let obj = Object::new();
-    Reflect::set(&obj, &JsValue::from_str("tabId"), &JsValue::from_f64(tab_id as f64))?;
+    Reflect::set(
+        &obj,
+        &JsValue::from_str("tabId"),
+        &JsValue::from_f64(tab_id as f64),
+    )?;
     Ok(obj.into())
 }
 
@@ -357,7 +368,11 @@ fn set_status(status: &str, title: &str, rgba: [u8; 4]) {
     }
 
     let text_obj = Object::new();
-    let _ = Reflect::set(&text_obj, &JsValue::from_str("text"), &JsValue::from_str(text));
+    let _ = Reflect::set(
+        &text_obj,
+        &JsValue::from_str("text"),
+        &JsValue::from_str(text),
+    );
     action_set_badge_text(&text_obj);
 
     let color_obj = Object::new();
@@ -365,7 +380,11 @@ fn set_status(status: &str, title: &str, rgba: [u8; 4]) {
     action_set_badge_background_color(&color_obj);
 
     let title_obj = Object::new();
-    let _ = Reflect::set(&title_obj, &JsValue::from_str("title"), &JsValue::from_str(title));
+    let _ = Reflect::set(
+        &title_obj,
+        &JsValue::from_str("title"),
+        &JsValue::from_str(title),
+    );
     action_set_title(&title_obj);
 
     persist_state(status, title);
@@ -386,8 +405,16 @@ fn push_log(line: &str) {
 fn persist_state(status: &str, message: &str) {
     let obj = Object::new();
     let state = Object::new();
-    let _ = Reflect::set(&state, &JsValue::from_str("status"), &JsValue::from_str(status));
-    let _ = Reflect::set(&state, &JsValue::from_str("message"), &JsValue::from_str(message));
+    let _ = Reflect::set(
+        &state,
+        &JsValue::from_str("status"),
+        &JsValue::from_str(status),
+    );
+    let _ = Reflect::set(
+        &state,
+        &JsValue::from_str("message"),
+        &JsValue::from_str(message),
+    );
     let _ = Reflect::set(&obj, &JsValue::from_str("pw_bridge_state"), &state);
     let _ = storage_local_set(&obj);
 }

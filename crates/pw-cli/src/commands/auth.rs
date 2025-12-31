@@ -16,7 +16,7 @@ pub async fn login(
 ) -> Result<()> {
     // Resolve output path using project context (into auth/ directory)
     let output =
-        if output.is_absolute() || output.parent().map_or(false, |p| !p.as_os_str().is_empty()) {
+        if output.is_absolute() || output.parent().is_some_and(|p| !p.as_os_str().is_empty()) {
             output.to_path_buf()
         } else if let Some(ref proj) = ctx.project {
             proj.paths.auth_file(output.to_string_lossy().as_ref())

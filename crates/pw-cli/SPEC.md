@@ -25,10 +25,11 @@ CLI (Rust) --[stdio]--> Node.js Driver --[CDP/WS]--> Browser
 ```
 
 When the CLI exits:
+
 1. Stdio pipes close
-2. Node.js driver sees EOF and exits
-3. Driver sends close command to browser
-4. Browser exits
+1. Node.js driver sees EOF and exits
+1. Driver sends close command to browser
+1. Browser exits
 
 Even with `keep_server_running=true`, we only prevent explicit process kill - the driver
 still exits when its stdin closes.
@@ -36,6 +37,7 @@ still exits when its stdin closes.
 ### Root Cause for launch_server
 
 Playwright's wire protocol (`protocol.yml`) only exposes:
+
 ```yaml
 BrowserType:
   commands:
@@ -46,7 +48,7 @@ BrowserType:
 
 `launchServer` is a Node.js-only API that spawns a `PlaywrightServer` process. The Rust library cannot call it over the protocol.
 
----
+______________________________________________________________________
 
 ## Architecture
 
@@ -73,7 +75,7 @@ BrowserType:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
----
+______________________________________________________________________
 
 ## Roadmap
 
@@ -84,23 +86,24 @@ Added infrastructure for CDP-based session reuse, though true persistence requir
 #### Completed Tasks
 
 1. **LaunchOptions.remote_debugging_port** - Added to pw-core, injects `--remote-debugging-port` into Chrome args
-2. **BrowserSession.launch_persistent()** - Launches with CDP port and disables signal handlers
-3. **SessionBroker** - Stores/loads CDP endpoint in session descriptor
-4. **SessionRequest** - Added `remote_debugging_port` and `keep_browser_running` fields
-5. **session start** - Uses CDP port (9222 + hash(context) % 1000)
-6. **session stop** - Closes browser via CDP connection
+1. **BrowserSession.launch_persistent()** - Launches with CDP port and disables signal handlers
+1. **SessionBroker** - Stores/loads CDP endpoint in session descriptor
+1. **SessionRequest** - Added `remote_debugging_port` and `keep_browser_running` fields
+1. **session start** - Uses CDP port (9222 + hash(context) % 1000)
+1. **session stop** - Closes browser via CDP connection
 
 #### Limitation: Browser Exits on CLI Exit
 
 The current implementation cannot keep the browser running after CLI exit because:
+
 1. Playwright driver communicates via stdio
-2. When CLI exits, stdio closes
-3. Driver exits on stdin EOF
-4. Driver closes browser on exit
+1. When CLI exits, stdio closes
+1. Driver exits on stdin EOF
+1. Driver closes browser on exit
 
 **Workaround**: Use `pw session start` in a terminal you keep open, or proceed to Phase 4.
 
----
+______________________________________________________________________
 
 ### Phase 2: Process Lifecycle Management
 
@@ -180,7 +183,7 @@ async fn main() {
 }
 ```
 
----
+______________________________________________________________________
 
 ### Phase 3: Multi-Browser Support
 
@@ -189,12 +192,14 @@ CDP endpoint approach only works for Chromium. For Firefox/WebKit:
 #### Task 3.1: Firefox BiDi support
 
 Firefox supports BiDi protocol. Research:
+
 - Does Playwright's `launch` expose BiDi endpoint?
 - Can we reconnect via BiDi?
 
 #### Task 3.2: WebKit support
 
 WebKit has no remote debugging protocol. Options:
+
 - Don't support persistent sessions for WebKit
 - Use `launchPersistentContext` with user data dir (not true session reuse)
 
@@ -217,7 +222,7 @@ match request.browser {
 }
 ```
 
----
+______________________________________________________________________
 
 ### Phase 4: Daemon Mode (Completed)
 
@@ -273,23 +278,23 @@ The daemon provides true session persistence by keeping the Playwright driver ru
 
 Browsers are assigned ports from range 9222-10221. The daemon tracks which ports are in use and finds the next available port for new browser requests.
 
----
+______________________________________________________________________
 
 ## File Change Summary
 
-| Phase | File | Changes |
-|-------|------|---------|
-| 1.1 | `pw-core/src/api/launch_options.rs` | Add `remote_debugging_port` |
-| 1.2 | `pw-core/src/protocol/browser.rs` | CDP endpoint retrieval |
-| 1.3-1.4 | `pw-cli/src/session_broker.rs` | Store/load CDP endpoint |
-| 1.5 | `pw-cli/src/browser/session.rs` | `keep_browser_running` flag |
-| 1.6-1.7 | `pw-cli/src/commands/session.rs` | Update start/stop commands |
-| 2.1-2.2 | `pw-cli/src/session_broker.rs` | Enhanced lifecycle checks |
-| 2.3 | `pw-cli/src/main.rs` | Signal handling |
-| 3.x | Various | Browser-specific handling |
-| 4.x | `pw-cli/src/daemon/*`, `pw-cli/src/commands/daemon.rs` | Daemon implementation (completed) |
+| Phase   | File                                                   | Changes                           |
+| ------- | ------------------------------------------------------ | --------------------------------- |
+| 1.1     | `pw-core/src/api/launch_options.rs`                    | Add `remote_debugging_port`       |
+| 1.2     | `pw-core/src/protocol/browser.rs`                      | CDP endpoint retrieval            |
+| 1.3-1.4 | `pw-cli/src/session_broker.rs`                         | Store/load CDP endpoint           |
+| 1.5     | `pw-cli/src/browser/session.rs`                        | `keep_browser_running` flag       |
+| 1.6-1.7 | `pw-cli/src/commands/session.rs`                       | Update start/stop commands        |
+| 2.1-2.2 | `pw-cli/src/session_broker.rs`                         | Enhanced lifecycle checks         |
+| 2.3     | `pw-cli/src/main.rs`                                   | Signal handling                   |
+| 3.x     | Various                                                | Browser-specific handling         |
+| 4.x     | `pw-cli/src/daemon/*`, `pw-cli/src/commands/daemon.rs` | Daemon implementation (completed) |
 
----
+______________________________________________________________________
 
 ## Testing Checklist
 
@@ -323,15 +328,15 @@ pw session status
 ### Edge Cases
 
 1. **Stale descriptor**: Kill browser manually, run command → should detect and launch fresh
-2. **Port conflict**: Start two sessions → should use different ports
-3. **Context isolation**: `--context a` and `--context b` → separate browsers
-4. **Crash recovery**: Browser crashes → next command detects and relaunches
+1. **Port conflict**: Start two sessions → should use different ports
+1. **Context isolation**: `--context a` and `--context b` → separate browsers
+1. **Crash recovery**: Browser crashes → next command detects and relaunches
 
----
+______________________________________________________________________
 
 ## Open Questions
 
 1. **Port allocation**: Fixed port per context vs dynamic with port file?
-2. **Browser reuse scope**: Per-context or global pool?
-3. **Auth state**: Reload `--auth` file on reconnect or cache in browser?
-4. **Headless→Headful**: Can we switch modes on reconnect? (Likely no)
+1. **Browser reuse scope**: Per-context or global pool?
+1. **Auth state**: Reload `--auth` file on reconnect or cache in browser?
+1. **Headless→Headful**: Can we switch modes on reconnect? (Likely no)

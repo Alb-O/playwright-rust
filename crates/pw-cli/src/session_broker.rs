@@ -179,7 +179,7 @@ impl<'a> SessionBroker<'a> {
                     if let Some(endpoint) = descriptor
                         .cdp_endpoint
                         .as_deref()
-                        .or_else(|| descriptor.ws_endpoint.as_deref())
+                        .or(descriptor.ws_endpoint.as_deref())
                     {
                         debug!(
                             target = "pw.session",

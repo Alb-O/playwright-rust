@@ -20,7 +20,16 @@ pub struct BrowserSession {
 
 impl BrowserSession {
     pub async fn new(wait_until: WaitUntil) -> Result<Self> {
-        Self::with_options(wait_until, None, true, BrowserKind::default(), None, false, &[]).await
+        Self::with_options(
+            wait_until,
+            None,
+            true,
+            BrowserKind::default(),
+            None,
+            false,
+            &[],
+        )
+        .await
     }
 
     /// Create a session with optional auth file (convenience for commands)
@@ -45,7 +54,16 @@ impl BrowserSession {
                 Self::with_auth_file_and_browser(wait_until, path, browser_kind, cdp_endpoint).await
             }
             None => {
-                Self::with_options(wait_until, None, true, browser_kind, cdp_endpoint, false, &[]).await
+                Self::with_options(
+                    wait_until,
+                    None,
+                    true,
+                    browser_kind,
+                    cdp_endpoint,
+                    false,
+                    &[],
+                )
+                .await
             }
         }
     }

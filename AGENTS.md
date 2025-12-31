@@ -109,6 +109,7 @@ pw protect remove slack.com
 ```
 
 Protected tabs:
+
 - Are marked with `"protected": true` in `pw tabs list` output
 - Cannot be switched to or closed via `pw tabs switch/close`
 - Are skipped when the CLI selects which existing tab to reuse

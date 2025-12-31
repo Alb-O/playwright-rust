@@ -359,7 +359,7 @@ impl DaemonState {
         }
 
         let port = if let Some(port) = requested_port {
-            if port < PORT_RANGE_START || port > PORT_RANGE_END {
+            if !(PORT_RANGE_START..=PORT_RANGE_END).contains(&port) {
                 return Err(anyhow!("Port {port} outside allowed range"));
             }
             if self.browsers.contains_key(&port) {

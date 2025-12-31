@@ -35,15 +35,17 @@ async fn get_page_url(page: &pw::protocol::Page) -> String {
 
 /// Sort pages by URL for stable ordering across invocations.
 /// Returns Vec of (url, title, page_ref) sorted by URL.
-async fn sort_pages_by_url(pages: &[pw::protocol::Page]) -> Vec<(String, String, &pw::protocol::Page)> {
+async fn sort_pages_by_url(
+    pages: &[pw::protocol::Page],
+) -> Vec<(String, String, &pw::protocol::Page)> {
     let mut page_info: Vec<(String, String, &pw::protocol::Page)> = Vec::with_capacity(pages.len());
-    
+
     for page in pages {
         let url = get_page_url(page).await;
         let title = page.title().await.unwrap_or_default();
         page_info.push((url, title, page));
     }
-    
+
     page_info.sort_by(|a, b| a.0.cmp(&b.0));
     page_info
 }
@@ -162,7 +164,10 @@ pub async fn new_tab(
         page.goto(url, None).await?;
     }
 
-    let final_url = page.evaluate_value("window.location.href").await.unwrap_or_else(|_| page.url());
+    let final_url = page
+        .evaluate_value("window.location.href")
+        .await
+        .unwrap_or_else(|_| page.url());
     let final_url = final_url.trim_matches('"').to_string();
     let title = page.title().await.unwrap_or_default();
 

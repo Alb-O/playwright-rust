@@ -82,7 +82,7 @@ impl CommandContext {
     /// Get the screenshot output path, using project paths if available
     pub fn screenshot_path(&self, output: &Path) -> PathBuf {
         // If output is absolute or has directory components, use as-is
-        if output.is_absolute() || output.parent().map_or(false, |p| !p.as_os_str().is_empty()) {
+        if output.is_absolute() || output.parent().is_some_and(|p| !p.as_os_str().is_empty()) {
             return output.to_path_buf();
         }
 
