@@ -453,6 +453,16 @@ fn clean_whitespace(html: &str) -> String {
     result.trim().to_string()
 }
 
+/// Junk text patterns to filter out (placeholder text, timestamps, etc.)
+static JUNK_LINE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^(NaN|NaN / NaN|0:00|0:00 / •|undefined|null|\[object Object\]|loading\.{0,3}|-|•|/|\\)$").unwrap()
+});
+
+/// Check if a line is junk text that should be filtered
+fn is_junk_line(line: &str) -> bool {
+    JUNK_LINE_RE.is_match(line)
+}
+
 /// Convert HTML to plain text
 fn html_to_text(html: &str) -> String {
     static TAG_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<[^>]+>").unwrap());
@@ -476,11 +486,11 @@ fn html_to_text(html: &str) -> String {
     let result = MULTI_SPACE.replace_all(&result, " ");
     let result = MULTI_NEWLINE.replace_all(&result, "\n");
     
-    // Trim lines and filter empty ones
+    // Trim lines, filter empty ones and junk text
     result
         .lines()
         .map(|l| l.trim())
-        .filter(|l| !l.is_empty())
+        .filter(|l| !l.is_empty() && !is_junk_line(l))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -592,11 +602,11 @@ fn html_to_markdown(html: &str) -> String {
     let result = MULTI_SPACE.replace_all(&result, " ");
     let result = MULTI_NEWLINE.replace_all(&result, "\n");
     
-    // Trim lines, filter empty ones and empty headers
+    // Trim lines, filter empty ones, empty headers, and junk text
     result
         .lines()
         .map(|l| l.trim())
-        .filter(|l| !l.is_empty() && !EMPTY_HEADER.is_match(l))
+        .filter(|l| !l.is_empty() && !EMPTY_HEADER.is_match(l) && !is_junk_line(l))
         .collect::<Vec<_>>()
         .join("\n")
 }
