@@ -9,13 +9,14 @@ mod eval;
 mod html;
 pub mod init;
 mod navigate;
+mod protect;
 mod screenshot;
 mod session;
 mod tabs;
 mod text;
 mod wait;
 
-use crate::cli::{AuthAction, Cli, Commands, DaemonAction, SessionAction, TabsAction};
+use crate::cli::{AuthAction, Cli, Commands, DaemonAction, ProtectAction, SessionAction, TabsAction};
 use crate::context::CommandContext;
 use crate::context_store::{ContextState, ContextUpdate};
 use crate::error::{PwError, Result};
@@ -400,11 +401,23 @@ async fn dispatch_command_inner(
         }),
         Commands::Relay { .. } => unreachable!("handled earlier"),
         Commands::Connect { endpoint, clear } => connect::run(ctx_state, format, endpoint, clear),
-        Commands::Tabs(action) => match action {
-            TabsAction::List => tabs::list(ctx, broker, format).await,
-            TabsAction::Switch { target } => tabs::switch(&target, ctx, broker, format).await,
-            TabsAction::Close { target } => tabs::close_tab(&target, ctx, broker, format).await,
-            TabsAction::New { url } => tabs::new_tab(url.as_deref(), ctx, broker, format).await,
+        Commands::Tabs(action) => {
+            let protected = ctx_state.protected_urls();
+            match action {
+                TabsAction::List => tabs::list(ctx, broker, format, protected).await,
+                TabsAction::Switch { target } => {
+                    tabs::switch(&target, ctx, broker, format, protected).await
+                }
+                TabsAction::Close { target } => {
+                    tabs::close_tab(&target, ctx, broker, format, protected).await
+                }
+                TabsAction::New { url } => tabs::new_tab(url.as_deref(), ctx, broker, format).await,
+            }
+        }
+        Commands::Protect(action) => match action {
+            ProtectAction::Add { pattern } => protect::add(ctx_state, format, pattern),
+            ProtectAction::Remove { pattern } => protect::remove(ctx_state, format, &pattern),
+            ProtectAction::List => protect::list(ctx_state, format),
         },
     }
 }

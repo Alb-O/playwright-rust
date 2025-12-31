@@ -20,20 +20,7 @@ pw daemon stop
 
 ## Why Use the Daemon?
 
-Without the daemon, each `pw` command:
-
-1. Spawns a new Playwright driver (~200ms)
-1. Launches a new browser (~300ms)
-1. Executes the command
-1. Tears everything down
-
-With the daemon running:
-
-1. Command connects to existing daemon via Unix socket (~5ms)
-1. Reuses existing browser instance
-1. Executes immediately
-
-For agents making multiple browser calls, the daemon reduces latency from ~500ms to ~50ms per command.
+Without the daemon, each `pw` command spawns a new Playwright driver (~200ms) and launches a new browser (~300ms). With the daemon running, commands connect via Unix socket (~5ms) and reuse the existing browser instance.
 
 ## Common Patterns
 
@@ -103,6 +90,31 @@ pw connect --clear
 ```
 
 This is useful when you need access to existing login sessions or browser state that can't be captured with `pw auth`.
+
+### Protect tabs from CLI access
+
+When connecting to an existing browser, you may have tabs open (like Discord, Slack, or other PWAs) that you don't want the CLI to accidentally navigate or close. Use `pw protect` to mark URL patterns as protected:
+
+```bash
+# Add patterns to protect (substring match, case-insensitive)
+pw protect add discord.com
+pw protect add slack.com
+pw protect add notion.so
+
+# List protected patterns
+pw protect list
+
+# Remove a pattern
+pw protect remove slack.com
+```
+
+Protected tabs:
+- Are marked with `"protected": true` in `pw tabs list` output
+- Cannot be switched to or closed via `pw tabs switch/close`
+- Are skipped when the CLI selects which existing tab to reuse
+- Can still be seen in `pw tabs list` (for awareness)
+
+This prevents agents from accidentally navigating away from your important apps.
 
 ## Output Format
 

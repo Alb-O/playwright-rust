@@ -20,7 +20,7 @@ pub struct BrowserSession {
 
 impl BrowserSession {
     pub async fn new(wait_until: WaitUntil) -> Result<Self> {
-        Self::with_options(wait_until, None, true, BrowserKind::default(), None, false).await
+        Self::with_options(wait_until, None, true, BrowserKind::default(), None, false, &[]).await
     }
 
     /// Create a session with optional auth file (convenience for commands)
@@ -45,7 +45,7 @@ impl BrowserSession {
                 Self::with_auth_file_and_browser(wait_until, path, browser_kind, cdp_endpoint).await
             }
             None => {
-                Self::with_options(wait_until, None, true, browser_kind, cdp_endpoint, false).await
+                Self::with_options(wait_until, None, true, browser_kind, cdp_endpoint, false, &[]).await
             }
         }
     }
@@ -58,6 +58,7 @@ impl BrowserSession {
         browser_kind: BrowserKind,
         cdp_endpoint: Option<&str>,
         launch_server: bool,
+        protected_urls: &[String],
     ) -> Result<Self> {
         debug!(
             target = "pw",
@@ -193,12 +194,31 @@ impl BrowserSession {
         // Reuse existing page if connecting to existing browser, otherwise create new
         let page = if reuse_existing_page {
             let existing_pages = context.pages();
-            if let Some(page) = existing_pages.into_iter().next() {
-                debug!(target = "pw", "reusing existing page");
-                page
-            } else {
-                debug!(target = "pw", "no existing pages, creating new");
-                context.new_page().await?
+            // Find first non-protected page
+            let mut selected_page = None;
+            for page in existing_pages {
+                let url = page
+                    .evaluate_value("window.location.href")
+                    .await
+                    .unwrap_or_else(|_| page.url());
+                let url = url.trim_matches('"');
+                let is_protected = protected_urls
+                    .iter()
+                    .any(|pattern| url.to_lowercase().contains(&pattern.to_lowercase()));
+                if !is_protected {
+                    debug!(target = "pw", url = %url, "reusing existing page");
+                    selected_page = Some(page);
+                    break;
+                } else {
+                    debug!(target = "pw", url = %url, "skipping protected page");
+                }
+            }
+            match selected_page {
+                Some(page) => page,
+                None => {
+                    debug!(target = "pw", "no non-protected pages found, creating new");
+                    context.new_page().await?
+                }
             }
         } else {
             context.new_page().await?
@@ -239,6 +259,7 @@ impl BrowserSession {
             browser_kind,
             cdp_endpoint,
             false,
+            &[],
         )
         .await
     }
@@ -256,6 +277,7 @@ impl BrowserSession {
             browser_kind,
             None,
             true,
+            &[],
         )
         .await
     }

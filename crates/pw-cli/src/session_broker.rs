@@ -94,6 +94,8 @@ pub struct SessionRequest<'a> {
     pub remote_debugging_port: Option<u16>,
     /// Whether to keep the browser running after the session closes.
     pub keep_browser_running: bool,
+    /// URL patterns to exclude when selecting which existing page to reuse.
+    pub protected_urls: &'a [String],
 }
 
 impl<'a> SessionRequest<'a> {
@@ -107,7 +109,13 @@ impl<'a> SessionRequest<'a> {
             launch_server: ctx.launch_server(),
             remote_debugging_port: None,
             keep_browser_running: false,
+            protected_urls: &[],
         }
+    }
+
+    pub fn with_protected_urls(mut self, urls: &'a [String]) -> Self {
+        self.protected_urls = urls;
+        self
     }
 
     pub fn with_headless(mut self, headless: bool) -> Self {
@@ -186,6 +194,7 @@ impl<'a> SessionBroker<'a> {
                             request.browser,
                             Some(endpoint),
                             false,
+                            request.protected_urls,
                         )
                         .await?;
                         return Ok(SessionHandle { session });
@@ -240,6 +249,7 @@ impl<'a> SessionBroker<'a> {
                 request.browser,
                 Some(endpoint),
                 false,
+                request.protected_urls,
             )
             .await?;
             // Daemon manages the browser lifecycle - don't close it on session close
@@ -276,6 +286,7 @@ impl<'a> SessionBroker<'a> {
                 request.browser,
                 request.cdp_endpoint,
                 false,
+                request.protected_urls,
             )
             .await?
         };
@@ -410,6 +421,7 @@ mod tests {
             launch_server: true,
             remote_debugging_port: None,
             keep_browser_running: false,
+            protected_urls: &[],
         };
         assert!(loaded.matches(&req, Some(DRIVER_HASH)));
     }
@@ -435,6 +447,7 @@ mod tests {
             launch_server: true,
             remote_debugging_port: None,
             keep_browser_running: false,
+            protected_urls: &[],
         };
 
         assert!(!desc.matches(&req, Some(DRIVER_HASH)));
@@ -461,6 +474,7 @@ mod tests {
             launch_server: true,
             remote_debugging_port: None,
             keep_browser_running: false,
+            protected_urls: &[],
         };
 
         assert!(!desc.matches(&req, Some(DRIVER_HASH)));

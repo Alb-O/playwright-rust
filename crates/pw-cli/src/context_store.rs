@@ -43,6 +43,9 @@ pub struct StoredContext {
     pub cdp_endpoint: Option<String>,
     #[serde(default)]
     pub last_used_at: Option<u64>,
+    /// URL patterns to protect from CLI access (e.g., PWAs like "discord.com", "slack.com")
+    #[serde(default)]
+    pub protected_urls: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -313,6 +316,62 @@ impl ContextState {
         if let Some(selected) = self.selected.as_mut() {
             selected.data.cdp_endpoint = endpoint;
         }
+    }
+
+    /// Get the list of protected URL patterns
+    pub fn protected_urls(&self) -> &[String] {
+        if self.no_context {
+            return &[];
+        }
+        self.selected
+            .as_ref()
+            .map(|s| s.data.protected_urls.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Check if a URL matches any protected pattern
+    pub fn is_protected(&self, url: &str) -> bool {
+        let url_lower = url.to_lowercase();
+        self.protected_urls()
+            .iter()
+            .any(|pattern| url_lower.contains(&pattern.to_lowercase()))
+    }
+
+    /// Add a URL pattern to the protected list
+    pub fn add_protected(&mut self, pattern: String) -> bool {
+        if self.no_save || self.no_context {
+            return false;
+        }
+        if let Some(selected) = self.selected.as_mut() {
+            let pattern_lower = pattern.to_lowercase();
+            if !selected
+                .data
+                .protected_urls
+                .iter()
+                .any(|p| p.to_lowercase() == pattern_lower)
+            {
+                selected.data.protected_urls.push(pattern);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Remove a URL pattern from the protected list
+    pub fn remove_protected(&mut self, pattern: &str) -> bool {
+        if self.no_save || self.no_context {
+            return false;
+        }
+        if let Some(selected) = self.selected.as_mut() {
+            let pattern_lower = pattern.to_lowercase();
+            let before_len = selected.data.protected_urls.len();
+            selected
+                .data
+                .protected_urls
+                .retain(|p| p.to_lowercase() != pattern_lower);
+            return selected.data.protected_urls.len() < before_len;
+        }
+        false
     }
 
     pub fn resolve_output(&self, ctx: &CommandContext, provided: Option<PathBuf>) -> PathBuf {

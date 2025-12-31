@@ -323,6 +323,14 @@ pub enum Commands {
     /// Manage browser tabs
     #[command(subcommand)]
     Tabs(TabsAction),
+
+    /// Manage protected URL patterns (tabs the CLI won't touch)
+    ///
+    /// Protected tabs are excluded from page selection and tab operations.
+    /// Use this to prevent the CLI from accidentally navigating your PWAs or
+    /// important tabs like Discord, Slack, etc.
+    #[command(subcommand)]
+    Protect(ProtectAction),
 }
 
 /// Project template type for init command
@@ -413,6 +421,22 @@ pub enum TabsAction {
         /// URL to open in the new tab
         url: Option<String>,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ProtectAction {
+    /// Add a URL pattern to protect (e.g., "discord.com", "slack.com")
+    Add {
+        /// URL pattern to protect (substring match, case-insensitive)
+        pattern: String,
+    },
+    /// Remove a URL pattern from protection
+    Remove {
+        /// URL pattern to remove
+        pattern: String,
+    },
+    /// List all protected URL patterns
+    List,
 }
 
 #[cfg(test)]
