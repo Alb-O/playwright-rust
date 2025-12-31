@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::artifact_collector::{collect_failure_artifacts, CollectedArtifacts};
 use crate::browser::BrowserSession;
 use crate::context::CommandContext;
+use crate::daemon;
 use crate::error::{PwError, Result};
 use crate::types::BrowserKind;
 use pw::{StorageState, WaitUntil};
@@ -195,7 +196,41 @@ impl<'a> SessionBroker<'a> {
             }
         }
 
-        let session = if let Some(port) = request.remote_debugging_port {
+        let mut daemon_endpoint = None;
+        if !self.ctx.no_daemon()
+            && request.cdp_endpoint.is_none()
+            && request.remote_debugging_port.is_none()
+            && !request.launch_server
+            && request.browser == BrowserKind::Chromium
+        {
+            if let Some(client) = daemon::try_connect().await {
+                match daemon::request_browser(&client, request.browser, request.headless).await {
+                    Ok(endpoint) => {
+                        debug!(target = "pw.session", %endpoint, "using daemon browser");
+                        daemon_endpoint = Some(endpoint);
+                    }
+                    Err(err) => {
+                        debug!(
+                            target = "pw.session",
+                            error = %err,
+                            "daemon request failed; falling back"
+                        );
+                    }
+                }
+            }
+        }
+
+        let session = if let Some(endpoint) = daemon_endpoint.as_deref() {
+            BrowserSession::with_options(
+                request.wait_until,
+                storage_state.clone(),
+                request.headless,
+                request.browser,
+                Some(endpoint),
+                false,
+            )
+            .await?
+        } else if let Some(port) = request.remote_debugging_port {
             // Persistent session with CDP debugging port (Chromium only)
             if request.browser != BrowserKind::Chromium {
                 return Err(PwError::BrowserLaunch(

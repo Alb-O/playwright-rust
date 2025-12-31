@@ -74,22 +74,22 @@ Subsequent commands can load that session state:
 pw --auth auth.json screenshot https://app.example.com/dashboard -o dash.png
 ```
 
-Reusable local sessions are opt-in so the default pipe launch stays unchanged. When you pass `--launch-server`, `pw` starts a Playwright launch server, captures its WebSocket endpoint, and reconnects across commands until you stop it. The broker writes a descriptor with the ws endpoint, browser kind, headless setting, pid, and driver version hash; if any of those drift or the endpoint is dead, it deletes the descriptor and relaunches.
+### Daemon mode
+
+For persistent browser sessions across multiple commands, start the daemon:
 
 ```bash
-pw --launch-server screenshot https://example.com -o first.png
-pw screenshot https://example.com/about -o second.png   # reuses the same browser
-pw session stop                                         # closes server and removes descriptor
+pw daemon start                    # starts background daemon
+pw navigate https://example.com    # spawns browser via daemon
+pw text -s h1                      # reuses same browser
+pw screenshot -o page.png          # still reusing
+pw daemon status                   # shows running browsers
+pw daemon stop                     # shuts down daemon and browsers
 ```
 
-If you want to pin a browser for a while, start it explicitly, then run arbitrary commands against it until you stop it:
+The daemon keeps the Playwright driver running in the background, managing a pool of browser instances. Commands automatically connect to the daemon if it's running (disable with `--no-daemon`). This avoids the ~500ms startup cost per command and enables true session persistence.
 
-```bash
-pw session start --headful
-pw text https://example.com "h1"
-pw session status
-pw session stop
-```
+On Unix systems, the daemon listens on `/tmp/pw-daemon.sock`. Browser instances are assigned ports in the 9222-10221 range. The daemon handles cleanup when browsers crash or become unresponsive.
 
 ## Session persistence
 

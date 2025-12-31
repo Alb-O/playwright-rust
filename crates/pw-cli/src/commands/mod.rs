@@ -2,6 +2,7 @@ mod auth;
 mod click;
 mod console;
 mod coords;
+mod daemon;
 mod elements;
 mod eval;
 mod html;
@@ -12,7 +13,7 @@ mod session;
 mod text;
 mod wait;
 
-use crate::cli::{AuthAction, Cli, Commands, SessionAction};
+use crate::cli::{AuthAction, Cli, Commands, DaemonAction, SessionAction};
 use crate::context::CommandContext;
 use crate::context_store::{ContextState, ContextUpdate};
 use crate::error::{PwError, Result};
@@ -29,6 +30,7 @@ pub async fn dispatch(cli: Cli, format: OutputFormat) -> Result<()> {
         browser,
         cdp_endpoint,
         launch_server,
+        no_daemon,
         no_project,
         context,
         no_context,
@@ -46,7 +48,14 @@ pub async fn dispatch(cli: Cli, format: OutputFormat) -> Result<()> {
             .await
             .map_err(PwError::Anyhow),
         command => {
-            let ctx = CommandContext::new(browser, no_project, auth, cdp_endpoint, launch_server);
+            let ctx = CommandContext::new(
+                browser,
+                no_project,
+                auth,
+                cdp_endpoint,
+                launch_server,
+                no_daemon,
+            );
             let project_root = ctx.project.as_ref().map(|p| p.paths.root.clone());
             let mut ctx_state = ContextState::new(
                 project_root,
@@ -280,6 +289,11 @@ async fn dispatch_command_inner(
             SessionAction::Clear => session::clear(ctx_state, format).await,
             SessionAction::Start { headful } => session::start(ctx_state, broker, headful, format).await,
             SessionAction::Stop => session::stop(ctx_state, broker, format).await,
+        },
+        Commands::Daemon { action } => match action {
+            DaemonAction::Start { foreground } => daemon::start(foreground, format).await,
+            DaemonAction::Stop => daemon::stop(format).await,
+            DaemonAction::Status => daemon::status(format).await,
         },
         Commands::Init {
             path,

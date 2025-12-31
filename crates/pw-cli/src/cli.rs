@@ -35,6 +35,10 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub launch_server: bool,
 
+    /// Disable daemon usage for this invocation
+    #[arg(long, global = true)]
+    pub no_daemon: bool,
+
     /// Disable project detection (use current directory paths)
     #[arg(long, global = true)]
     pub no_project: bool,
@@ -257,6 +261,12 @@ pub enum Commands {
         action: SessionAction,
     },
 
+    /// Manage the pw daemon for persistent browser sessions
+    Daemon {
+        #[command(subcommand)]
+        action: DaemonAction,
+    },
+
     /// Initialize a new playwright project structure
     Init {
         /// Project directory (defaults to current directory)
@@ -337,6 +347,19 @@ pub enum AuthAction {
         /// File to read authentication state from
         file: PathBuf,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum DaemonAction {
+    /// Start the daemon (use --foreground to run in terminal)
+    Start {
+        #[arg(long)]
+        foreground: bool,
+    },
+    /// Stop the running daemon
+    Stop,
+    /// Show daemon status
+    Status,
 }
 
 #[derive(Subcommand, Debug)]

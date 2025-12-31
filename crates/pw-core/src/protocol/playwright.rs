@@ -73,6 +73,8 @@ pub struct Playwright {
     server: Arc<Mutex<Option<PlaywrightServer>>>,
     /// Whether to keep the launched server running when Playwright is dropped
     keep_server_running: bool,
+    /// Whether this Playwright instance owns the server process
+    owns_server: bool,
 }
 
 impl Playwright {
@@ -145,6 +147,7 @@ impl Playwright {
             webkit: Arc::clone(&playwright.webkit),
             server: Arc::new(Mutex::new(Some(server))),
             keep_server_running: false,
+            owns_server: true,
         })
     }
 
@@ -181,7 +184,13 @@ impl Playwright {
             webkit: Arc::clone(&playwright.webkit),
             server: Arc::new(Mutex::new(None)),
             keep_server_running: false,
+            owns_server: false,
         })
+    }
+
+    /// Connect to a running Playwright driver on localhost.
+    pub async fn connect_daemon(port: u16) -> Result<Self> {
+        Self::connect_ws(&format!("ws://127.0.0.1:{}", port)).await
     }
 
     /// Creates a new Playwright object from protocol initialization.
@@ -250,6 +259,7 @@ impl Playwright {
             webkit,
             server: Arc::new(Mutex::new(None)), // No server for protocol-created objects
             keep_server_running: false,
+            owns_server: false,
         })
     }
 
@@ -376,7 +386,7 @@ impl Drop for Playwright {
     /// Note: For graceful shutdown, prefer calling `playwright.shutdown().await`
     /// explicitly before dropping.
     fn drop(&mut self) {
-        if self.keep_server_running {
+        if self.keep_server_running || !self.owns_server {
             return;
         }
 

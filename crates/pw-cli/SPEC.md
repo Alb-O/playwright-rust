@@ -219,45 +219,59 @@ match request.browser {
 
 ---
 
-### Phase 4: Daemon Mode (Long-term)
+### Phase 4: Daemon Mode (Completed)
 
-For true session persistence without CDP limitations:
+The daemon provides true session persistence by keeping the Playwright driver running in a background process.
 
-#### Task 4.1: Background daemon process
+#### Implementation
 
-Create `pw daemon start` that:
-1. Spawns background process
-2. Keeps Playwright driver running
-3. Listens on Unix socket for commands
-4. Manages browser lifecycle
+- **`pw daemon start`**: Spawns background daemon, listens on Unix socket (`/tmp/pw-daemon.sock`)
+- **`pw daemon stop`**: Gracefully shuts down daemon and all managed browsers
+- **`pw daemon status`**: Shows running status and list of managed browsers
+- **Automatic integration**: Commands automatically use daemon if running (disable with `--no-daemon`)
 
-#### Task 4.2: IPC protocol
+#### Architecture
 
-Define simple protocol over Unix socket:
 ```
--> {"cmd": "launch", "browser": "chromium", "headless": true}
-<- {"session_id": "abc123", "cdp_endpoint": "..."}
-
--> {"cmd": "connect", "session_id": "abc123"}
-<- {"ok": true}
-
--> {"cmd": "close", "session_id": "abc123"}
-<- {"ok": true}
+┌──────────────────────────────────────────────────────────────────┐
+│                        pw daemon                                  │
+│  ┌────────────────┐    ┌─────────────────────────────────────┐   │
+│  │ Unix Socket    │    │ Playwright Driver (persistent)      │   │
+│  │ /tmp/pw-daemon │◄──►│                                     │   │
+│  │    .sock       │    │  ┌─────────┐ ┌─────────┐            │   │
+│  └────────────────┘    │  │Browser 1│ │Browser 2│ ...        │   │
+│         ▲              │  │:9222    │ │:9223    │            │   │
+│         │              │  └─────────┘ └─────────┘            │   │
+└─────────│──────────────┴─────────────────────────────────────────┘
+          │
+    ┌─────┴─────┐
+    │ pw text   │  CLI commands connect via socket,
+    │ pw nav    │  daemon spawns/reuses browsers
+    │ pw click  │
+    └───────────┘
 ```
 
-#### Task 4.3: CLI integration
+#### Protocol (JSON over newline-delimited socket)
 
-**File**: `crates/pw-cli/src/browser/session.rs`
+```json
+// Request browser
+{"type": "spawn_browser", "browser": "chromium", "headless": true}
+// Response
+{"type": "browser", "cdp_endpoint": "http://127.0.0.1:9222", "port": 9222}
 
-```rust
-impl BrowserSession {
-    pub async fn via_daemon(...) -> Result<Self> {
-        let socket = UnixStream::connect("/tmp/pw-daemon.sock")?;
-        // Send launch/connect command
-        // Receive session handle
-    }
-}
+// List browsers
+{"type": "list_browsers"}
+// Response  
+{"type": "browsers", "list": [{"port": 9222, "browser": "chromium", ...}]}
+
+// Shutdown
+{"type": "shutdown"}
+{"type": "ok"}
 ```
+
+#### Port Allocation
+
+Browsers are assigned ports from range 9222-10221. The daemon tracks which ports are in use and finds the next available port for new browser requests.
 
 ---
 
@@ -273,7 +287,7 @@ impl BrowserSession {
 | 2.1-2.2 | `pw-cli/src/session_broker.rs` | Enhanced lifecycle checks |
 | 2.3 | `pw-cli/src/main.rs` | Signal handling |
 | 3.x | Various | Browser-specific handling |
-| 4.x | New files | Daemon implementation |
+| 4.x | `pw-cli/src/daemon/*`, `pw-cli/src/commands/daemon.rs` | Daemon implementation (completed) |
 
 ---
 

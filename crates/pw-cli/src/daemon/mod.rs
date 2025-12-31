@@ -1,0 +1,99 @@
+mod protocol;
+mod server;
+
+use anyhow::{Context, Result, anyhow};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+#[cfg(windows)]
+use tokio::net::TcpStream;
+#[cfg(unix)]
+use tokio::net::UnixStream;
+use tracing::debug;
+
+use crate::types::BrowserKind;
+
+pub use protocol::{BrowserInfo, DaemonRequest, DaemonResponse};
+pub use server::Daemon;
+
+pub const DAEMON_SOCKET: &str = "/tmp/pw-daemon.sock";
+pub const DAEMON_TCP_PORT: u16 = 19222;
+
+#[derive(Clone, Copy, Debug)]
+pub struct DaemonClient;
+
+pub async fn try_connect() -> Option<DaemonClient> {
+    match connect_daemon().await {
+        Ok(stream) => {
+            drop(stream);
+            Some(DaemonClient)
+        }
+        Err(err) if is_not_running(&err) => None,
+        Err(err) => {
+            debug!(target = "pw.daemon", error = %err, "daemon connection failed");
+            None
+        }
+    }
+}
+
+pub async fn request_browser(
+    _client: &DaemonClient,
+    kind: BrowserKind,
+    headless: bool,
+) -> Result<String> {
+    let response = send_request(DaemonRequest::SpawnBrowser {
+        browser: kind,
+        headless,
+        port: None,
+    })
+    .await?;
+
+    match response {
+        DaemonResponse::Browser { cdp_endpoint, .. } => Ok(cdp_endpoint),
+        DaemonResponse::Error { code, message } => {
+            Err(anyhow!("daemon error {code}: {message}"))
+        }
+        other => Err(anyhow!("unexpected daemon response: {other:?}")),
+    }
+}
+
+async fn send_request(request: DaemonRequest) -> Result<DaemonResponse> {
+    let stream = connect_daemon().await.context("Failed to connect to daemon")?;
+    send_request_stream(stream, request).await
+}
+
+#[cfg(unix)]
+async fn connect_daemon() -> std::io::Result<UnixStream> {
+    UnixStream::connect(DAEMON_SOCKET).await
+}
+
+#[cfg(windows)]
+async fn connect_daemon() -> std::io::Result<TcpStream> {
+    TcpStream::connect(("127.0.0.1", DAEMON_TCP_PORT)).await
+}
+
+fn is_not_running(err: &std::io::Error) -> bool {
+    matches!(
+        err.kind(),
+        std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused
+    )
+}
+
+async fn send_request_stream<S>(mut stream: S, request: DaemonRequest) -> Result<DaemonResponse>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    let payload = serde_json::to_string(&request).context("Failed to serialize daemon request")?;
+    stream
+        .write_all(format!("{}\n", payload).as_bytes())
+        .await
+        .context("Failed writing daemon request")?;
+    stream.flush().await.context("Failed flushing daemon request")?;
+
+    let mut reader = BufReader::new(stream);
+    let mut line = String::new();
+    reader
+        .read_line(&mut line)
+        .await
+        .context("Failed reading daemon response")?;
+    let response = serde_json::from_str(&line).context("Failed parsing daemon response")?;
+    Ok(response)
+}
