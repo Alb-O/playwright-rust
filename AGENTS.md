@@ -32,6 +32,36 @@ pw html https://example.com -s "article"           # HTML content
 pw eval https://example.com "document.title"       # run JavaScript
 ```
 
+### Extract readable content (articles, docs)
+
+Use `pw read` to extract the main content from a page, automatically removing ads, navigation, sidebars, and other clutter:
+
+```bash
+pw read https://example.com                        # plain text (default)
+pw read https://example.com -o markdown            # markdown with links
+pw read https://example.com -o html                # cleaned HTML
+pw read https://example.com -m                     # include metadata
+```
+
+Output includes word count and optional metadata (title, author, description):
+
+```json
+{
+  "ok": true,
+  "command": "read",
+  "data": {
+    "content": "# Article Title\n\nArticle content...",
+    "format": "markdown",
+    "wordCount": 150,
+    "title": "Article Title",
+    "author": "John Doe",
+    "site": "example.com"
+  }
+}
+```
+
+This is ideal for reading articles, documentation, or any page where you want the content without the noise.
+
 ### Navigate and interact
 
 ```bash
