@@ -204,9 +204,11 @@ impl<'a> SessionBroker<'a> {
             && request.browser == BrowserKind::Chromium
         {
             if let Some(client) = daemon::try_connect().await {
-                match daemon::request_browser(&client, request.browser, request.headless).await {
+                // Use descriptor path as reuse_key for consistent browser reuse per context
+                let reuse_key = self.descriptor_path.as_ref().map(|p| p.to_string_lossy().to_string());
+                match daemon::request_browser(&client, request.browser, request.headless, reuse_key.as_deref()).await {
                     Ok(endpoint) => {
-                        debug!(target = "pw.session", %endpoint, "using daemon browser");
+                        debug!(target = "pw.session", %endpoint, reuse_key = ?reuse_key, "using daemon browser");
                         daemon_endpoint = Some(endpoint);
                     }
                     Err(err) => {
@@ -221,7 +223,7 @@ impl<'a> SessionBroker<'a> {
         }
 
         let session = if let Some(endpoint) = daemon_endpoint.as_deref() {
-            BrowserSession::with_options(
+            let mut s = BrowserSession::with_options(
                 request.wait_until,
                 storage_state.clone(),
                 request.headless,
@@ -229,7 +231,10 @@ impl<'a> SessionBroker<'a> {
                 Some(endpoint),
                 false,
             )
-            .await?
+            .await?;
+            // Daemon manages the browser lifecycle - don't close it on session close
+            s.set_keep_browser_running(true);
+            s
         } else if let Some(port) = request.remote_debugging_port {
             // Persistent session with CDP debugging port (Chromium only)
             if request.browser != BrowserKind::Chromium {

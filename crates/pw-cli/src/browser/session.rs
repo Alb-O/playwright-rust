@@ -71,10 +71,13 @@ impl BrowserSession {
             .map_err(|e| PwError::BrowserLaunch(e.to_string()))?;
 
         let mut ws_endpoint = None;
+        let mut cdp_endpoint_stored = None;
         let mut launched_server = None;
         let mut keep_server_running = false;
 
         let (browser, context) = if let Some(endpoint) = cdp_endpoint {
+            // Store the CDP endpoint for later retrieval
+            cdp_endpoint_stored = Some(endpoint.to_string());
             if browser_kind != BrowserKind::Chromium {
                 return Err(PwError::BrowserLaunch(
                     "CDP endpoint connections require the chromium browser".to_string(),
@@ -191,7 +194,7 @@ impl BrowserSession {
             page,
             wait_until,
             ws_endpoint,
-            cdp_endpoint: None,
+            cdp_endpoint: cdp_endpoint_stored,
             launched_server,
             keep_server_running,
             keep_browser_running: false,
