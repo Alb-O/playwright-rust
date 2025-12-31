@@ -6,6 +6,7 @@ use crate::readable::{ReadableContent, extract_readable};
 use crate::session_broker::{SessionBroker, SessionRequest};
 use pw::WaitUntil;
 use serde::Serialize;
+use std::io::{self, Write};
 use tracing::info;
 
 #[derive(Debug, Serialize)]
@@ -98,6 +99,13 @@ pub async fn execute(
     let readable = extract_readable(&html, Some(url));
 
     let data = ReadData::from_readable(readable, output_format, include_metadata);
+
+    // For text output format, print content directly (properly formatted)
+    if format == OutputFormat::Text {
+        let mut stdout = io::stdout().lock();
+        let _ = writeln!(stdout, "{}", data.content);
+        return session.close().await;
+    }
 
     let result = ResultBuilder::new("read")
         .inputs(CommandInputs {

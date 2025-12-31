@@ -231,8 +231,8 @@ pub enum Commands {
         /// Target URL (named alternative)
         #[arg(long = "url", short = 'u', value_name = "URL")]
         url_flag: Option<String>,
-        /// Output format: text (default), html, or markdown
-        #[arg(long, short = 'o', default_value = "text", value_enum)]
+        /// Output format: markdown (default), text, or html
+        #[arg(long, short = 'o', default_value = "markdown", value_enum)]
         output_format: ReadOutputFormat,
         /// Include metadata (title, author, etc.) in output
         #[arg(long, short = 'm')]
@@ -364,12 +364,12 @@ pub enum InitTemplate {
 /// Output format for the read command
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum)]
 pub enum ReadOutputFormat {
-    /// Plain text (default)
-    #[default]
+    /// Plain text
     Text,
     /// Cleaned HTML
     Html,
-    /// Markdown
+    /// Markdown (default)
+    #[default]
     Markdown,
 }
 
