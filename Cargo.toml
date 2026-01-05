@@ -9,7 +9,7 @@ edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"
 authors = ["Paul Adamson", "Albert O'Shea <albertoshea2@gmail.com>"]
-repository = "https://github.com/padamson/playwright-rust"
+repository = "https://github.com/Alb-O/pw-rs"
 
 [workspace.dependencies]
 anyhow = "1"
