@@ -10,6 +10,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const CONTEXT_SCHEMA_VERSION: u32 = 1;
 
+/// Session timeout in seconds (1 hour). If the last invocation was longer ago,
+/// the session is considered stale and context is automatically refreshed.
+const SESSION_TIMEOUT_SECS: u64 = 3600;
+
 /// Sentinel URL value indicating the command should operate on the current browser page
 /// without navigating. This is returned by `resolve_url()` when `--no-context` is used
 /// with a CDP connection and no explicit URL is provided.
@@ -206,6 +210,9 @@ impl ContextState {
                 ctx.data.base_url = Some(base);
             }
         }
+
+        // Auto-refresh if session has been idle for more than SESSION_TIMEOUT_SECS
+        let refresh = refresh || is_session_stale(selected.as_ref());
 
         Ok(Self {
             stores,
@@ -644,4 +651,10 @@ fn now_ts() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs()
+}
+
+fn is_session_stale(selected: Option<&SelectedContext>) -> bool {
+    let Some(ctx) = selected else { return false };
+    let Some(last_used) = ctx.data.last_used_at else { return false };
+    now_ts().saturating_sub(last_used) > SESSION_TIMEOUT_SECS
 }
