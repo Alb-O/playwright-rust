@@ -25,8 +25,9 @@ pub async fn execute(
         .session(SessionRequest::from_context(WaitUntil::Load, ctx))
         .await?;
 
+    // Skip navigation if already on the target URL (avoids page refresh)
     if !is_current_page_sentinel(url) {
-        session.goto(url).await?;
+        session.goto_if_needed(url).await?;
     }
 
     let title = session.page().title().await.unwrap_or_default();
