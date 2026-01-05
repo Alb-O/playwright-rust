@@ -39,15 +39,22 @@ pub struct ReadData {
 }
 
 impl ReadData {
-    fn from_readable(readable: ReadableContent, output_format: ReadOutputFormat, include_metadata: bool) -> Self {
+    fn from_readable(
+        readable: ReadableContent,
+        output_format: ReadOutputFormat,
+        include_metadata: bool,
+    ) -> Self {
         let (content, format) = match output_format {
             ReadOutputFormat::Text => (readable.text, "text".to_string()),
             ReadOutputFormat::Html => (readable.html, "html".to_string()),
-            ReadOutputFormat::Markdown => (readable.markdown.unwrap_or_else(|| readable.text.clone()), "markdown".to_string()),
+            ReadOutputFormat::Markdown => (
+                readable.markdown.unwrap_or_else(|| readable.text.clone()),
+                "markdown".to_string(),
+            ),
         };
-        
+
         let word_count = content.split_whitespace().count();
-        
+
         if include_metadata {
             Self {
                 content,

@@ -88,15 +88,8 @@ fn click_updates_context_with_actual_url() {
     let html = "data:text/html,<button id=btn onclick=\"history.pushState(null,null,location.href+'?changed=1')\">Go</button>";
 
     // Run click command
-    let (success, stdout, stderr) = run_pw(&[
-        "-f",
-        "json",
-        "click",
-        html,
-        "#btn",
-        "--wait-ms",
-        "100",
-    ]);
+    let (success, stdout, stderr) =
+        run_pw(&["-f", "json", "click", html, "#btn", "--wait-ms", "100"]);
 
     assert!(success, "Click command failed: {}", stderr);
     assert!(

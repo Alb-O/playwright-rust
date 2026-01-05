@@ -120,10 +120,7 @@ fn no_context_ignores_cached_url() {
     // Should fail even though context has a URL
     let (success, stdout, _stderr) = run_pw(&["-f", "json", "--no-context", "text", "-s", "h1"]);
 
-    assert!(
-        !success,
-        "Expected failure with --no-context and no URL"
-    );
+    assert!(!success, "Expected failure with --no-context and no URL");
     assert!(
         stdout.contains("URL is required") || stdout.contains("error"),
         "Expected error about missing URL: {}",
@@ -140,8 +137,7 @@ fn no_context_with_explicit_url_works() {
     clear_context_store();
 
     let url = "data:text/html,<p>Explicit URL Test</p>";
-    let (success, stdout, stderr) =
-        run_pw(&["-f", "json", "--no-context", "text", url, "-s", "p"]);
+    let (success, stdout, stderr) = run_pw(&["-f", "json", "--no-context", "text", url, "-s", "p"]);
 
     assert!(success, "Text command failed: {}", stderr);
     assert!(

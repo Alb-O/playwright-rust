@@ -538,11 +538,17 @@ mod tests {
         // Trailing slash normalization
         assert!(urls_match("https://example.com/", "https://example.com"));
         assert!(urls_match("https://example.com", "https://example.com/"));
-        assert!(urls_match("https://example.com/path/", "https://example.com/path"));
+        assert!(urls_match(
+            "https://example.com/path/",
+            "https://example.com/path"
+        ));
 
         // Different URLs should not match
         assert!(!urls_match("https://example.com", "https://other.com"));
-        assert!(!urls_match("https://example.com/a", "https://example.com/b"));
+        assert!(!urls_match(
+            "https://example.com/a",
+            "https://example.com/b"
+        ));
         assert!(!urls_match("https://example.com", "http://example.com"));
     }
 }

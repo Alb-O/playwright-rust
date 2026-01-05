@@ -12,20 +12,105 @@ const URL_PREFIXES: &[&str] = &["http://", "https://", "ws://", "wss://", "file:
 
 /// Common HTML tag names recognized as selectors (matched case-insensitively).
 const HTML_TAGS: &[&str] = &[
-    "html", "head", "body", "main", "header", "footer", "nav", "aside",
-    "section", "article", "div", "span",
-    "h1", "h2", "h3", "h4", "h5", "h6",
-    "p", "a", "strong", "em", "b", "i", "u", "s", "small", "mark",
-    "blockquote", "pre", "code", "kbd", "samp", "var", "cite", "q",
-    "abbr", "time", "address", "sub", "sup",
-    "ul", "ol", "li", "dl", "dt", "dd", "menu",
-    "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption", "colgroup", "col",
-    "form", "input", "button", "textarea", "select", "option", "optgroup",
-    "label", "fieldset", "legend", "datalist", "output", "progress", "meter",
-    "img", "picture", "source", "video", "audio", "track", "canvas", "svg",
-    "figure", "figcaption", "iframe", "embed", "object", "param",
-    "details", "summary", "dialog",
-    "br", "hr", "wbr", "template", "slot", "noscript", "script", "style", "link", "meta",
+    "html",
+    "head",
+    "body",
+    "main",
+    "header",
+    "footer",
+    "nav",
+    "aside",
+    "section",
+    "article",
+    "div",
+    "span",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "p",
+    "a",
+    "strong",
+    "em",
+    "b",
+    "i",
+    "u",
+    "s",
+    "small",
+    "mark",
+    "blockquote",
+    "pre",
+    "code",
+    "kbd",
+    "samp",
+    "var",
+    "cite",
+    "q",
+    "abbr",
+    "time",
+    "address",
+    "sub",
+    "sup",
+    "ul",
+    "ol",
+    "li",
+    "dl",
+    "dt",
+    "dd",
+    "menu",
+    "table",
+    "thead",
+    "tbody",
+    "tfoot",
+    "tr",
+    "th",
+    "td",
+    "caption",
+    "colgroup",
+    "col",
+    "form",
+    "input",
+    "button",
+    "textarea",
+    "select",
+    "option",
+    "optgroup",
+    "label",
+    "fieldset",
+    "legend",
+    "datalist",
+    "output",
+    "progress",
+    "meter",
+    "img",
+    "picture",
+    "source",
+    "video",
+    "audio",
+    "track",
+    "canvas",
+    "svg",
+    "figure",
+    "figcaption",
+    "iframe",
+    "embed",
+    "object",
+    "param",
+    "details",
+    "summary",
+    "dialog",
+    "br",
+    "hr",
+    "wbr",
+    "template",
+    "slot",
+    "noscript",
+    "script",
+    "style",
+    "link",
+    "meta",
 ];
 
 /// Returns true if the string looks like a CSS selector rather than a URL.
@@ -213,7 +298,9 @@ mod tests {
         assert!(looks_like_selector(".titleline a >> nth=0"));
         assert!(looks_like_selector("article.post > header h1"));
         assert!(looks_like_selector("#main .content p:first-of-type"));
-        assert!(looks_like_selector("table tr:nth-child(odd) td:first-child"));
+        assert!(looks_like_selector(
+            "table tr:nth-child(odd) td:first-child"
+        ));
     }
 
     #[test]
@@ -231,7 +318,9 @@ mod tests {
     fn test_websocket_urls_not_selectors() {
         assert!(!looks_like_selector("ws://localhost:9222"));
         assert!(!looks_like_selector("wss://example.com/socket"));
-        assert!(!looks_like_selector("ws://127.0.0.1:9222/devtools/browser/abc"));
+        assert!(!looks_like_selector(
+            "ws://127.0.0.1:9222/devtools/browser/abc"
+        ));
     }
 
     #[test]
@@ -243,7 +332,9 @@ mod tests {
     #[test]
     fn test_data_urls_not_selectors() {
         assert!(!looks_like_selector("data:text/html,<h1>Test</h1>"));
-        assert!(!looks_like_selector("data:text/html,<button id=btn>Go</button>"));
+        assert!(!looks_like_selector(
+            "data:text/html,<button id=btn>Go</button>"
+        ));
         assert!(!looks_like_selector("data:text/plain,Hello World"));
     }
 

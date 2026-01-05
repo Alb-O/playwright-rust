@@ -312,7 +312,8 @@ impl ContextState {
 
         let Some(selected) = &self.selected else {
             return Err(PwError::Context(
-                "No active context available. Use `pw navigate <url>` first to set up context.".into(),
+                "No active context available. Use `pw navigate <url>` first to set up context."
+                    .into(),
             ));
         };
 
@@ -660,6 +661,8 @@ fn now_ts() -> u64 {
 
 fn is_session_stale(selected: Option<&SelectedContext>) -> bool {
     let Some(ctx) = selected else { return false };
-    let Some(last_used) = ctx.data.last_used_at else { return false };
+    let Some(last_used) = ctx.data.last_used_at else {
+        return false;
+    };
     now_ts().saturating_sub(last_used) > SESSION_TIMEOUT_SECS
 }

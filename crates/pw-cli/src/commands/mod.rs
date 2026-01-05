@@ -182,11 +182,8 @@ async fn dispatch_command_inner(
             url_flag,
             selector_flag,
         } => {
-            let resolved = args::resolve_url_and_selector(
-                url.clone(),
-                url_flag,
-                selector_flag.or(selector),
-            );
+            let resolved =
+                args::resolve_url_and_selector(url.clone(), url_flag, selector_flag.or(selector));
             let final_url = ctx_state.resolve_url_with_cdp(resolved.url, has_cdp)?;
             let final_selector = ctx_state.resolve_selector(resolved.selector, Some("html"))?;
             let outcome = html::execute(&final_url, &final_selector, ctx, broker, format).await;
@@ -264,11 +261,8 @@ async fn dispatch_command_inner(
             selector_flag,
             wait_ms,
         } => {
-            let resolved = args::resolve_url_and_selector(
-                url.clone(),
-                url_flag,
-                selector_flag.or(selector),
-            );
+            let resolved =
+                args::resolve_url_and_selector(url.clone(), url_flag, selector_flag.or(selector));
             let final_url = ctx_state.resolve_url_with_cdp(resolved.url, has_cdp)?;
             let final_selector = ctx_state.resolve_selector(resolved.selector, None)?;
             let after_url = click::execute(
@@ -295,11 +289,8 @@ async fn dispatch_command_inner(
             url_flag,
             selector_flag,
         } => {
-            let resolved = args::resolve_url_and_selector(
-                url.clone(),
-                url_flag,
-                selector_flag.or(selector),
-            );
+            let resolved =
+                args::resolve_url_and_selector(url.clone(), url_flag, selector_flag.or(selector));
             let final_url = ctx_state.resolve_url_with_cdp(resolved.url, has_cdp)?;
             let final_selector = ctx_state.resolve_selector(resolved.selector, None)?;
             let outcome = text::execute(
