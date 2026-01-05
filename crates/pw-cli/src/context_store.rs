@@ -283,8 +283,11 @@ impl ContextState {
 
     /// Resolve URL with knowledge of whether a CDP endpoint is active.
     ///
-    /// When `--no-context` is used with a CDP connection and no URL is provided,
-    /// returns [`CURRENT_PAGE_SENTINEL`] to operate on the current browser page.
+    /// When a CDP connection is active and no URL is explicitly provided, returns
+    /// [`CURRENT_PAGE_SENTINEL`] to operate on the current browser page. This avoids
+    /// navigating away from whatever page the user has open in the connected browser.
+    ///
+    /// The stored `last_url` is only used when launching a fresh browser (non-CDP mode).
     pub fn resolve_url_with_cdp(
         &self,
         provided: Option<String>,
@@ -294,10 +297,12 @@ impl ContextState {
             return Ok(apply_base_url(url, self.base_url()));
         }
 
+        // CDP mode: operate on current page when no URL explicitly provided
+        if has_cdp_endpoint {
+            return Ok(CURRENT_PAGE_SENTINEL.to_string());
+        }
+
         if self.no_context {
-            if has_cdp_endpoint {
-                return Ok(CURRENT_PAGE_SENTINEL.to_string());
-            }
             return Err(PwError::Context(
                 "URL is required when context usage is disabled. \
                  Use `pw --url <url>` to specify a URL, or remove `--no-context` to use cached context."

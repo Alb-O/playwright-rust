@@ -19,8 +19,10 @@ pub async fn execute(
 ) -> Result<String> {
     info!(target = "pw", %url, browser = %ctx.browser, "navigate");
 
+    // Use WaitUntil::Load instead of NetworkIdle - SPAs with analytics/websockets
+    // often never reach "network idle", causing false timeout errors.
     let session = broker
-        .session(SessionRequest::from_context(WaitUntil::NetworkIdle, ctx))
+        .session(SessionRequest::from_context(WaitUntil::Load, ctx))
         .await?;
 
     if !is_current_page_sentinel(url) {

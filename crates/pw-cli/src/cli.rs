@@ -227,6 +227,18 @@ pub enum Commands {
         selector_flag: Option<String>,
     },
 
+    /// Fill text into an input field (works with React and other frameworks)
+    Fill {
+        /// Text to fill into the input
+        text: String,
+        /// CSS selector for the input element
+        #[arg(long = "selector", short = 's', value_name = "SELECTOR")]
+        selector: Option<String>,
+        /// Target URL (named alternative)
+        #[arg(long = "url", short = 'u', value_name = "URL")]
+        url: Option<String>,
+    },
+
     /// Extract readable content from a web page
     ///
     /// Removes clutter (ads, navigation, sidebars) and extracts the main article content.

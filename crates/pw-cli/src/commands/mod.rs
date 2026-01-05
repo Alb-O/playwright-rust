@@ -6,6 +6,7 @@ mod coords;
 mod daemon;
 mod elements;
 mod eval;
+mod fill;
 mod html;
 pub mod init;
 mod navigate;
@@ -310,6 +311,24 @@ async fn dispatch_command_inner(
                 artifacts_dir,
             )
             .await;
+            if outcome.is_ok() {
+                ctx_state.record(ContextUpdate {
+                    url: Some(&final_url),
+                    selector: Some(&final_selector),
+                    ..Default::default()
+                });
+            }
+            outcome
+        }
+        Commands::Fill {
+            text,
+            selector,
+            url,
+        } => {
+            let final_url = ctx_state.resolve_url_with_cdp(url, has_cdp)?;
+            let final_selector = ctx_state.resolve_selector(selector, None)?;
+            let outcome =
+                fill::execute(&final_url, &final_selector, &text, ctx, broker, format).await;
             if outcome.is_ok() {
                 ctx_state.record(ContextUpdate {
                     url: Some(&final_url),

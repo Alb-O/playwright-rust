@@ -612,6 +612,14 @@ pub struct TextData {
     pub match_count: usize,
 }
 
+/// Result data for fill command
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FillData {
+    pub selector: String,
+    pub text: String,
+}
+
 /// Result data for eval command
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
