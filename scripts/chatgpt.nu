@@ -9,6 +9,7 @@
 use pw.nu
 
 const BASE_URL = "https://chatgpt.com"
+const DEFAULT_MODEL = "thinking"  # Default to GPT-5.2 Thinking
 
 # Get current model from selector aria-label
 def get-current-model []: nothing -> string {
@@ -190,6 +191,10 @@ export def "chatgpt send" [
         pw nav $"($BASE_URL)/?temporary-chat=true"
         pw wait-for "#prompt-textarea"
         sleep 500ms
+        # Set default model for new chats (unless overridden)
+        if ($model | is-empty) {
+            chatgpt set-model $DEFAULT_MODEL
+        }
     }
 
     if ($model | is-not-empty) {
