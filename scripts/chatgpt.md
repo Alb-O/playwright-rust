@@ -1,0 +1,87 @@
+# ChatGPT Automation with pw-cli
+
+Findings from exploring ChatGPT automation via CDP connection.
+
+## Connection
+
+```bash
+pw --cdp-endpoint http://localhost:9222 <command>
+```
+
+## Key Selectors
+
+| Element | Selector |
+|---------|----------|
+| Model selector button | `button[aria-label^="Model selector"]` |
+| Model dropdown menu | `[role="menu"]` |
+| Extended thinking pill | `.__composer-pill` or `button:has-text("Extended thinking")` |
+| Chat input | `#prompt-textarea` |
+
+## Model Selector
+
+The model selector shows current model in `aria-label`:
+- `Model selector, current model is 5.2`
+- `Model selector, current model is 5.2 Thinking`
+
+Menu options (when open):
+- **Auto** - Decides how long to think
+- **Instant** - Answers right away
+- **Thinking** - Thinks longer for better answers
+- **Legacy models**
+
+## Dropdown Interaction Pattern
+
+ChatGPT uses Radix UI dropdowns that close between separate `pw` commands. Use a single `eval` with synchronous polling:
+
+```javascript
+(function() {
+  // Click to open
+  document.querySelector("button[aria-label^='Model selector']").click();
+
+  // Poll for menu (synchronous busy-wait)
+  var start = Date.now();
+  var menu = null;
+  while (Date.now() - start < 500) {
+    menu = document.querySelector("[role='menu']");
+    if (menu) break;
+  }
+
+  if (!menu) return { error: "Menu did not open" };
+
+  // Find and click option
+  var items = menu.querySelectorAll("*");
+  for (var item of items) {
+    if (item.textContent.includes("Thinking") &&
+        item.textContent.includes("Thinks longer")) {
+      item.click();
+      return { clicked: true };
+    }
+  }
+
+  return { error: "Option not found" };
+})()
+```
+
+## Thinking Mode
+
+When "Thinking" mode is selected:
+1. Header changes to "ChatGPT 5.2 Thinking"
+2. "Extended thinking" pill appears in the composer area
+3. The pill has class `__composer-pill` and `aria-haspopup="menu"`
+
+## Detecting Streaming State
+
+| State | Indicator |
+|-------|-----------|
+| Thinking (5.2 Thinking) | `.result-thinking` class on message |
+| Streaming | `button[aria-label="Stop streaming"]` visible |
+| Complete | Neither indicator present AND message has content |
+
+## Gotchas
+
+- Dropdowns close between separate `pw` commands (new session each time)
+- Playwright locator clicks may timeout on pills inside the composer
+- Use JavaScript `element.click()` within `eval` for more reliable clicks
+- Poll synchronously after clicking to catch the dropdown before it closes
+- **UI gets stuck**: ChatGPT sometimes shows loading dot indefinitely; use `location.reload()` to recover
+- ContentEditable div: `#prompt-textarea` is a div with `contentEditable=true`, not a real textarea; use JS to set content and trigger input event
