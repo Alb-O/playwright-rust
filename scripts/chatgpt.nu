@@ -81,6 +81,105 @@ export def "chatgpt refresh" []: nothing -> record {
     { refreshed: true }
 }
 
+# Insert text into composer (bypasses attachment conversion for large text)
+# Use execCommand which handles newlines and doesn't trigger file attachment
+def insert-text [text: string]: nothing -> record {
+    # Write text to temp file to avoid shell escaping issues
+    let tmp = (mktemp)
+    $text | save -f $tmp
+
+    # Read and insert via JS
+    let js_text = (open $tmp | to json)
+    rm $tmp
+
+    let js = "(function() {
+        const el = document.querySelector('#prompt-textarea');
+        if (!el) return { error: 'textarea not found' };
+        el.focus();
+        el.innerHTML = '';
+        document.execCommand('insertText', false, " + $js_text + ");
+        el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        return { inserted: el.textContent.length };
+    })()"
+
+    (pw eval $js).data.result
+}
+
+# Paste text from stdin into ChatGPT composer (inline, no attachment)
+export def "chatgpt paste" [
+    --send (-s)  # Also send after pasting
+]: string -> record {
+    let text = $in
+    let result = (insert-text $text)
+
+    if ($result | get -o error | is-not-empty) {
+        error make { msg: ($result.error) }
+    }
+
+    if $send {
+        # Click send button
+        pw eval "document.querySelector('[data-testid=\"send-button\"]')?.click()"
+        { pasted: true, sent: true, length: $result.inserted }
+    } else {
+        { pasted: true, sent: false, length: $result.inserted }
+    }
+}
+
+# Attach text as a document file (triggers ChatGPT's file attachment UI)
+export def "chatgpt attach" [
+    --name (-n): string = "document.txt"  # Filename for attachment
+    --send (-s)  # Also send after attaching
+]: string -> record {
+    let text = $in
+
+    # Write to temp file for JS to read
+    let tmp = (mktemp)
+    $text | save -f $tmp
+    let js_text = (open $tmp | to json)
+    let js_name = ($name | to json)
+    rm $tmp
+
+    let js = "(function() {
+        const el = document.querySelector('#prompt-textarea');
+        if (!el) return { error: 'textarea not found' };
+        el.focus();
+
+        const text = " + $js_text + ";
+        const filename = " + $js_name + ";
+
+        // Create file and DataTransfer
+        const dt = new DataTransfer();
+        const file = new File([text], filename, { type: 'text/plain' });
+        dt.items.add(file);
+
+        // Dispatch paste event with file
+        const pasteEvent = new ClipboardEvent('paste', {
+            bubbles: true,
+            cancelable: true,
+            clipboardData: dt
+        });
+
+        el.dispatchEvent(pasteEvent);
+        return { attached: true, filename: filename, size: text.length };
+    })()"
+
+    let result = (pw eval $js).data.result
+
+    if ($result | get -o error | is-not-empty) {
+        error make { msg: ($result.error) }
+    }
+
+    # Wait for attachment to process
+    sleep 500ms
+
+    if $send {
+        pw eval "document.querySelector('[data-testid=\"send-button\"]')?.click()"
+        { attached: true, sent: true, filename: $name, size: ($text | str length) }
+    } else {
+        { attached: true, sent: false, filename: $name, size: ($text | str length) }
+    }
+}
+
 # Send a message to ChatGPT
 export def "chatgpt send" [
     message: string
@@ -97,29 +196,24 @@ export def "chatgpt send" [
         chatgpt set-model $model
     }
 
-    # ChatGPT uses contentEditable div, not real textarea - must use JS to fill
-    let escaped_msg = ($message | str replace '"' '\"' | str replace "\n" "\\n")
-    let fill_js = "(async () => {
-        const el = document.querySelector('#prompt-textarea');
-        if (!el) return { error: 'textarea not found' };
-        el.focus();
-        el.textContent = \"" + $escaped_msg + "\";
-        el.dispatchEvent(new InputEvent('input', { bubbles: true }));
-
-        // Wait for send button to become enabled
-        for (let i = 0; i < 20; i++) {
-            await new Promise(r => setTimeout(r, 50));
-            const btn = document.querySelector('[data-testid=\"send-button\"]');
-            if (btn && !btn.disabled) {
-                btn.click();
-                return { sent: true };
-            }
-        }
-        return { error: 'send button not enabled' };
-    })()"
-    let result = (pw eval $fill_js).data.result
+    # Use insert-text helper (handles newlines, escaping, large text)
+    let result = (insert-text $message)
     if ($result | get -o error | is-not-empty) {
         error make { msg: ($result.error) }
+    }
+
+    # Wait for send button and click it
+    sleep 100ms
+    let send_result = (pw eval "(function() {
+        const btn = document.querySelector('[data-testid=\"send-button\"]');
+        if (!btn) return { error: 'send button not found' };
+        if (btn.disabled) return { error: 'send button disabled' };
+        btn.click();
+        return { sent: true };
+    })()").data.result
+
+    if ($send_result | get -o error | is-not-empty) {
+        error make { msg: ($send_result.error) }
     }
 
     { success: true, message: $message, model: (get-current-model) }

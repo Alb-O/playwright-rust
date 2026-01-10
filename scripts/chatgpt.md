@@ -77,6 +77,25 @@ When "Thinking" mode is selected:
 | Streaming | `button[aria-label="Stop streaming"]` visible |
 | Complete | Neither indicator present AND message has content |
 
+## Pasting Large Text
+
+Two approaches for inserting text:
+
+| Method | Command | Behavior |
+|--------|---------|----------|
+| Inline | `chatgpt paste` | Uses `execCommand('insertText')`, text stays in composer |
+| Attachment | `chatgpt attach` | Uses `ClipboardEvent` with `File`, creates document attachment |
+
+```bash
+# Inline paste (any size, no attachment)
+cat file.rs | chatgpt paste
+
+# File attachment (appears as document)
+cat file.rs | chatgpt attach --name "file.rs"
+```
+
+The attachment method creates a `File` object in `DataTransfer` and dispatches a `paste` event, which triggers ChatGPT's file attachment handler.
+
 ## Gotchas
 
 - Dropdowns close between separate `pw` commands (new session each time)
@@ -85,3 +104,4 @@ When "Thinking" mode is selected:
 - Poll synchronously after clicking to catch the dropdown before it closes
 - **UI gets stuck**: ChatGPT sometimes shows loading dot indefinitely; use `location.reload()` to recover
 - ContentEditable div: `#prompt-textarea` is a div with `contentEditable=true`, not a real textarea; use JS to set content and trigger input event
+- File attachments show UUID names in UI, but content is correctly processed
