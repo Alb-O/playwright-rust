@@ -15,7 +15,6 @@ use crate::server::channel_owner::{
 };
 use crate::server::connection::ConnectionLike;
 use serde_json::Value;
-use std::any::Any;
 use std::sync::Arc;
 
 /// Root object for sending the initialize message to the Playwright server
@@ -182,10 +181,6 @@ impl ChannelOwner for Root {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

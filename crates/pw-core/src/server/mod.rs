@@ -21,3 +21,7 @@ pub mod object_factory;
 pub mod playwright_server;
 #[doc(hidden)]
 pub mod transport;
+
+/// Fake transport for unit testing (available with #[cfg(test)] or as a dev-dependency feature)
+#[cfg(test)]
+pub mod fake_transport;

@@ -8,7 +8,6 @@ use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConne
 use base64::Engine;
 use serde::Deserialize;
 use serde_json::Value;
-use std::any::Any;
 use std::sync::Arc;
 
 /// ElementHandle represents a DOM element in the page.
@@ -149,10 +148,6 @@ impl ChannelOwner for ElementHandle {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

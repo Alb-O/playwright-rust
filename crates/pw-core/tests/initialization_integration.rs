@@ -87,7 +87,6 @@ async fn test_initialize_playwright_with_real_server() {
     // 6. Downcast to Playwright type
     use pw::protocol::Playwright;
     let playwright = playwright_obj
-        .as_any()
         .downcast_ref::<Playwright>()
         .expect("Failed to downcast to Playwright");
 

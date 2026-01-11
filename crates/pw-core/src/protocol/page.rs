@@ -11,10 +11,10 @@ use base64::Engine;
 use parking_lot::Mutex;
 use serde::Deserialize;
 use serde_json::Value;
-use std::any::Any;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
+use tokio::sync::broadcast;
 
 /// Page represents a web page within a browser context.
 ///
@@ -137,6 +137,8 @@ pub struct Page {
     download_handlers: Arc<Mutex<Vec<DownloadHandlerEntry>>>,
     /// Dialog event handlers
     dialog_handlers: Arc<Mutex<Vec<DialogHandlerEntry>>>,
+    /// Console message broadcast channel
+    console_tx: broadcast::Sender<ConsoleMessage>,
 }
 
 /// Type alias for boxed route handler future
@@ -147,6 +149,142 @@ type DownloadHandlerFuture = Pin<Box<dyn Future<Output = Result<()>> + Send>>;
 
 /// Type alias for boxed dialog handler future
 type DialogHandlerFuture = Pin<Box<dyn Future<Output = Result<()>> + Send>>;
+
+/// Console message received from a page.
+///
+/// Console messages are emitted when JavaScript code in the page calls console API
+/// methods like `console.log()`, `console.error()`, etc.
+///
+/// # Example
+///
+/// ```ignore
+/// let mut rx = page.console_messages();
+/// while let Ok(msg) = rx.recv().await {
+///     println!("[{}] {}", msg.kind(), msg.text());
+/// }
+/// ```
+///
+/// See: <https://playwright.dev/docs/api/class-consolemessage>
+#[derive(Debug, Clone)]
+pub struct ConsoleMessage {
+    /// The type of console message (log, error, warning, etc.)
+    kind: ConsoleMessageKind,
+    /// The text content of the message
+    text: String,
+    /// Source location where the message was logged
+    location: Option<ConsoleLocation>,
+}
+
+impl ConsoleMessage {
+    /// Returns the type of console message.
+    pub fn kind(&self) -> ConsoleMessageKind {
+        self.kind
+    }
+
+    /// Returns the text content of the message.
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Returns the source location where the message was logged, if available.
+    pub fn location(&self) -> Option<&ConsoleLocation> {
+        self.location.as_ref()
+    }
+}
+
+/// The type of console message.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConsoleMessageKind {
+    /// `console.log()`
+    Log,
+    /// `console.debug()`
+    Debug,
+    /// `console.info()`
+    Info,
+    /// `console.warn()`
+    Warning,
+    /// `console.error()`
+    Error,
+    /// `console.dir()`
+    Dir,
+    /// `console.dirxml()`
+    DirXml,
+    /// `console.table()`
+    Table,
+    /// `console.trace()`
+    Trace,
+    /// `console.clear()`
+    Clear,
+    /// `console.count()`
+    Count,
+    /// `console.assert()`
+    Assert,
+    /// `console.profile()`
+    Profile,
+    /// `console.profileEnd()`
+    ProfileEnd,
+    /// `console.timeEnd()`
+    TimeEnd,
+    /// Unknown console type
+    Other,
+}
+
+impl ConsoleMessageKind {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "log" => Self::Log,
+            "debug" => Self::Debug,
+            "info" => Self::Info,
+            "warning" => Self::Warning,
+            "error" => Self::Error,
+            "dir" => Self::Dir,
+            "dirxml" => Self::DirXml,
+            "table" => Self::Table,
+            "trace" => Self::Trace,
+            "clear" => Self::Clear,
+            "count" => Self::Count,
+            "assert" => Self::Assert,
+            "profile" => Self::Profile,
+            "profileEnd" => Self::ProfileEnd,
+            "timeEnd" => Self::TimeEnd,
+            _ => Self::Other,
+        }
+    }
+}
+
+impl std::fmt::Display for ConsoleMessageKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Log => write!(f, "log"),
+            Self::Debug => write!(f, "debug"),
+            Self::Info => write!(f, "info"),
+            Self::Warning => write!(f, "warning"),
+            Self::Error => write!(f, "error"),
+            Self::Dir => write!(f, "dir"),
+            Self::DirXml => write!(f, "dirxml"),
+            Self::Table => write!(f, "table"),
+            Self::Trace => write!(f, "trace"),
+            Self::Clear => write!(f, "clear"),
+            Self::Count => write!(f, "count"),
+            Self::Assert => write!(f, "assert"),
+            Self::Profile => write!(f, "profile"),
+            Self::ProfileEnd => write!(f, "profileEnd"),
+            Self::TimeEnd => write!(f, "timeEnd"),
+            Self::Other => write!(f, "other"),
+        }
+    }
+}
+
+/// Source code location for a console message.
+#[derive(Debug, Clone)]
+pub struct ConsoleLocation {
+    /// Source URL
+    pub url: String,
+    /// Line number (0-indexed)
+    pub line_number: u32,
+    /// Column number (0-indexed)
+    pub column_number: u32,
+}
 
 /// Unique identifier for event handlers
 type HandlerId = u64;
@@ -352,6 +490,7 @@ impl Page {
         let route_handlers = Arc::new(Mutex::new(Vec::new()));
         let download_handlers = Arc::new(Mutex::new(Vec::new()));
         let dialog_handlers = Arc::new(Mutex::new(Vec::new()));
+        let (console_tx, _) = broadcast::channel(256);
 
         Ok(Self {
             base,
@@ -360,6 +499,7 @@ impl Page {
             route_handlers,
             download_handlers,
             dialog_handlers,
+            console_tx,
         })
     }
 
@@ -377,7 +517,6 @@ impl Page {
         let frame_arc = self.connection().get_object(&self.main_frame_guid).await?;
 
         let frame = frame_arc
-            .as_any()
             .downcast_ref::<crate::protocol::Frame>()
             .ok_or_else(|| {
                 crate::error::Error::ProtocolError(format!(
@@ -1170,6 +1309,81 @@ impl Page {
         Subscription::new_dialog(id, &self.dialog_handlers)
     }
 
+    /// Returns a receiver for console messages from the page.
+    ///
+    /// Console messages are emitted when JavaScript code calls console API methods
+    /// like `console.log()`, `console.error()`, etc.
+    ///
+    /// The returned receiver is a broadcast receiver. If the receiver falls behind
+    /// (processing messages slower than they arrive), older messages may be dropped
+    /// with a `RecvError::Lagged` error.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let mut rx = page.console_messages();
+    ///
+    /// // In a background task
+    /// tokio::spawn(async move {
+    ///     while let Ok(msg) = rx.recv().await {
+    ///         println!("[{}] {}", msg.kind(), msg.text());
+    ///     }
+    /// });
+    /// ```
+    ///
+    /// See: <https://playwright.dev/docs/api/class-page#page-event-console>
+    pub fn console_messages(&self) -> broadcast::Receiver<ConsoleMessage> {
+        self.console_tx.subscribe()
+    }
+
+    /// Waits for a console message matching the predicate.
+    ///
+    /// Returns the first [`ConsoleMessage`] for which `predicate` returns `true`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::Timeout`] if no matching message arrives within `timeout`
+    /// - [`Error::ChannelClosed`] if the page is closed
+    ///
+    /// [`Error::Timeout`]: crate::error::Error::Timeout
+    /// [`Error::ChannelClosed`]: crate::error::Error::ChannelClosed
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let msg = page.wait_for_console(
+    ///     |msg| msg.text().contains("ready"),
+    ///     std::time::Duration::from_secs(10)
+    /// ).await?;
+    /// ```
+    pub async fn wait_for_console<F>(
+        &self,
+        predicate: F,
+        timeout: std::time::Duration,
+    ) -> Result<ConsoleMessage>
+    where
+        F: Fn(&ConsoleMessage) -> bool,
+    {
+        let mut rx = self.console_messages();
+
+        tokio::time::timeout(timeout, async move {
+            loop {
+                match rx.recv().await {
+                    Ok(msg) if predicate(&msg) => return Ok(msg),
+                    Ok(_) => continue,
+                    Err(broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!(dropped = n, "Console message receiver lagged");
+                    }
+                    Err(broadcast::error::RecvError::Closed) => {
+                        return Err(Error::ChannelClosed);
+                    }
+                }
+            }
+        })
+        .await
+        .map_err(|_| Error::Timeout("Timeout waiting for console message".to_string()))?
+    }
+
     /// Handles a download event from the protocol
     async fn on_download_event(&self, download: Download) {
         let handlers = self.download_handlers.lock().clone();
@@ -1275,7 +1489,7 @@ impl ChannelOwner for Page {
                             }
                         };
 
-                        let route = match route_arc.as_any().downcast_ref::<Route>() {
+                        let route = match route_arc.downcast_ref::<Route>() {
                             Some(r) => r.clone(),
                             None => {
                                 tracing::error!(guid = %route_guid_owned, "Failed to downcast to Route");
@@ -1329,6 +1543,35 @@ impl ChannelOwner for Page {
             "dialog" => {
                 // Handled by BrowserContext and forwarded to Page
             }
+            "console" => {
+                if let Some(message_obj) = params.get("message") {
+                    let kind = message_obj
+                        .get("type")
+                        .and_then(|v| v.as_str())
+                        .map(ConsoleMessageKind::from_str)
+                        .unwrap_or(ConsoleMessageKind::Log);
+
+                    let text = message_obj
+                        .get("text")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    let location = message_obj.get("location").and_then(|loc| {
+                        Some(ConsoleLocation {
+                            url: loc.get("url")?.as_str()?.to_string(),
+                            line_number: loc.get("lineNumber")?.as_u64()? as u32,
+                            column_number: loc.get("columnNumber")?.as_u64()? as u32,
+                        })
+                    });
+
+                    let _ = self.console_tx.send(ConsoleMessage {
+                        kind,
+                        text,
+                        location,
+                    });
+                }
+            }
             _ => {
                 // TODO: Future events - load, domcontentloaded, close, crash, etc.
             }
@@ -1337,10 +1580,6 @@ impl ChannelOwner for Page {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
@@ -1453,5 +1692,76 @@ impl Response {
     /// Returns the response headers
     pub fn headers(&self) -> &std::collections::HashMap<String, String> {
         &self.headers
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_console_message_kind_from_str() {
+        assert_eq!(ConsoleMessageKind::from_str("log"), ConsoleMessageKind::Log);
+        assert_eq!(
+            ConsoleMessageKind::from_str("error"),
+            ConsoleMessageKind::Error
+        );
+        assert_eq!(
+            ConsoleMessageKind::from_str("warning"),
+            ConsoleMessageKind::Warning
+        );
+        assert_eq!(
+            ConsoleMessageKind::from_str("info"),
+            ConsoleMessageKind::Info
+        );
+        assert_eq!(
+            ConsoleMessageKind::from_str("debug"),
+            ConsoleMessageKind::Debug
+        );
+        assert_eq!(
+            ConsoleMessageKind::from_str("unknown"),
+            ConsoleMessageKind::Other
+        );
+    }
+
+    #[test]
+    fn test_console_message_kind_display() {
+        assert_eq!(format!("{}", ConsoleMessageKind::Log), "log");
+        assert_eq!(format!("{}", ConsoleMessageKind::Error), "error");
+        assert_eq!(format!("{}", ConsoleMessageKind::Warning), "warning");
+        assert_eq!(format!("{}", ConsoleMessageKind::Other), "other");
+    }
+
+    #[test]
+    fn test_console_message_accessors() {
+        let msg = ConsoleMessage {
+            kind: ConsoleMessageKind::Log,
+            text: "Hello, World!".to_string(),
+            location: Some(ConsoleLocation {
+                url: "http://example.com/script.js".to_string(),
+                line_number: 42,
+                column_number: 10,
+            }),
+        };
+
+        assert_eq!(msg.kind(), ConsoleMessageKind::Log);
+        assert_eq!(msg.text(), "Hello, World!");
+        let loc = msg.location().unwrap();
+        assert_eq!(loc.url, "http://example.com/script.js");
+        assert_eq!(loc.line_number, 42);
+        assert_eq!(loc.column_number, 10);
+    }
+
+    #[test]
+    fn test_console_message_without_location() {
+        let msg = ConsoleMessage {
+            kind: ConsoleMessageKind::Error,
+            text: "Something went wrong".to_string(),
+            location: None,
+        };
+
+        assert_eq!(msg.kind(), ConsoleMessageKind::Error);
+        assert_eq!(msg.text(), "Something went wrong");
+        assert!(msg.location().is_none());
     }
 }

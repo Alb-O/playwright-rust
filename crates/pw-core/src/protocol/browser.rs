@@ -8,7 +8,6 @@ use crate::server::channel::Channel;
 use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use serde::Deserialize;
 use serde_json::Value;
-use std::any::Any;
 use std::sync::Arc;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -183,7 +182,6 @@ impl Browser {
 
         // Downcast to BrowserContext
         let context = context_arc
-            .as_any()
             .downcast_ref::<BrowserContext>()
             .ok_or_else(|| {
                 crate::error::Error::ProtocolError(format!(
@@ -244,7 +242,6 @@ impl Browser {
 
         // Downcast to BrowserContext
         let context = context_arc
-            .as_any()
             .downcast_ref::<BrowserContext>()
             .ok_or_else(|| {
                 crate::error::Error::ProtocolError(format!(
@@ -365,10 +362,6 @@ impl ChannelOwner for Browser {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

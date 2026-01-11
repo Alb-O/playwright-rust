@@ -10,7 +10,6 @@ use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConne
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use std::any::Any;
 use std::sync::Arc;
 
 /// Frame represents a frame within a page.
@@ -206,7 +205,6 @@ impl Frame {
 
         // Downcast to ElementHandle
         let handle = element
-            .as_any()
             .downcast_ref::<crate::protocol::ElementHandle>()
             .map(|e| Arc::new(e.clone()))
             .ok_or_else(|| {
@@ -253,7 +251,6 @@ impl Frame {
             let element = connection.get_object(guid).await?;
 
             let handle = element
-                .as_any()
                 .downcast_ref::<crate::protocol::ElementHandle>()
                 .map(|e| Arc::new(e.clone()))
                 .ok_or_else(|| {
@@ -1249,10 +1246,6 @@ impl ChannelOwner for Frame {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

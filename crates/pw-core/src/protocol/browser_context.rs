@@ -11,7 +11,6 @@ use crate::server::channel::Channel;
 use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -119,7 +118,7 @@ impl BrowserContext {
         self.base
             .children()
             .into_iter()
-            .filter_map(|child| child.as_any().downcast_ref::<Page>().cloned())
+            .filter_map(|child| child.downcast_ref::<Page>().cloned())
             .collect()
     }
 
@@ -158,7 +157,7 @@ impl BrowserContext {
         let page_arc = self.connection().get_object(&response.page.guid).await?;
 
         // Downcast to Page
-        let page = page_arc.as_any().downcast_ref::<Page>().ok_or_else(|| {
+        let page = page_arc.downcast_ref::<Page>().ok_or_else(|| {
             crate::error::Error::ProtocolError(format!(
                 "Expected Page object, got {}",
                 page_arc.type_name()
@@ -432,10 +431,7 @@ impl ChannelOwner for BrowserContext {
                         };
 
                         // Downcast to Dialog
-                        let dialog = match dialog_arc
-                            .as_any()
-                            .downcast_ref::<crate::protocol::Dialog>()
-                        {
+                        let dialog = match dialog_arc.downcast_ref::<crate::protocol::Dialog>() {
                             Some(d) => d.clone(),
                             None => return,
                         };
@@ -447,7 +443,7 @@ impl ChannelOwner for BrowserContext {
                         };
 
                         // Downcast to Page
-                        let page = match page_arc.as_any().downcast_ref::<Page>() {
+                        let page = match page_arc.downcast_ref::<Page>() {
                             Some(p) => p.clone(),
                             None => return,
                         };
@@ -465,10 +461,6 @@ impl ChannelOwner for BrowserContext {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
