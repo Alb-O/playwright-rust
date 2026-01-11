@@ -14,4 +14,5 @@ pub mod readable;
 pub mod relay;
 pub mod session_broker;
 pub mod styles;
+pub mod testing;
 pub mod types;

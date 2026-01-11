@@ -2,6 +2,19 @@
 
 This document captures recommendations from a thorough code review discussion with GPT-5.2 Thinking, analyzing the full codebase via the CODEMAP.md.
 
+## Progress
+
+| Task | Status | Commit |
+|------|--------|--------|
+| Quick Win 1: downcast-rs integration | ✅ Done | `ccae233` |
+| Quick Win 2: In-memory transport tests | ✅ Done | `ccae233` |
+| Quick Win 3: Page console events | ✅ Done | `ccae233` |
+| Task 1.2: Centralize downcasting | ✅ Done | `ccae233` |
+| Task 1.3: CLI testing infrastructure | ✅ Done | `535bec8` |
+| Task 1.1: Event system infrastructure | Partial | console done, need EventBus |
+
+---
+
 ## Executive Summary
 
 The pw-rs codebase is well-structured with clear separation between `pw-core` (library) and `pw-cli` (CLI). The main opportunities for improvement are:
@@ -28,7 +41,7 @@ The pw-rs codebase is well-structured with clear separation between `pw-core` (l
 
 ## Quick Wins (Single PR Each)
 
-### 1. Replace Panicky Downcasts with Typed Helper
+### 1. Replace Panicky Downcasts with Typed Helper ✅
 
 **Current problem** (`crates/pw-core/src/protocol/playwright.rs`):
 ```rust
@@ -83,7 +96,7 @@ impl Playwright {
 
 ---
 
-### 2. In-Memory Transport Tests
+### 2. In-Memory Transport Tests ✅
 
 **Goal**: Test JSON-RPC correlation and event dispatch without spawning browsers.
 
@@ -128,7 +141,7 @@ async fn send_message_correlates_response() {
 
 ---
 
-### 3. Page Event Surface (console + downloads)
+### 3. Page Event Surface (console + downloads) ✅
 
 Build on existing download subscription pattern to add console events:
 
@@ -232,7 +245,7 @@ pub trait PageEvents {
 
 **Key design principle**: Never execute user code in the connection reader loop. Callbacks spawn tasks that read streams.
 
-#### Task 1.2: Centralize Downcasting
+#### Task 1.2: Centralize Downcasting ✅
 
 1. Add `downcast-rs` dependency
 2. Implement `DowncastSync` for `ChannelOwner` trait
@@ -242,7 +255,7 @@ pub trait PageEvents {
    - `Browser::new_context()` response handling
    - Object creation sites
 
-#### Task 1.3: Testing Infrastructure
+#### Task 1.3: Testing Infrastructure ✅
 
 **Protocol layer tests** (no browser):
 - Request/response correlation
