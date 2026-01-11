@@ -9,7 +9,6 @@
 use crate::error::Result;
 use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use serde_json::{Value, json};
-use std::any::Any;
 use std::sync::Arc;
 
 /// Dialog represents a browser dialog (alert, confirm, prompt, or beforeunload).
@@ -182,10 +181,6 @@ impl ChannelOwner for Dialog {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

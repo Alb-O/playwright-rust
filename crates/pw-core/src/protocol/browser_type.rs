@@ -15,7 +15,6 @@ use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConne
 use crate::server::connection::ConnectionLike;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::any::Any;
 use std::sync::Arc;
 
 /// BrowserType represents a browser engine (Chromium, Firefox, or WebKit).
@@ -216,15 +215,12 @@ impl BrowserType {
         let browser_arc = self.connection().get_object(&response.browser.guid).await?;
 
         // Downcast to Browser
-        let browser = browser_arc
-            .as_any()
-            .downcast_ref::<Browser>()
-            .ok_or_else(|| {
-                crate::error::Error::ProtocolError(format!(
-                    "Expected Browser object, got {}",
-                    browser_arc.type_name()
-                ))
-            })?;
+        let browser = browser_arc.downcast_ref::<Browser>().ok_or_else(|| {
+            crate::error::Error::ProtocolError(format!(
+                "Expected Browser object, got {}",
+                browser_arc.type_name()
+            ))
+        })?;
 
         Ok(browser.clone())
     }
@@ -251,15 +247,12 @@ impl BrowserType {
         let response: LaunchServerResponse = self.channel().send("launchServer", params).await?;
 
         let browser_arc = self.connection().get_object(&response.browser.guid).await?;
-        let browser = browser_arc
-            .as_any()
-            .downcast_ref::<Browser>()
-            .ok_or_else(|| {
-                crate::error::Error::ProtocolError(format!(
-                    "Expected Browser object, got {}",
-                    browser_arc.type_name()
-                ))
-            })?;
+        let browser = browser_arc.downcast_ref::<Browser>().ok_or_else(|| {
+            crate::error::Error::ProtocolError(format!(
+                "Expected Browser object, got {}",
+                browser_arc.type_name()
+            ))
+        })?;
 
         Ok(LaunchedServer {
             ws_endpoint: response.ws_endpoint,
@@ -306,27 +299,21 @@ impl BrowserType {
         let response: ConnectResponse = self.channel().send("connectOverCDP", params_json).await?;
 
         let browser_arc = self.connection().get_object(&response.browser.guid).await?;
-        let browser = browser_arc
-            .as_any()
-            .downcast_ref::<Browser>()
-            .ok_or_else(|| {
-                crate::error::Error::ProtocolError(format!(
-                    "Expected Browser object, got {}",
-                    browser_arc.type_name()
-                ))
-            })?;
+        let browser = browser_arc.downcast_ref::<Browser>().ok_or_else(|| {
+            crate::error::Error::ProtocolError(format!(
+                "Expected Browser object, got {}",
+                browser_arc.type_name()
+            ))
+        })?;
 
         let default_context = if let Some(ctx_ref) = response.default_context {
             let ctx_arc = self.connection().get_object(&ctx_ref.guid).await?;
-            let ctx = ctx_arc
-                .as_any()
-                .downcast_ref::<BrowserContext>()
-                .ok_or_else(|| {
-                    crate::error::Error::ProtocolError(format!(
-                        "Expected BrowserContext object, got {}",
-                        ctx_arc.type_name()
-                    ))
-                })?;
+            let ctx = ctx_arc.downcast_ref::<BrowserContext>().ok_or_else(|| {
+                crate::error::Error::ProtocolError(format!(
+                    "Expected BrowserContext object, got {}",
+                    ctx_arc.type_name()
+                ))
+            })?;
             Some(ctx.clone())
         } else {
             None
@@ -441,10 +428,6 @@ impl ChannelOwner for BrowserType {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

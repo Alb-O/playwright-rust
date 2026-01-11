@@ -6,7 +6,6 @@
 use crate::error::Result;
 use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use serde_json::Value;
-use std::any::Any;
 use std::sync::Arc;
 
 /// Request represents an HTTP request during navigation.
@@ -129,10 +128,6 @@ impl ChannelOwner for Request {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

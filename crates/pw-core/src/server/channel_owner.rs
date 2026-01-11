@@ -16,9 +16,9 @@
 
 use crate::server::channel::Channel;
 use crate::server::connection::ConnectionLike;
+use downcast_rs::{DowncastSync, impl_downcast};
 use parking_lot::Mutex;
 use serde_json::Value;
-use std::any::Any;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
@@ -81,6 +81,23 @@ pub enum ParentOrConnection {
 /// downstream code, and guarantees that all implementations maintain
 /// internal invariants.
 ///
+/// # Downcasting
+///
+/// This trait extends `DowncastSync` from the `downcast-rs` crate, enabling
+/// type-safe downcasting from `Arc<dyn ChannelOwner>` to concrete types:
+///
+/// ```ignore
+/// # use pw::server::channel_owner::ChannelOwner;
+/// # use pw::protocol::Page;
+/// # use std::sync::Arc;
+/// # fn example(obj: Arc<dyn ChannelOwner>) -> Result<(), Box<dyn std::error::Error>> {
+/// // Downcast Arc<dyn ChannelOwner> to Arc<Page>
+/// let page: Arc<Page> = obj.downcast_arc::<Page>()
+///     .map_err(|_| "Not a Page")?;
+/// # Ok(())
+/// # }
+/// ```
+///
 /// # Example
 ///
 /// ```ignore
@@ -95,7 +112,7 @@ pub enum ParentOrConnection {
 /// browser.dispose(pw::server::channel_owner::DisposeReason::Closed);
 /// # }
 /// ```
-pub trait ChannelOwner: private::Sealed + Send + Sync {
+pub trait ChannelOwner: private::Sealed + DowncastSync {
     /// Returns the unique GUID for this object.
     ///
     /// The GUID is assigned by the Playwright server and used for:
@@ -161,13 +178,9 @@ pub trait ChannelOwner: private::Sealed + Send + Sync {
 
     /// Returns true if this object was garbage collected.
     fn was_collected(&self) -> bool;
-
-    /// Enables downcasting to concrete types.
-    ///
-    /// Required for converting `Arc<dyn ChannelOwner>` to specific types
-    /// like `Arc<Browser>` when retrieving objects from the connection.
-    fn as_any(&self) -> &dyn Any;
 }
+
+impl_downcast!(sync ChannelOwner);
 
 /// Base implementation of ChannelOwner that can be embedded in protocol objects.
 ///
@@ -222,7 +235,6 @@ pub trait ChannelOwner: private::Sealed + Send + Sync {
 ///     fn remove_child(&self, guid: &str) { self.base.remove_child(guid) }
 ///     fn on_event(&self, method: &str, params: Value) { self.base.on_event(method, params) }
 ///     fn was_collected(&self) -> bool { self.base.was_collected() }
-///     fn as_any(&self) -> &dyn Any { self }
 /// }
 /// ```
 pub struct ChannelOwnerImpl {

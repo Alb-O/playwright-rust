@@ -9,7 +9,6 @@
 use crate::error::Result;
 use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use serde_json::Value;
-use std::any::Any;
 use std::sync::Arc;
 
 /// Artifact is the protocol object for downloaded files.
@@ -89,10 +88,6 @@ impl ChannelOwner for Artifact {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

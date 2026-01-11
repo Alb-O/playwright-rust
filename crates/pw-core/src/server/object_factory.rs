@@ -19,7 +19,6 @@ use crate::protocol::{
 };
 use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use serde_json::Value;
-use std::any::Any;
 use std::sync::Arc;
 
 /// Creates a protocol object from a `__create__` message.
@@ -334,10 +333,6 @@ impl ChannelOwner for UnknownObject {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

@@ -15,7 +15,6 @@ use crate::server::connection::ConnectionLike;
 use crate::server::playwright_server::PlaywrightServer;
 use parking_lot::Mutex;
 use serde_json::Value;
-use std::any::Any;
 use std::sync::Arc;
 
 /// Playwright is the root object that provides access to browser types.
@@ -128,14 +127,11 @@ impl Playwright {
         let playwright_obj = connection.initialize_playwright().await?;
 
         // 6. Downcast to Playwright type
-        let playwright = playwright_obj
-            .as_any()
-            .downcast_ref::<Playwright>()
-            .ok_or_else(|| {
-                crate::error::Error::ProtocolError(
-                    "Initialized object is not Playwright type".to_string(),
-                )
-            })?;
+        let playwright = playwright_obj.downcast_ref::<Playwright>().ok_or_else(|| {
+            crate::error::Error::ProtocolError(
+                "Initialized object is not Playwright type".to_string(),
+            )
+        })?;
 
         // Clone the Playwright object to return it
         // Note: We need to own the Playwright, not just borrow it
@@ -168,14 +164,11 @@ impl Playwright {
 
         let playwright_obj = connection.initialize_playwright().await?;
 
-        let playwright = playwright_obj
-            .as_any()
-            .downcast_ref::<Playwright>()
-            .ok_or_else(|| {
-                crate::error::Error::ProtocolError(
-                    "Initialized object is not Playwright type".to_string(),
-                )
-            })?;
+        let playwright = playwright_obj.downcast_ref::<Playwright>().ok_or_else(|| {
+            crate::error::Error::ProtocolError(
+                "Initialized object is not Playwright type".to_string(),
+            )
+        })?;
 
         Ok(Self {
             base: playwright.base.clone(),
@@ -267,7 +260,6 @@ impl Playwright {
     pub fn chromium(&self) -> &BrowserType {
         // Downcast from Arc<dyn ChannelOwner> to &BrowserType
         self.chromium
-            .as_any()
             .downcast_ref::<BrowserType>()
             .expect("chromium should be BrowserType")
     }
@@ -275,7 +267,6 @@ impl Playwright {
     /// Returns the Firefox browser type.
     pub fn firefox(&self) -> &BrowserType {
         self.firefox
-            .as_any()
             .downcast_ref::<BrowserType>()
             .expect("firefox should be BrowserType")
     }
@@ -283,7 +274,6 @@ impl Playwright {
     /// Returns the WebKit browser type.
     pub fn webkit(&self) -> &BrowserType {
         self.webkit
-            .as_any()
             .downcast_ref::<BrowserType>()
             .expect("webkit should be BrowserType")
     }
@@ -372,10 +362,6 @@ impl ChannelOwner for Playwright {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

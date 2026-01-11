@@ -616,7 +616,6 @@ impl Connection {
         tracing::debug!("Root object registered, sending initialize message");
 
         let root_typed = root
-            .as_any()
             .downcast_ref::<Root>()
             .expect("Root object should be Root type");
 
@@ -641,7 +640,6 @@ impl Connection {
 
         // Verify it's actually a Playwright object
         playwright_obj
-            .as_any()
             .downcast_ref::<crate::protocol::Playwright>()
             .ok_or_else(|| {
                 Error::ProtocolError(format!(

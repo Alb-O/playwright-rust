@@ -9,7 +9,6 @@ use crate::error::Result;
 use crate::protocol::Request;
 use crate::server::channel_owner::{ChannelOwner, ChannelOwnerImpl, ParentOrConnection};
 use serde_json::{Value, json};
-use std::any::Any;
 use std::sync::Arc;
 
 /// Route represents a network route handler.
@@ -50,7 +49,7 @@ impl Route {
         // The Route's parent is the Request object
         // Try to downcast the parent to Request
         if let Some(parent) = self.parent() {
-            if let Some(request) = parent.as_any().downcast_ref::<Request>() {
+            if let Some(request) = parent.downcast_ref::<Request>() {
                 return request.clone();
             }
         }
@@ -460,10 +459,6 @@ impl ChannelOwner for Route {
 
     fn was_collected(&self) -> bool {
         self.base.was_collected()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
