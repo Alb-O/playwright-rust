@@ -342,7 +342,7 @@ def message-count []: nothing -> int {
 
 # Wait for ChatGPT response to complete
 export def "chatgpt wait" [
-    --timeout (-t): int = 120000  # Timeout in ms
+    --timeout (-t): int = 1200000  # Timeout in ms (default: 20 minutes for thinking model)
 ]: nothing -> record {
     ensure-tab
     let start = (date now)
@@ -396,7 +396,7 @@ export def "chatgpt ask" [
     message: string
     --model (-m): string
     --new (-n)
-    --timeout (-t): int = 120000
+    --timeout (-t): int = 1200000  # Default: 20 minutes for thinking model
 ]: nothing -> record {
     let initial_count = (message-count)
     chatgpt send $message --model=$model --new=$new
