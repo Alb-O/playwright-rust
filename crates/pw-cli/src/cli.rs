@@ -681,6 +681,7 @@ mod tests {
                 url,
                 expression_flag,
                 url_flag,
+                ..
             } => {
                 assert!(expression.is_none());
                 assert!(url.is_none());

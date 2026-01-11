@@ -484,6 +484,7 @@ mod tests {
             remote_debugging_port: None,
             keep_browser_running: false,
             protected_urls: &[],
+            preferred_url: None,
         };
         assert!(loaded.matches(&req, Some(DRIVER_HASH)));
     }
@@ -510,6 +511,7 @@ mod tests {
             remote_debugging_port: None,
             keep_browser_running: false,
             protected_urls: &[],
+            preferred_url: None,
         };
 
         assert!(!desc.matches(&req, Some(DRIVER_HASH)));
@@ -537,6 +539,7 @@ mod tests {
             remote_debugging_port: None,
             keep_browser_running: false,
             protected_urls: &[],
+            preferred_url: None,
         };
 
         assert!(!desc.matches(&req, Some(DRIVER_HASH)));
