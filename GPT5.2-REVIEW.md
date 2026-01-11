@@ -2,19 +2,20 @@
 
 Generated from conversation with GPT-5.2 Thinking model after reviewing the full codemap (8500+ lines).
 
----
+______________________________________________________________________
 
 ## Executive Summary
 
 The codebase mirrors the official Playwright bindings mental model well, with a connection-based object registry and channel owner pattern. However, there are several architectural issues that could cause reliability problems at scale, particularly around async/sync boundaries and GUID resolution.
 
 **Priority fixes:**
-1. GUID reference replacement (remove retry/sleep loops)
-2. Send pipeline refactor (no mutex across .await)
-3. Error type restructuring
-4. Evaluate API to return typed values
 
----
+1. GUID reference replacement (remove retry/sleep loops)
+1. Send pipeline refactor (no mutex across .await)
+1. Error type restructuring
+1. Evaluate API to return typed values
+
+______________________________________________________________________
 
 ## 1. Architecture Review
 
@@ -31,6 +32,7 @@ The codebase mirrors the official Playwright bindings mental model well, with a 
 `ChannelOwnerImpl::dispose()` is synchronous, but it performs async cleanup by spawning a task to unregister the object from the connection registry.
 
 **Failure modes:**
+
 - If `dispose()` runs outside a Tokio runtime, `tokio::spawn` will panic
 - Cleanup ordering becomes nondeterministic (registry removal races with other operations)
 - Errors from `unregister_object` are silently dropped
@@ -40,6 +42,7 @@ The codebase mirrors the official Playwright bindings mental model well, with a 
 `get_object` maps "missing guid" into `TargetClosed` by guessing type from guid prefixes like `page@`, `frame@`, etc., otherwise falling back to `ProtocolError("Object not found")`.
 
 **Problems:**
+
 - Protocol could change prefixes
 - Conflates "closed/collected" with "never existed / race / bug"
 
@@ -51,7 +54,7 @@ Even internal invariants are guarded via downcast + `ProtocolError` text. This m
 
 The codemap contains TODOs and retry loops around resolving response GUIDs into channel objects. This "sleep/retry 20 times" approach will be flaky under load and adds nondeterministic latency.
 
----
+______________________________________________________________________
 
 ## 2. API Ergonomics
 
@@ -62,6 +65,7 @@ The codemap contains TODOs and retry loops around resolving response GUIDs into 
 `Page::evaluate_value` returns `Result<String>` rather than a typed value or `serde_json::Value`, and pw-cli trims quotes when using it.
 
 **Better options:**
+
 ```rust
 async fn evaluate_json(&self, expr: &str) -> Result<serde_json::Value>
 async fn evaluate<T: DeserializeOwned>(&self, expr: &str) -> Result<T>
@@ -72,6 +76,7 @@ async fn evaluate<T: DeserializeOwned>(&self, expr: &str) -> Result<T>
 Routing uses a shared vector of handlers under a mutex, and errors are printed via `eprintln!` inside the library.
 
 **Better pattern:**
+
 - Return a `Subscription`/`ListenerHandle` that unregisters on Drop
 - Use `tracing` for logging (not `eprintln!`)
 - Expose events as `Stream`/`broadcast::Receiver` when feasible
@@ -86,13 +91,14 @@ The `Page` struct holds handler lists and page state behind `std::sync::Mutex`/`
 
 `ChannelOwner`/`ConnectionLike` are core invariants. Consider a sealed-trait pattern to prevent downstream users from implementing them.
 
----
+______________________________________________________________________
 
 ## 3. Error Handling
 
 ### Current State
 
 Protocol errors are parsed into:
+
 - `Timeout`
 - `TargetClosed`
 - Otherwise `ProtocolError(message)` (dropping name + stack)
@@ -144,7 +150,7 @@ pub enum Error {
 
 **Key improvement:** Don't throw away remote stack and name.
 
----
+______________________________________________________________________
 
 ## 4. Concurrency Model
 
@@ -155,6 +161,7 @@ pub enum Error {
 `send_message` takes a `transport_sender` mutex and awaits the send while holding it. This serializes all writers and can become a throughput bottleneck or deadlock risk.
 
 **Better pattern:**
+
 - Have an `mpsc::Sender<Request>` cloneable without locks
 - One dedicated task owns the transport writer and processes the queue
 - `send_message` enqueues + awaits response
@@ -176,10 +183,11 @@ If a caller drops the future returned by `send_message` after inserting the call
 The connection loop calls `dispatch_internal` per message. If `on_event` handlers do meaningful work, they can block the loop.
 
 **Better pattern:**
+
 - Minimal parsing + enqueue onto per-object channels
 - Handlers run in independent tasks with bounded queues (backpressure)
 
----
+______________________________________________________________________
 
 ## 5. CLI Improvements for AI Agent Workflows
 
@@ -194,6 +202,7 @@ The connection loop calls `dispatch_internal` per message. If `on_event` handler
 #### A. Multi-tenant daemon
 
 Current daemon uses fixed `/tmp/pw-daemon.sock`. For agents:
+
 - Per-user socket location (XDG runtime dir, permissioned)
 - Optional auth token / nonce handshake
 - Commands to list/inspect/evict sessions (by reuse_key)
@@ -202,14 +211,17 @@ Current daemon uses fixed `/tmp/pw-daemon.sock`. For agents:
 #### B. Batch protocol
 
 Agent loops pay too much overhead by invoking CLI repeatedly. Add:
+
 ```bash
 pw run --format ndjson  # reads commands from stdin, streams responses
 ```
+
 Extend into stable machine protocol (request id, status, artifact refs).
 
 #### C. Structured state outputs
 
 Agents need:
+
 - "Active page" identity (url, title, opener, context id)
 - Tab list and selection semantics
 - Deterministic selectors (Playwright selector engine output) for follow-up actions
@@ -224,96 +236,112 @@ Agents need:
 
 Export JSON Schemas for command outputs. With current Toon/NDJSON formats, you're close; formal schemas let agents validate and recover.
 
----
+______________________________________________________________________
 
 ## Action Items / TODOs
 
 ### Priority 1: Critical Architecture Fixes
 
-- [ ] **GUID Resolution**: Implement proper guid ref resolution pass at connection boundary
+- [x] **GUID Resolution**: Implement proper guid ref resolution pass at connection boundary
+
   - Walk JSON response structure
   - Replace `{"guid": "..."}` references with typed objects
   - Block response future until referenced GUIDs are registered
   - Files: `crates/pw-core/src/server/connection.rs`
 
-- [ ] **Send Pipeline**: Refactor to avoid mutex across .await
+- [x] **Send Pipeline**: Refactor to avoid mutex across .await
+
   - Add `mpsc::Sender<Request>` for cloneable sends
   - Dedicated writer task owns transport
   - `send_message` enqueues + awaits response via oneshot
   - Files: `crates/pw-core/src/server/connection.rs`, `transport.rs`
 
-- [ ] **Sync Disposal**: Remove tokio::spawn from dispose()
+- [x] **Sync Disposal**: Remove tokio::spawn from dispose()
+
   - Make `ConnectionLike::unregister_object` synchronous
   - Keep server RPC effects explicit and awaited in async fns
   - Files: `crates/pw-core/src/server/channel_owner.rs`
 
 ### Priority 2: Error Handling
 
-- [ ] **Restructure Error enum**: Add structured variants with full context
+- [x] **Restructure Error enum**: Add structured variants with full context
+
   - `Error::Remote { name, message, stack, method, guid }`
   - `Error::ObjectNotFound { guid, expected }`
   - Preserve `#[source]` for wrapped errors
   - Files: `crates/pw-core/src/error.rs`
 
-- [ ] **Object Registry**: Store type info, add distinct `ObjectNotFound` error
+- [x] **Object Registry**: Store type info, add distinct `ObjectNotFound` error
+
   - Don't guess type from GUID prefix
   - Files: `crates/pw-core/src/server/connection.rs`
 
 ### Priority 3: API Ergonomics
 
-- [ ] **Typed evaluate**: Add `evaluate_json()` and generic `evaluate<T>()`
+- [x] **Typed evaluate**: Add `evaluate_json()` and generic `evaluate<T>()`
+
   - Keep `evaluate_value_string()` as convenience
   - Files: `crates/pw-core/src/protocol/page.rs`, `frame.rs`
 
-- [ ] **Cancellable event handles**: Return `Subscription` that unregisters on Drop
+- [x] **Cancellable event handles**: Return `Subscription` that unregisters on Drop
+
   - Replace `Vec<Box<dyn Fn>>` with proper subscription model
   - Files: `crates/pw-core/src/protocol/page.rs`, `browser_context.rs`
 
-- [ ] **Replace eprintln! with tracing**: Library should not print to stderr
+- [x] **Replace eprintln! with tracing**: Library should not print to stderr
+
   - Files: grep for `eprintln!` in `crates/pw-core/`
 
-- [ ] **Seal internal traits**: Prevent downstream ChannelOwner implementations
+- [x] **Seal internal traits**: Prevent downstream ChannelOwner implementations
+
   - Add private marker trait
   - Files: `crates/pw-core/src/server/channel_owner.rs`
 
 ### Priority 4: Concurrency
 
 - [ ] **Cancellation guard**: RAII guard to remove callback on future drop
+
   - Files: `crates/pw-core/src/server/connection.rs`
 
 - [ ] **Event backpressure**: Enqueue events to per-object channels
+
   - Handlers run in independent tasks
   - Files: `crates/pw-core/src/server/connection.rs`
 
-- [ ] **Use parking_lot consistently**: Replace std::sync::Mutex on async paths
+- [x] **Use parking_lot consistently**: Replace std::sync::Mutex on async paths
+
   - Or use tokio::sync for contended locks
   - Files: `crates/pw-core/src/protocol/page.rs`
 
 ### Priority 5: CLI Agent Features
 
 - [ ] **Daemon security**: Per-user socket, auth tokens, session TTL
+
   - Files: `crates/pw-cli/src/daemon/`
 
 - [ ] **Batch protocol**: `pw run --format ndjson` with stdin commands
+
   - Request ID, status, artifact refs
   - Files: `crates/pw-cli/src/commands/mod.rs`
 
 - [ ] **JSON Schema exports**: Formal schemas for command outputs
+
   - Files: `crates/pw-cli/src/output.rs`
 
 - [ ] **Artifact manifest**: Machine-readable artifact list in responses
+
   - Files: `crates/pw-cli/src/artifact_collector.rs`
 
----
+______________________________________________________________________
 
 ## Summary of Highest-Impact Changes
 
 1. **Proper GUID reference replacement** instead of retry/sleep loops
-2. **Remove tokio::spawn from sync disposal/constructors**; make registry mutation synchronous
-3. **Fix evaluate_value** to return typed/JSON values
-4. **Rework outbound sending** to avoid holding mutex across .await
-5. **Daemon**: make secure + add session management, then add batch stdin/stdout protocol
+1. **Remove tokio::spawn from sync disposal/constructors**; make registry mutation synchronous
+1. **Fix evaluate_value** to return typed/JSON values
+1. **Rework outbound sending** to avoid holding mutex across .await
+1. **Daemon**: make secure + add session management, then add batch stdin/stdout protocol
 
----
+______________________________________________________________________
 
 *Review generated by GPT-5.2 Thinking model, January 2026*
