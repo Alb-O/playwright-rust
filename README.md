@@ -64,6 +64,16 @@ pw daemon stop                     # cleanup
 
 Without the daemon, each command launches a fresh browser (~500ms). With the daemon, commands take ~5ms.
 
+### Run Playwright tests
+
+Run `@playwright/test` tests without npm or Node.js installed:
+
+```bash
+pw test                            # run all tests
+pw test -- --headed                # show browser
+pw test -- -g "login"              # filter by name
+```
+
 ## Library
 
 For Rust applications, use `pw-rs` directly:

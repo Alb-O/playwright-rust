@@ -56,6 +56,20 @@
         doCheck = false;
       };
 
+      # Full playwright package (test runner) with matching playwright-core
+      # Both must be from npm to ensure compatibility
+      playwrightVersion = "1.57.0";
+      playwrightTestRunner = pkgs.fetchzip {
+        url = "https://registry.npmjs.org/playwright/-/playwright-${playwrightVersion}.tgz";
+        hash = "sha256-ViiO10O8Oc+kFcmHv1apxcGIiZ0Uz3V9wk9gNGxxLck=";
+        stripRoot = true;
+      };
+      playwrightCore = pkgs.fetchzip {
+        url = "https://registry.npmjs.org/playwright-core/-/playwright-core-${playwrightVersion}.tgz";
+        hash = "sha256-3t6PSrbQrmGroDdFOiZR1vlrJsm7WQautBZ54K7JdLQ=";
+        stripRoot = true;
+      };
+
       # Browser compatibility symlinks for Playwright
       # Creates version aliases needed by pw-rs (expects revision 1200)
       browserCompat = pkgs.runCommand "playwright-browser-compat" { } ''
@@ -100,7 +114,8 @@
         postBuild = ''
           wrapProgram $out/bin/pw \
             --set PLAYWRIGHT_NODE_EXE "${pkgs.nodejs_22}/bin/node" \
-            --set PLAYWRIGHT_CLI_JS "${pkgs.playwright-driver}/cli.js" \
+            --set PLAYWRIGHT_CLI_JS "${playwrightCore}/cli.js" \
+            --set PLAYWRIGHT_TEST_CLI_JS "${playwrightTestRunner}/cli.js" \
             --set PLAYWRIGHT_BROWSERS_PATH "${browserCompat}" \
             --set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD "1"
         '';

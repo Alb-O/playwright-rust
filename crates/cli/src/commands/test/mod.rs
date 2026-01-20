@@ -6,6 +6,7 @@
 use crate::error::{PwError, Result};
 use pw::pw_runtime::{self, TestRunnerPaths};
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// Spawns the Playwright test runner with the given arguments.
@@ -16,13 +17,18 @@ pub fn execute(args: Vec<String>) -> Result<()> {
         )
     })?;
 
-    ensure_node_modules(&paths)?;
+    let node_modules = ensure_node_modules(&paths)?;
+    let cli_js = node_modules
+        .join("playwright/cli.js")
+        .exists()
+        .then(|| node_modules.join("playwright/cli.js"))
+        .unwrap_or_else(|| paths.test_cli_js.clone());
 
     let status = Command::new(&paths.node_exe)
-        .arg(&paths.test_cli_js)
+        .arg(&cli_js)
         .arg("test")
         .args(&args)
-        .env("NODE_PATH", &paths.node_modules_dir)
+        .env("NODE_PATH", &node_modules)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -35,65 +41,178 @@ pub fn execute(args: Vec<String>) -> Result<()> {
     Ok(())
 }
 
-/// Sets up node_modules with required symlinks for module resolution.
+/// Sets up node_modules with required structure for module resolution.
 ///
-/// Creates:
-/// - `playwright-core` symlink to the bundled driver package
-/// - `@playwright/test` wrapper package pointing to `playwright/test.js`
-fn ensure_node_modules(paths: &TestRunnerPaths) -> Result<()> {
-    let node_modules = &paths.node_modules_dir;
+/// Returns the path to use for `NODE_PATH`. Falls back to a cache directory
+/// when the package's node_modules is read-only (e.g., Nix store).
+fn ensure_node_modules(paths: &TestRunnerPaths) -> Result<PathBuf> {
     let playwright_dir = paths.test_cli_js.parent().unwrap();
 
-    fs::create_dir_all(node_modules)?;
+    let node_modules = if is_writable(&paths.node_modules_dir) {
+        fs::create_dir_all(&paths.node_modules_dir)?;
+        paths.node_modules_dir.clone()
+    } else {
+        cache_node_modules()?
+    };
 
-    create_symlink_if_needed(
-        &paths.driver_package_dir,
-        &node_modules.join("playwright-core"),
-    )?;
+    setup_node_modules(&node_modules, &paths.driver_package_dir, playwright_dir)?;
+    Ok(node_modules)
+}
 
-    // @playwright/test needs a wrapper package.json because Node resolves
-    // scoped packages by their main field, not the parent package's exports
-    let scoped_dir = node_modules.join("@playwright").join("test");
-    fs::create_dir_all(&scoped_dir)?;
+/// Tests if a path is writable by attempting to create a temp file.
+fn is_writable(path: &Path) -> bool {
+    if path.exists() {
+        let test_file = path.join(".pw-write-test");
+        if fs::write(&test_file, b"").is_ok() {
+            let _ = fs::remove_file(&test_file);
+            return true;
+        }
+        false
+    } else {
+        path.parent().is_some_and(|p| is_writable(p))
+    }
+}
 
-    let wrapper_package_json = scoped_dir.join("package.json");
-    if !wrapper_package_json.exists() {
-        let content = format!(
-            r#"{{"name":"@playwright/test","version":"1.56.1","main":"{}"}}"#,
-            playwright_dir.join("test.js").display()
-        );
-        fs::write(&wrapper_package_json, content)?;
+/// Returns a writable cache directory for node_modules.
+fn cache_node_modules() -> Result<PathBuf> {
+    let cache_dir = dirs::cache_dir()
+        .or_else(|| std::env::var_os("XDG_CACHE_HOME").map(PathBuf::from))
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("pw/test-runner/node_modules");
+    fs::create_dir_all(&cache_dir)?;
+    Ok(cache_dir)
+}
+
+/// Creates the node_modules structure for Playwright module resolution.
+///
+/// For Nix builds (read-only source), copies packages to avoid circular dependency
+/// errors caused by Node.js resolving realpaths when caching modules.
+///
+/// For local cargo builds where node_modules is nested inside playwright_dir,
+/// uses symlinks since the playwright package is already accessible as the parent.
+fn setup_node_modules(
+    node_modules: &Path,
+    driver_package_dir: &Path,
+    playwright_dir: &Path,
+) -> Result<()> {
+    let playwright_dst = node_modules.join("playwright");
+    let core_dst = node_modules.join("playwright-core");
+
+    let is_nested = node_modules
+        .canonicalize()
+        .ok()
+        .zip(playwright_dir.canonicalize().ok())
+        .is_some_and(|(nm, pd)| nm.starts_with(&pd));
+
+    if is_nested {
+        link_or_copy(driver_package_dir, &core_dst)?;
+        symlink_to_parent(&playwright_dst)?;
+    } else {
+        copy_dir_if_needed(driver_package_dir, &core_dst)?;
+        copy_dir_if_needed(playwright_dir, &playwright_dst)?;
     }
 
+    let version = read_package_version(if is_nested { playwright_dir } else { &playwright_dst })
+        .unwrap_or_else(|| "0.0.0".into());
+    setup_scoped_wrapper(node_modules, &version)
+}
+
+/// Creates the @playwright/test wrapper package.
+fn setup_scoped_wrapper(node_modules: &Path, version: &str) -> Result<()> {
+    let scoped_dir = node_modules.join("@playwright").join("test");
+
+    if scoped_dir.is_symlink() {
+        fs::remove_file(&scoped_dir)?;
+    } else if scoped_dir.exists() && !scoped_dir.join("package.json").exists() {
+        fs::remove_dir_all(&scoped_dir)?;
+    }
+
+    fs::create_dir_all(&scoped_dir)?;
+    fs::write(
+        scoped_dir.join("package.json"),
+        format!(r#"{{"name":"@playwright/test","version":"{version}","main":"index.js"}}"#),
+    )?;
+    fs::write(
+        scoped_dir.join("index.js"),
+        "module.exports = require('playwright/test');",
+    )?;
     Ok(())
 }
 
-/// Creates a symlink, replacing any existing incorrect link.
-fn create_symlink_if_needed(target: &std::path::Path, link: &std::path::Path) -> Result<()> {
-    if link.exists() || link.is_symlink() {
-        if fs::read_link(link).ok().as_deref() == Some(target) {
-            return Ok(());
-        }
-        if link.is_dir() && !link.is_symlink() {
-            fs::remove_dir_all(link)?;
-        } else {
-            fs::remove_file(link)?;
-        }
-    }
+/// Creates a symlink pointing to the parent directory.
+fn symlink_to_parent(link: &Path) -> Result<()> {
+    remove_existing(link)?;
 
     #[cfg(unix)]
-    std::os::unix::fs::symlink(target, link)?;
+    std::os::unix::fs::symlink("..", link)?;
 
     #[cfg(windows)]
-    if std::os::windows::fs::symlink_dir(target, link).is_err() {
-        copy_dir_recursive(target, link)?;
-    }
+    std::os::windows::fs::symlink_dir("..", link)?;
 
     Ok(())
 }
 
-#[cfg(windows)]
-fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> Result<()> {
+/// Removes an existing file, symlink, or directory at the given path.
+fn remove_existing(path: &Path) -> Result<()> {
+    if path.is_symlink() {
+        fs::remove_file(path)?;
+    } else if path.exists() {
+        fs::remove_dir_all(path)?;
+    }
+    Ok(())
+}
+
+/// Links or copies a directory, preferring symlinks with copy fallback.
+fn link_or_copy(src: &Path, dst: &Path) -> Result<()> {
+    remove_existing(dst)?;
+
+    #[cfg(unix)]
+    if std::os::unix::fs::symlink(src, dst).is_ok() {
+        return Ok(());
+    }
+
+    #[cfg(windows)]
+    if std::os::windows::fs::symlink_dir(src, dst).is_ok() {
+        return Ok(());
+    }
+
+    copy_dir_recursive(src, dst)
+}
+
+/// Extracts the version field from a package.json file.
+fn read_package_version(package_dir: &Path) -> Option<String> {
+    let content = fs::read_to_string(package_dir.join("package.json")).ok()?;
+    let version_key = content.find(r#""version""#)?;
+    let after_key = &content[version_key + 9..];
+    let quote_start = after_key.find('"')? + 1;
+    let version_str = &after_key[quote_start..];
+    let quote_end = version_str.find('"')?;
+    Some(version_str[..quote_end].to_string())
+}
+
+/// Copies a directory if it doesn't exist or source has changed.
+///
+/// Uses a marker file to track the source path and skip redundant copies.
+fn copy_dir_if_needed(src: &Path, dst: &Path) -> Result<()> {
+    let marker = dst.join(".pw-source");
+    let src_str = src.to_string_lossy();
+
+    if dst.exists() {
+        if fs::read_to_string(&marker).is_ok_and(|s| s == src_str) {
+            return Ok(());
+        }
+        fs::remove_dir_all(dst)?;
+    }
+
+    copy_dir_recursive(src, dst)?;
+    fs::write(&marker, src_str.as_ref())?;
+    Ok(())
+}
+
+/// Recursively copies a directory, making files writable.
+///
+/// Nix store files are read-only; copies must be writable for later updates.
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;
@@ -102,6 +221,15 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> Result<()
             copy_dir_recursive(&entry.path(), &dst_path)?;
         } else {
             fs::copy(entry.path(), &dst_path)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(meta) = fs::metadata(&dst_path) {
+                    let mut perms = meta.permissions();
+                    perms.set_mode(perms.mode() | 0o200);
+                    let _ = fs::set_permissions(&dst_path, perms);
+                }
+            }
         }
     }
     Ok(())

@@ -272,26 +272,39 @@ pub struct TestRunnerPaths {
 
 /// Returns paths needed for the Playwright test runner.
 ///
+/// Checks in order:
+/// 1. `PLAYWRIGHT_TEST_CLI_JS` env var (Nix wrapper sets this explicitly)
+/// 2. `PLAYWRIGHT_CLI_JS` env var if it has test.js (full playwright package)
+/// 3. Build-time `PLAYWRIGHT_TEST_DIR` (cargo build downloads playwright npm package)
+///
 /// # Errors
 ///
-/// Returns [`Error::ServerNotFound`] if the test runner package or driver
-/// was not downloaded during build.
+/// Returns [`Error::ServerNotFound`] if no test runner is available.
 pub fn get_test_runner_paths() -> Result<TestRunnerPaths> {
-    let (node_exe, _) = get_driver_executable()?;
+    let (node_exe, driver_cli_js) = get_driver_executable()?;
 
-    let test_dir = PathBuf::from(option_env!("PLAYWRIGHT_TEST_DIR").ok_or(Error::ServerNotFound)?);
+    let test_dir = if let Ok(test_cli) = std::env::var("PLAYWRIGHT_TEST_CLI_JS") {
+        PathBuf::from(test_cli)
+            .parent()
+            .ok_or(Error::ServerNotFound)?
+            .to_path_buf()
+    } else if let Some(dir) = env_cli_js_if_has_test() {
+        dir
+    } else if let Some(test_dir) = option_env!("PLAYWRIGHT_TEST_DIR") {
+        PathBuf::from(test_dir)
+    } else {
+        return Err(Error::ServerNotFound);
+    };
+
     let test_cli_js = test_dir.join("cli.js");
-
     if !test_cli_js.exists() {
         return Err(Error::ServerNotFound);
     }
 
-    let driver_dir = option_env!("PLAYWRIGHT_DRIVER_DIR").ok_or(Error::ServerNotFound)?;
-    let driver_package_dir = PathBuf::from(driver_dir).join("package");
-
-    if !driver_package_dir.exists() {
-        return Err(Error::ServerNotFound);
-    }
+    let driver_package_dir = driver_cli_js
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| test_dir.clone());
 
     Ok(TestRunnerPaths {
         node_exe,
@@ -299,6 +312,13 @@ pub fn get_test_runner_paths() -> Result<TestRunnerPaths> {
         node_modules_dir: test_dir.join("node_modules"),
         driver_package_dir,
     })
+}
+
+/// Returns the directory from PLAYWRIGHT_CLI_JS if it contains test.js.
+fn env_cli_js_if_has_test() -> Option<PathBuf> {
+    let cli_js = std::env::var("PLAYWRIGHT_CLI_JS").ok()?;
+    let dir = PathBuf::from(cli_js).parent()?.to_path_buf();
+    dir.join("test.js").exists().then_some(dir)
 }
 
 /// Find the node executable in PATH or common locations
