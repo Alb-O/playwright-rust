@@ -303,8 +303,59 @@ fn download_playwright_package(drivers_dir: &Path) -> io::Result<PathBuf> {
         }
     }
 
+    apply_playwright_patches(&extract_dir)?;
     println!("cargo:warning=Successfully extracted playwright test runner");
     Ok(extract_dir)
+}
+
+/// Applies patches to fix known Playwright issues.
+///
+/// See `docs/issues/webserver-hang.md` for details on the port check timeout fix.
+fn apply_playwright_patches(extract_dir: &Path) -> io::Result<()> {
+    let plugin = extract_dir.join("lib/plugins/webServerPlugin.js");
+    if plugin.exists() {
+        patch_web_server_plugin(&plugin)?;
+    }
+    Ok(())
+}
+
+/// Adds timeout to `isPortUsed()` in webServerPlugin.js.
+///
+/// In WSL2 and sandboxed environments, TCP connections to unused ports on
+/// 127.0.0.1 don't receive immediate ECONNREFUSED—they hang until the kernel's
+/// TCP timeout (~120s). Adding a 1-second socket timeout prevents this.
+fn patch_web_server_plugin(path: &Path) -> io::Result<()> {
+    let content = fs::read_to_string(path)?;
+    if content.contains("conn.setTimeout") {
+        return Ok(());
+    }
+
+    const ORIGINAL: &str = r#"const conn = import_net.default.connect(port, host).on("error", () => {
+      resolve(false);
+    }).on("connect", () => {
+      conn.end();
+      resolve(true);
+    });"#;
+
+    const PATCHED: &str = r#"const conn = import_net.default.connect(port, host);
+    conn.setTimeout(1000);
+    conn.on("error", () => {
+      resolve(false);
+    }).on("connect", () => {
+      conn.end();
+      resolve(true);
+    }).on("timeout", () => {
+      conn.destroy();
+      resolve(false);
+    });"#;
+
+    if content.contains(ORIGINAL) {
+        fs::write(path, content.replace(ORIGINAL, PATCHED))?;
+        println!("cargo:warning=Patched webServerPlugin.js for port check timeout");
+    } else {
+        println!("cargo:warning=webServerPlugin.js patch pattern not found");
+    }
+    Ok(())
 }
 
 /// Sets executable permission on files with a shebang.
