@@ -20,6 +20,7 @@ pub fn emit_success(
 }
 
 /// Centralized printing for failure.
+#[allow(dead_code)]
 pub fn emit_failure(command: &'static str, err: &PwError, format: OutputFormat) {
 	if let Some(failure) = err.failure_with_artifacts() {
 		print_failure_with_artifacts(command, failure, format);
@@ -77,9 +78,9 @@ macro_rules! command_registry {
 		pub async fn run_command(
 			id: CommandId,
 			args: serde_json::Value,
-			env: &crate::target::ResolveEnv<'_>,
+			env: &$crate::target::ResolveEnv<'_>,
 			exec: $crate::commands::def::ExecCtx<'_, '_>,
-		) -> crate::error::Result<$crate::commands::def::ErasedOutcome> {
+		) -> $crate::error::Result<$crate::commands::def::ErasedOutcome> {
 			match id {
 				$(
 					CommandId::$id => {
@@ -121,4 +122,10 @@ command_registry! {
 	PageText => crate::commands::page::text::TextCommand { names: ["page.text"] },
 	PageHtml => crate::commands::page::html::HtmlCommand { names: ["page.html"] },
 	PageEval => crate::commands::page::eval::EvalCommand { names: ["page.eval"] },
+	PageConsole => crate::commands::page::console::ConsoleCommand { names: ["page.console"] },
+	PageRead => crate::commands::page::read::ReadCommand { names: ["page.read"] },
+	PageElements => crate::commands::page::elements::ElementsCommand { names: ["page.elements"] },
+	PageSnapshot => crate::commands::page::snapshot::SnapshotCommand { names: ["page.snapshot"] },
+	PageCoords => crate::commands::page::coords::CoordsCommand { names: ["page.coords"] },
+	PageCoordsAll => crate::commands::page::coords::CoordsAllCommand { names: ["page.coords-all"] },
 }

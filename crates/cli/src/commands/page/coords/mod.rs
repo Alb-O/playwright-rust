@@ -21,16 +21,15 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::browser::js;
-use crate::context::CommandContext;
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
 use crate::error::{PwError, Result};
-use crate::output::{CommandInputs, ErrorCode, OutputFormat, ResultBuilder, print_result};
-use crate::session_broker::{SessionBroker, SessionRequest};
-use crate::target::{Resolve, ResolveEnv, ResolvedTarget, TargetPolicy};
+use crate::output::CommandInputs;
+use crate::session_broker::SessionRequest;
+use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 use crate::types::{ElementCoords, IndexedElementCoords};
 
 /// Raw inputs from CLI or batch JSON before resolution.
-///
-/// Use [`Resolve::resolve`] to convert to [`CoordsResolved`] for execution.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoordsRaw {
@@ -62,27 +61,6 @@ pub struct CoordsResolved {
 	pub selector: String,
 }
 
-impl CoordsResolved {
-	/// Returns the URL for page preference matching.
-	///
-	/// For [`Navigate`](crate::target::Target::Navigate) targets, returns the URL.
-	/// For [`CurrentPage`](crate::target::Target::CurrentPage), returns `last_url` as a hint.
-	pub fn preferred_url<'a>(&'a self, last_url: Option<&'a str>) -> Option<&'a str> {
-		self.target.preferred_url(last_url)
-	}
-}
-
-impl Resolve for CoordsRaw {
-	type Output = CoordsResolved;
-
-	fn resolve(self, env: &ResolveEnv<'_>) -> Result<CoordsResolved> {
-		let target = env.resolve_target(self.url, TargetPolicy::AllowCurrentPage)?;
-		let selector = env.resolve_selector(self.selector, None)?;
-
-		Ok(CoordsResolved { target, selector })
-	}
-}
-
 /// Alias for [`CoordsRaw`] used by the `coords-all` command.
 pub type CoordsAllRaw = CoordsRaw;
 
@@ -92,147 +70,171 @@ pub type CoordsAllResolved = CoordsResolved;
 /// Output for single element coordinates.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct CoordsData {
-	coords: ElementCoords,
-	selector: String,
+pub struct CoordsData {
+	pub coords: ElementCoords,
+	pub selector: String,
 }
 
 /// Output for multiple element coordinates.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct CoordsAllData {
-	coords: Vec<IndexedElementCoords>,
-	selector: String,
-	count: usize,
+pub struct CoordsAllData {
+	pub coords: Vec<IndexedElementCoords>,
+	pub selector: String,
+	pub count: usize,
 }
 
-/// Executes the coords command for a single element.
-///
-/// Returns the bounding box and center point of the first element matching
-/// the selector.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Navigation fails
-/// - The selector matches no visible elements ([`PwError::ElementNotFound`])
-/// - JavaScript evaluation fails
-pub async fn execute_single_resolved(
-	args: &CoordsResolved,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-	last_url: Option<&str>,
-) -> Result<()> {
-	let url_display = args.target.url_str().unwrap_or("<current page>");
-	info!(target = "pw", url = %url_display, selector = %args.selector, browser = %ctx.browser, "coords single");
+pub struct CoordsCommand;
 
-	let session = broker
-		.session(
-			SessionRequest::from_context(WaitUntil::NetworkIdle, ctx)
-				.with_preferred_url(args.preferred_url(last_url)),
-		)
-		.await?;
-	session
-		.goto_target(&args.target.target, ctx.timeout_ms())
-		.await?;
+impl CommandDef for CoordsCommand {
+	const NAME: &'static str = "coords";
 
-	let result_json = session
-		.page()
-		.evaluate_value(&js::get_element_coords_js(&args.selector))
-		.await?;
+	type Raw = CoordsRaw;
+	type Resolved = CoordsResolved;
+	type Data = CoordsData;
 
-	if result_json == "null" {
-		let result = ResultBuilder::<CoordsData>::new("coords")
-			.inputs(CommandInputs {
+	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
+		let selector = env.resolve_selector(raw.selector, None)?;
+
+		Ok(CoordsResolved { target, selector })
+	}
+
+	fn execute<'exec, 'ctx>(
+		args: &'exec Self::Resolved,
+		mut exec: ExecCtx<'exec, 'ctx>,
+	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			let url_display = args.target.url_str().unwrap_or("<current page>");
+			info!(target = "pw", url = %url_display, selector = %args.selector, browser = %exec.ctx.browser, "coords single");
+
+			let preferred_url = args.target.preferred_url(exec.last_url);
+			let timeout_ms = exec.ctx.timeout_ms();
+			let target = args.target.target.clone();
+			let selector = args.selector.clone();
+
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
+				.with_preferred_url(preferred_url);
+
+			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
+				let selector = selector.clone();
+				Box::pin(async move {
+					session.goto_target(&target, timeout_ms).await?;
+
+					let result_json = session
+						.page()
+						.evaluate_value(&js::get_element_coords_js(&selector))
+						.await?;
+
+					if result_json == "null" {
+						return Err(PwError::ElementNotFound {
+							selector: selector.clone(),
+						});
+					}
+
+					let coords: ElementCoords = serde_json::from_str(&result_json)?;
+
+					Ok(CoordsData { coords, selector })
+				})
+			})
+			.await?;
+
+			let inputs = CommandInputs {
 				url: args.target.url_str().map(String::from),
 				selector: Some(args.selector.clone()),
 				..Default::default()
+			};
+
+			Ok(CommandOutcome {
+				inputs,
+				data,
+				delta: ContextDelta {
+					url: args.target.url_str().map(String::from),
+					selector: Some(args.selector.clone()),
+					output: None,
+				},
 			})
-			.error(
-				ErrorCode::SelectorNotFound,
-				format!("Element not found or not visible: {}", args.selector),
-			)
-			.build();
-
-		print_result(&result, format);
-		session.close().await?;
-		return Err(PwError::ElementNotFound {
-			selector: args.selector.clone(),
-		});
+		})
 	}
-
-	let coords: ElementCoords = serde_json::from_str(&result_json)?;
-
-	let result = ResultBuilder::new("coords")
-		.inputs(CommandInputs {
-			url: args.target.url_str().map(String::from),
-			selector: Some(args.selector.clone()),
-			..Default::default()
-		})
-		.data(CoordsData {
-			coords,
-			selector: args.selector.clone(),
-		})
-		.build();
-
-	print_result(&result, format);
-	session.close().await
 }
 
-/// Executes the coords-all command for multiple elements.
-///
-/// Returns the bounding box and center point of all elements matching
-/// the selector, each with an index for identification.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Navigation fails
-/// - JavaScript evaluation fails
-pub async fn execute_all_resolved(
-	args: &CoordsAllResolved,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-	last_url: Option<&str>,
-) -> Result<()> {
-	let url_display = args.target.url_str().unwrap_or("<current page>");
-	info!(target = "pw", url = %url_display, selector = %args.selector, browser = %ctx.browser, "coords all");
+pub struct CoordsAllCommand;
 
-	let session = broker
-		.session(
-			SessionRequest::from_context(WaitUntil::NetworkIdle, ctx)
-				.with_preferred_url(args.preferred_url(last_url)),
-		)
-		.await?;
-	session
-		.goto_target(&args.target.target, ctx.timeout_ms())
-		.await?;
+impl CommandDef for CoordsAllCommand {
+	const NAME: &'static str = "coords-all";
 
-	let results_json = session
-		.page()
-		.evaluate_value(&js::get_all_element_coords_js(&args.selector))
-		.await?;
+	type Raw = CoordsAllRaw;
+	type Resolved = CoordsAllResolved;
+	type Data = CoordsAllData;
 
-	let coords: Vec<IndexedElementCoords> = serde_json::from_str(&results_json)?;
-	let count = coords.len();
+	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
+		let selector = env.resolve_selector(raw.selector, None)?;
 
-	let result = ResultBuilder::new("coords-all")
-		.inputs(CommandInputs {
-			url: args.target.url_str().map(String::from),
-			selector: Some(args.selector.clone()),
-			..Default::default()
+		Ok(CoordsAllResolved { target, selector })
+	}
+
+	fn execute<'exec, 'ctx>(
+		args: &'exec Self::Resolved,
+		mut exec: ExecCtx<'exec, 'ctx>,
+	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			let url_display = args.target.url_str().unwrap_or("<current page>");
+			info!(target = "pw", url = %url_display, selector = %args.selector, browser = %exec.ctx.browser, "coords all");
+
+			let preferred_url = args.target.preferred_url(exec.last_url);
+			let timeout_ms = exec.ctx.timeout_ms();
+			let target = args.target.target.clone();
+			let selector = args.selector.clone();
+
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
+				.with_preferred_url(preferred_url);
+
+			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
+				let selector = selector.clone();
+				Box::pin(async move {
+					session.goto_target(&target, timeout_ms).await?;
+
+					let results_json = session
+						.page()
+						.evaluate_value(&js::get_all_element_coords_js(&selector))
+						.await?;
+
+					let coords: Vec<IndexedElementCoords> = serde_json::from_str(&results_json)?;
+					let count = coords.len();
+
+					Ok(CoordsAllData {
+						coords,
+						selector,
+						count,
+					})
+				})
+			})
+			.await?;
+
+			let inputs = CommandInputs {
+				url: args.target.url_str().map(String::from),
+				selector: Some(args.selector.clone()),
+				..Default::default()
+			};
+
+			Ok(CommandOutcome {
+				inputs,
+				data,
+				delta: ContextDelta {
+					url: args.target.url_str().map(String::from),
+					selector: Some(args.selector.clone()),
+					output: None,
+				},
+			})
 		})
-		.data(CoordsAllData {
-			coords,
-			selector: args.selector.clone(),
-			count,
-		})
-		.build();
-
-	print_result(&result, format);
-	session.close().await
+	}
 }
 
 #[cfg(test)]

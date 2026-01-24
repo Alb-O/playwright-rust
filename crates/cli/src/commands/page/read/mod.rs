@@ -16,23 +16,20 @@
 //! pw read https://example.com/article --metadata
 //! ```
 
-use std::io::{self, Write};
-
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::cli::ReadOutputFormat;
-use crate::context::CommandContext;
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
 use crate::error::Result;
-use crate::output::{CommandInputs, OutputFormat, ResultBuilder, print_result};
+use crate::output::CommandInputs;
 use crate::readable::{ReadableContent, extract_readable};
-use crate::session_broker::{SessionBroker, SessionRequest};
-use crate::target::{Resolve, ResolveEnv, ResolvedTarget, TargetPolicy};
+use crate::session_broker::SessionRequest;
+use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON before resolution.
-///
-/// Use [`Resolve::resolve`] to convert to [`ReadResolved`] for execution.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReadRaw {
@@ -84,22 +81,18 @@ pub struct ReadResolved {
 	pub include_metadata: bool,
 }
 
-impl ReadResolved {
-	/// Returns the URL for page preference matching.
-	///
-	/// For [`Navigate`](crate::target::Target::Navigate) targets, returns the URL.
-	/// For [`CurrentPage`](crate::target::Target::CurrentPage), returns `last_url` as a hint.
-	pub fn preferred_url<'a>(&'a self, last_url: Option<&'a str>) -> Option<&'a str> {
-		self.target.preferred_url(last_url)
-	}
-}
+pub struct ReadCommand;
 
-impl Resolve for ReadRaw {
-	type Output = ReadResolved;
+impl CommandDef for ReadCommand {
+	const NAME: &'static str = "read";
 
-	fn resolve(self, env: &ResolveEnv<'_>) -> Result<ReadResolved> {
-		let target = env.resolve_target(self.url, TargetPolicy::AllowCurrentPage)?;
-		let output_format = match self.output_format.as_deref() {
+	type Raw = ReadRaw;
+	type Resolved = ReadResolved;
+	type Data = ReadData;
+
+	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
+		let output_format = match raw.output_format.as_deref() {
 			Some("text") => ReadOutputFormat::Text,
 			Some("html") => ReadOutputFormat::Html,
 			Some("markdown") | None => ReadOutputFormat::Markdown,
@@ -112,7 +105,62 @@ impl Resolve for ReadRaw {
 		Ok(ReadResolved {
 			target,
 			output_format,
-			include_metadata: self.metadata.unwrap_or(false),
+			include_metadata: raw.metadata.unwrap_or(false),
+		})
+	}
+
+	fn execute<'exec, 'ctx>(
+		args: &'exec Self::Resolved,
+		mut exec: ExecCtx<'exec, 'ctx>,
+	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			let url_display = args.target.url_str().unwrap_or("<current page>");
+			info!(target = "pw", url = %url_display, output_format = ?args.output_format, browser = %exec.ctx.browser, "extract readable content");
+
+			let preferred_url = args.target.preferred_url(exec.last_url);
+			let timeout_ms = exec.ctx.timeout_ms();
+			let target = args.target.target.clone();
+			let output_format = args.output_format;
+			let include_metadata = args.include_metadata;
+			let url_str = args.target.url_str().map(String::from);
+
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
+				.with_preferred_url(preferred_url);
+
+			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
+				let url_str = url_str.clone();
+				Box::pin(async move {
+					session.goto_target(&target, timeout_ms).await?;
+
+					let locator = session.page().locator("html").await;
+					let html = locator.inner_html().await?;
+					let readable = extract_readable(&html, url_str.as_deref());
+					Ok(ReadData::from_readable(
+						readable,
+						output_format,
+						include_metadata,
+					))
+				})
+			})
+			.await?;
+
+			let inputs = CommandInputs {
+				url: args.target.url_str().map(String::from),
+				..Default::default()
+			};
+
+			Ok(CommandOutcome {
+				inputs,
+				data,
+				delta: ContextDelta {
+					url: args.target.url_str().map(String::from),
+					selector: None,
+					output: None,
+				},
+			})
 		})
 	}
 }
@@ -198,62 +246,6 @@ impl ReadData {
 			}
 		}
 	}
-}
-
-/// Executes the read command with resolved arguments.
-///
-/// Navigates to the target page, extracts readable content using a readability
-/// algorithm, and returns the content in the requested format.
-///
-/// When CLI output format is [`OutputFormat::Text`], the content is printed
-/// directly to stdout without JSON wrapping.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Navigation fails
-/// - HTML extraction fails
-pub async fn execute_resolved(
-	args: &ReadResolved,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-	last_url: Option<&str>,
-) -> Result<()> {
-	let url_display = args.target.url_str().unwrap_or("<current page>");
-	info!(target = "pw", url = %url_display, output_format = ?args.output_format, browser = %ctx.browser, "extract readable content");
-
-	let session = broker
-		.session(
-			SessionRequest::from_context(WaitUntil::NetworkIdle, ctx)
-				.with_preferred_url(args.preferred_url(last_url)),
-		)
-		.await?;
-	session
-		.goto_target(&args.target.target, ctx.timeout_ms())
-		.await?;
-
-	let locator = session.page().locator("html").await;
-	let html = locator.inner_html().await?;
-	let readable = extract_readable(&html, args.target.url_str());
-	let data = ReadData::from_readable(readable, args.output_format, args.include_metadata);
-
-	if format == OutputFormat::Text {
-		let mut stdout = io::stdout().lock();
-		let _ = writeln!(stdout, "{}", data.content);
-		return session.close().await;
-	}
-
-	let result = ResultBuilder::new("read")
-		.inputs(CommandInputs {
-			url: args.target.url_str().map(String::from),
-			..Default::default()
-		})
-		.data(data)
-		.build();
-
-	print_result(&result, format);
-	session.close().await
 }
 
 #[cfg(test)]

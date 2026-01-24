@@ -123,7 +123,10 @@ impl CommandDef for WaitCommand {
 							});
 						}
 
-						if matches!(condition.as_str(), "load" | "domcontentloaded" | "networkidle") {
+						if matches!(
+							condition.as_str(),
+							"load" | "domcontentloaded" | "networkidle"
+						) {
 							return Ok(WaitData {
 								condition: format!("loadstate:{condition}"),
 								waited_ms: None,

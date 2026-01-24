@@ -25,25 +25,20 @@
 //! pw snapshot --max-text-length 10000
 //! ```
 
-use std::path::Path;
-
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::context::CommandContext;
-use crate::error::{PwError, Result};
-use crate::output::{
-	CommandInputs, FailureWithArtifacts, InteractiveElement, OutputFormat, ResultBuilder,
-	SnapshotData, print_failure_with_artifacts, print_result,
-};
-use crate::session_broker::{SessionBroker, SessionHandle, SessionRequest};
-use crate::target::{Resolve, ResolveEnv, ResolvedTarget, TargetPolicy};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
+use crate::error::Result;
+use crate::output::{CommandInputs, InteractiveElement, SnapshotData};
+use crate::session_broker::{SessionHandle, SessionRequest};
+use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON before resolution.
 ///
 /// Accepts both camelCase (JSON) and snake_case (CLI) field names via serde aliases.
-/// Use [`Resolve::resolve`] to convert to [`SnapshotResolved`] for execution.
 ///
 /// # Example
 ///
@@ -115,25 +110,103 @@ pub struct SnapshotResolved {
 	pub max_text_length: usize,
 }
 
-impl SnapshotResolved {
-	/// Returns the URL for session page-matching, preferring the target URL
-	/// if navigating, or `last_url` as a hint for [`Target::CurrentPage`].
-	pub fn preferred_url<'a>(&'a self, last_url: Option<&'a str>) -> Option<&'a str> {
-		self.target.preferred_url(last_url)
-	}
-}
+pub struct SnapshotCommand;
 
-impl Resolve for SnapshotRaw {
-	type Output = SnapshotResolved;
+impl CommandDef for SnapshotCommand {
+	const NAME: &'static str = "snapshot";
 
-	fn resolve(self, env: &ResolveEnv<'_>) -> Result<SnapshotResolved> {
-		let target = env.resolve_target(self.url, TargetPolicy::AllowCurrentPage)?;
+	type Raw = SnapshotRaw;
+	type Resolved = SnapshotResolved;
+	type Data = SnapshotData;
+
+	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
 
 		Ok(SnapshotResolved {
 			target,
-			text_only: self.text_only.unwrap_or(false),
-			full: self.full.unwrap_or(false),
-			max_text_length: self.max_text_length.unwrap_or(5000),
+			text_only: raw.text_only.unwrap_or(false),
+			full: raw.full.unwrap_or(false),
+			max_text_length: raw.max_text_length.unwrap_or(5000),
+		})
+	}
+
+	fn execute<'exec, 'ctx>(
+		args: &'exec Self::Resolved,
+		mut exec: ExecCtx<'exec, 'ctx>,
+	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			let url_display = args.target.url_str().unwrap_or("<current page>");
+			info!(target = "pw", url = %url_display, text_only = %args.text_only, full = %args.full, browser = %exec.ctx.browser, "snapshot");
+
+			let preferred_url = args.target.preferred_url(exec.last_url);
+			let timeout_ms = exec.ctx.timeout_ms();
+			let target = args.target.target.clone();
+			let text_only = args.text_only;
+			let full = args.full;
+			let max_text_length = args.max_text_length;
+
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
+				.with_preferred_url(preferred_url);
+
+			let (final_url, data) = with_session(
+				&mut exec,
+				req,
+				ArtifactsPolicy::OnError {
+					command: "snapshot",
+				},
+				move |session| {
+					Box::pin(async move {
+						session.goto_target(&target, timeout_ms).await?;
+
+						let meta_js = format!("JSON.stringify({})", EXTRACT_META_JS);
+						let meta: PageMeta =
+							serde_json::from_str(&session.page().evaluate_value(&meta_js).await?)?;
+
+						let text_js = format!(
+							"JSON.stringify({}({}, {}))",
+							EXTRACT_TEXT_JS, max_text_length, full
+						);
+						let text: String =
+							serde_json::from_str(&session.page().evaluate_value(&text_js).await?)?;
+
+						let elements = extract_elements_if_needed(session, text_only).await?;
+						let element_count = elements.len();
+
+						let final_url = meta.url.clone();
+
+						let data = SnapshotData {
+							url: meta.url,
+							title: meta.title,
+							viewport_width: meta.viewport_width,
+							viewport_height: meta.viewport_height,
+							text,
+							elements,
+							element_count,
+						};
+
+						Ok((final_url, data))
+					})
+				},
+			)
+			.await?;
+
+			let inputs = CommandInputs {
+				url: args.target.url_str().map(String::from),
+				..Default::default()
+			};
+
+			Ok(CommandOutcome {
+				inputs,
+				data,
+				delta: ContextDelta {
+					url: Some(final_url),
+					selector: None,
+					output: None,
+				},
+			})
 		})
 	}
 }
@@ -369,108 +442,6 @@ pub(crate) const EXTRACT_ELEMENTS_JS: &str = r#"
     return elements;
 })()
 "#;
-
-/// Executes the snapshot command with resolved arguments.
-///
-/// Navigates to the target (or stays on current page in CDP mode), then extracts
-/// page metadata, visible text content, and interactive elements via JavaScript
-/// evaluation.
-///
-/// # Arguments
-///
-/// * `args` - Resolved snapshot parameters
-/// * `ctx` - Command context with browser configuration
-/// * `broker` - Session broker for browser connection
-/// * `format` - Output format (JSON, TOON, etc.)
-/// * `artifacts_dir` - Directory to save diagnostic artifacts on failure
-/// * `last_url` - Last visited URL for session page matching
-///
-/// # Errors
-///
-/// - [`PwError::Navigation`](crate::error::PwError) if page navigation fails
-/// - [`PwError::JsEval`](crate::error::PwError) if JavaScript evaluation fails
-/// - [`PwError::Parse`](crate::error::PwError) if response JSON is malformed
-///
-/// On failure with `artifacts_dir` set, saves screenshot and HTML for debugging.
-pub async fn execute_resolved(
-	args: &SnapshotResolved,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-	artifacts_dir: Option<&Path>,
-	last_url: Option<&str>,
-) -> Result<()> {
-	let url_display = args.target.url_str().unwrap_or("<current page>");
-	info!(target = "pw", url = %url_display, text_only = %args.text_only, full = %args.full, browser = %ctx.browser, "snapshot");
-
-	let session = broker
-		.session(
-			SessionRequest::from_context(WaitUntil::NetworkIdle, ctx)
-				.with_preferred_url(args.preferred_url(last_url)),
-		)
-		.await?;
-
-	match extract_snapshot(&session, args, format, ctx.timeout_ms()).await {
-		Ok(()) => session.close().await,
-		Err(e) => {
-			let artifacts = session
-				.collect_failure_artifacts(artifacts_dir, "snapshot")
-				.await;
-
-			if !artifacts.is_empty() {
-				let failure = FailureWithArtifacts::new(e.to_command_error())
-					.with_artifacts(artifacts.artifacts);
-				print_failure_with_artifacts("snapshot", &failure, format);
-				let _ = session.close().await;
-				return Err(PwError::OutputAlreadyPrinted);
-			}
-
-			let _ = session.close().await;
-			Err(e)
-		}
-	}
-}
-
-/// Performs the actual snapshot extraction after session acquisition.
-async fn extract_snapshot(
-	session: &SessionHandle,
-	args: &SnapshotResolved,
-	format: OutputFormat,
-	timeout_ms: Option<u64>,
-) -> Result<()> {
-	session.goto_target(&args.target.target, timeout_ms).await?;
-
-	let meta_js = format!("JSON.stringify({})", EXTRACT_META_JS);
-	let meta: PageMeta = serde_json::from_str(&session.page().evaluate_value(&meta_js).await?)?;
-
-	let text_js = format!(
-		"JSON.stringify({}({}, {}))",
-		EXTRACT_TEXT_JS, args.max_text_length, args.full
-	);
-	let text: String = serde_json::from_str(&session.page().evaluate_value(&text_js).await?)?;
-
-	let elements = extract_elements_if_needed(session, args.text_only).await?;
-	let element_count = elements.len();
-
-	let result = ResultBuilder::new("snapshot")
-		.inputs(CommandInputs {
-			url: args.target.url_str().map(String::from),
-			..Default::default()
-		})
-		.data(SnapshotData {
-			url: meta.url,
-			title: meta.title,
-			viewport_width: meta.viewport_width,
-			viewport_height: meta.viewport_height,
-			text,
-			elements,
-			element_count,
-		})
-		.build();
-
-	print_result(&result, format);
-	Ok(())
-}
 
 /// Extracts interactive elements unless `text_only` mode is enabled.
 async fn extract_elements_if_needed(

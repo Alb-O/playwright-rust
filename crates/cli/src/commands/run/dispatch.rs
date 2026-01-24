@@ -1,5 +1,6 @@
 //! Command dispatch for batch execution.
 
+use super::{BatchRequest, BatchResponse};
 use crate::commands::def::{ExecCtx, ExecMode};
 use crate::commands::registry::{command_name, lookup_command, run_command};
 use crate::context::CommandContext;
@@ -7,8 +8,6 @@ use crate::context_store::ContextState;
 use crate::output::OutputFormat;
 use crate::session_broker::SessionBroker;
 use crate::target::ResolveEnv;
-
-use super::{BatchRequest, BatchResponse};
 
 /// Dispatches a single batch command and returns the response.
 ///

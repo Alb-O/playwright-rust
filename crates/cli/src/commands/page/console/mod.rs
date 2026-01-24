@@ -17,16 +17,15 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
 use crate::browser::js::console_capture_injection_js;
-use crate::context::CommandContext;
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
 use crate::error::Result;
-use crate::output::{CommandInputs, OutputFormat, ResultBuilder, print_result};
-use crate::session_broker::{SessionBroker, SessionRequest};
-use crate::target::{Resolve, ResolveEnv, ResolvedTarget, TargetPolicy};
+use crate::output::CommandInputs;
+use crate::session_broker::SessionRequest;
+use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 use crate::types::ConsoleMessage;
 
 /// Raw inputs from CLI or batch JSON before resolution.
-///
-/// Use [`Resolve::resolve`] to convert to [`ConsoleResolved`] for execution.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConsoleRaw {
@@ -61,122 +60,117 @@ pub struct ConsoleResolved {
 	pub timeout_ms: u64,
 }
 
-impl ConsoleResolved {
-	/// Returns the URL for page preference matching.
-	///
-	/// For [`Navigate`](crate::target::Target::Navigate) targets, returns the URL.
-	/// For [`CurrentPage`](crate::target::Target::CurrentPage), returns `last_url` as a hint.
-	pub fn preferred_url<'a>(&'a self, last_url: Option<&'a str>) -> Option<&'a str> {
-		self.target.preferred_url(last_url)
-	}
-}
-
-impl Resolve for ConsoleRaw {
-	type Output = ConsoleResolved;
-
-	fn resolve(self, env: &ResolveEnv<'_>) -> Result<ConsoleResolved> {
-		let target = env.resolve_target(self.url, TargetPolicy::AllowCurrentPage)?;
-
-		Ok(ConsoleResolved {
-			target,
-			timeout_ms: self.timeout_ms.unwrap_or(3000),
-		})
-	}
-}
-
 /// Captured console messages with summary counts.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ConsoleData {
-	messages: Vec<ConsoleMessage>,
-	count: usize,
-	error_count: usize,
-	warning_count: usize,
+pub struct ConsoleData {
+	pub messages: Vec<ConsoleMessage>,
+	pub count: usize,
+	pub error_count: usize,
+	pub warning_count: usize,
 }
 
-/// Executes the console command with resolved arguments.
-///
-/// Injects a console capture script, navigates to the page, waits for
-/// [`timeout_ms`](ConsoleResolved::timeout_ms), then collects all captured
-/// console messages.
-///
-/// Messages are also emitted to tracing at the `pw.browser.console` target
-/// for logging visibility.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Navigation fails
-/// - Session creation fails
-pub async fn execute_resolved(
-	args: &ConsoleResolved,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-	last_url: Option<&str>,
-) -> Result<()> {
-	let url_display = args.target.url_str().unwrap_or("<current page>");
-	info!(target = "pw", url = %url_display, timeout_ms = args.timeout_ms, browser = %ctx.browser, "capture console");
+pub struct ConsoleCommand;
 
-	let session = broker
-		.session(
-			SessionRequest::from_context(WaitUntil::NetworkIdle, ctx)
-				.with_preferred_url(args.preferred_url(last_url)),
-		)
-		.await?;
+impl CommandDef for ConsoleCommand {
+	const NAME: &'static str = "console";
 
-	if let Err(err) = session
-		.page()
-		.evaluate(console_capture_injection_js())
-		.await
+	type Raw = ConsoleRaw;
+	type Resolved = ConsoleResolved;
+	type Data = ConsoleData;
+
+	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
+
+		Ok(ConsoleResolved {
+			target,
+			timeout_ms: raw.timeout_ms.unwrap_or(3000),
+		})
+	}
+
+	fn execute<'exec, 'ctx>(
+		args: &'exec Self::Resolved,
+		mut exec: ExecCtx<'exec, 'ctx>,
+	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
 	{
-		warn!(target = "pw.browser.console", error = %err, "failed to inject console capture");
-	}
+		Box::pin(async move {
+			let url_display = args.target.url_str().unwrap_or("<current page>");
+			info!(target = "pw", url = %url_display, timeout_ms = args.timeout_ms, browser = %exec.ctx.browser, "capture console");
 
-	session
-		.goto_target(&args.target.target, ctx.timeout_ms())
-		.await?;
+			let preferred_url = args.target.preferred_url(exec.last_url);
+			let timeout_ms = exec.ctx.timeout_ms();
+			let target = args.target.target.clone();
+			let capture_timeout_ms = args.timeout_ms;
 
-	tokio::time::sleep(Duration::from_millis(args.timeout_ms)).await;
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
+				.with_preferred_url(preferred_url);
 
-	let messages_json = session
-		.page()
-		.evaluate_value("JSON.stringify(window.__consoleMessages || [])")
-		.await
-		.unwrap_or_else(|_| "[]".to_string());
+			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
+				Box::pin(async move {
+					if let Err(err) = session
+						.page()
+						.evaluate(console_capture_injection_js())
+						.await
+					{
+						warn!(target = "pw.browser.console", error = %err, "failed to inject console capture");
+					}
 
-	let messages: Vec<ConsoleMessage> = serde_json::from_str(&messages_json).unwrap_or_default();
+					session.goto_target(&target, timeout_ms).await?;
 
-	for msg in &messages {
-		info!(
-			target = "pw.browser.console",
-			kind = %msg.msg_type,
-			text = %msg.text,
-			stack = ?msg.stack,
-			"browser console"
-		);
-	}
+					tokio::time::sleep(Duration::from_millis(capture_timeout_ms)).await;
 
-	let error_count = messages.iter().filter(|m| m.msg_type == "error").count();
-	let warning_count = messages.iter().filter(|m| m.msg_type == "warning").count();
-	let count = messages.len();
+					let messages_json = session
+						.page()
+						.evaluate_value("JSON.stringify(window.__consoleMessages || [])")
+						.await
+						.unwrap_or_else(|_| "[]".to_string());
 
-	let result = ResultBuilder::new("console")
-		.inputs(CommandInputs {
-			url: args.target.url_str().map(String::from),
-			extra: Some(serde_json::json!({ "timeout_ms": args.timeout_ms })),
-			..Default::default()
+					let messages: Vec<ConsoleMessage> =
+						serde_json::from_str(&messages_json).unwrap_or_default();
+
+					for msg in &messages {
+						info!(
+							target = "pw.browser.console",
+							kind = %msg.msg_type,
+							text = %msg.text,
+							stack = ?msg.stack,
+							"browser console"
+						);
+					}
+
+					let error_count = messages.iter().filter(|m| m.msg_type == "error").count();
+					let warning_count = messages.iter().filter(|m| m.msg_type == "warning").count();
+					let count = messages.len();
+
+					Ok(ConsoleData {
+						messages,
+						count,
+						error_count,
+						warning_count,
+					})
+				})
+			})
+			.await?;
+
+			let inputs = CommandInputs {
+				url: args.target.url_str().map(String::from),
+				extra: Some(serde_json::json!({ "timeout_ms": args.timeout_ms })),
+				..Default::default()
+			};
+
+			Ok(CommandOutcome {
+				inputs,
+				data,
+				delta: ContextDelta {
+					url: args.target.url_str().map(String::from),
+					selector: None,
+					output: None,
+				},
+			})
 		})
-		.data(ConsoleData {
-			messages,
-			count,
-			error_count,
-			warning_count,
-		})
-		.build();
-
-	print_result(&result, format);
-	session.close().await
+	}
 }
 
 #[cfg(test)]

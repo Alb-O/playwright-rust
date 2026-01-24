@@ -9,7 +9,7 @@ use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, Exe
 use crate::error::Result;
 use crate::output::CommandInputs;
 use crate::session_broker::SessionRequest;
-use crate::session_helpers::{with_session, ArtifactsPolicy};
+use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
@@ -116,26 +116,21 @@ impl CommandDef for HtmlCommand {
 			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
 				.with_preferred_url(preferred_url);
 
-			let data = with_session(
-				&mut exec,
-				req,
-				ArtifactsPolicy::Never,
-				move |session| {
-					let selector = selector.clone();
-					Box::pin(async move {
-						session.goto_target(&target, timeout_ms).await?;
+			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
+				let selector = selector.clone();
+				Box::pin(async move {
+					session.goto_target(&target, timeout_ms).await?;
 
-						let locator = session.page().locator(&selector).await;
-						let html = locator.inner_html().await?;
+					let locator = session.page().locator(&selector).await;
+					let html = locator.inner_html().await?;
 
-						Ok(HtmlData {
-							length: Some(html.len()),
-							html,
-							selector,
-						})
+					Ok(HtmlData {
+						length: Some(html.len()),
+						html,
+						selector,
 					})
-				},
-			)
+				})
+			})
 			.await?;
 
 			let inputs = CommandInputs {

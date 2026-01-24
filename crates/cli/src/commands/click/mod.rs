@@ -11,7 +11,7 @@ use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, Exe
 use crate::error::Result;
 use crate::output::{ClickData, CommandInputs, DownloadedFile};
 use crate::session_broker::SessionRequest;
-use crate::session_helpers::{with_session, ArtifactsPolicy};
+use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.

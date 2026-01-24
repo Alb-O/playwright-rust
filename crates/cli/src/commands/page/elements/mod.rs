@@ -17,24 +17,18 @@
 //! pw elements https://example.com --wait --timeout-ms 5000
 //! ```
 
-use std::path::Path;
-
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::context::CommandContext;
-use crate::error::{PwError, Result};
-use crate::output::{
-	CommandInputs, ElementsData, FailureWithArtifacts, InteractiveElement, OutputFormat,
-	ResultBuilder, print_failure_with_artifacts, print_result,
-};
-use crate::session_broker::{SessionBroker, SessionHandle, SessionRequest};
-use crate::target::{Resolve, ResolveEnv, ResolvedTarget, TargetPolicy};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
+use crate::error::Result;
+use crate::output::{CommandInputs, ElementsData, InteractiveElement};
+use crate::session_broker::{SessionHandle, SessionRequest};
+use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON before resolution.
-///
-/// Use [`Resolve::resolve`] to convert to [`ElementsResolved`] for execution.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ElementsRaw {
@@ -77,26 +71,106 @@ pub struct ElementsResolved {
 	pub timeout_ms: u64,
 }
 
-impl ElementsResolved {
-	/// Returns the URL for page preference matching.
-	///
-	/// For [`Navigate`](crate::target::Target::Navigate) targets, returns the URL.
-	/// For [`CurrentPage`](crate::target::Target::CurrentPage), returns `last_url` as a hint.
-	pub fn preferred_url<'a>(&'a self, last_url: Option<&'a str>) -> Option<&'a str> {
-		self.target.preferred_url(last_url)
-	}
-}
+pub struct ElementsCommand;
 
-impl Resolve for ElementsRaw {
-	type Output = ElementsResolved;
+impl CommandDef for ElementsCommand {
+	const NAME: &'static str = "elements";
 
-	fn resolve(self, env: &ResolveEnv<'_>) -> Result<ElementsResolved> {
-		let target = env.resolve_target(self.url, TargetPolicy::AllowCurrentPage)?;
+	type Raw = ElementsRaw;
+	type Resolved = ElementsResolved;
+	type Data = ElementsData;
+
+	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
 
 		Ok(ElementsResolved {
 			target,
-			wait: self.wait.unwrap_or(false),
-			timeout_ms: self.timeout_ms.unwrap_or(10000),
+			wait: raw.wait.unwrap_or(false),
+			timeout_ms: raw.timeout_ms.unwrap_or(10000),
+		})
+	}
+
+	fn execute<'exec, 'ctx>(
+		args: &'exec Self::Resolved,
+		mut exec: ExecCtx<'exec, 'ctx>,
+	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			let url_display = args.target.url_str().unwrap_or("<current page>");
+			info!(target = "pw", url = %url_display, wait = %args.wait, timeout_ms = %args.timeout_ms, browser = %exec.ctx.browser, "list elements");
+
+			let preferred_url = args.target.preferred_url(exec.last_url);
+			let timeout_ms = exec.ctx.timeout_ms();
+			let target = args.target.target.clone();
+			let wait = args.wait;
+			let poll_timeout_ms = args.timeout_ms;
+
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
+				.with_preferred_url(preferred_url);
+
+			let data = with_session(
+				&mut exec,
+				req,
+				ArtifactsPolicy::OnError {
+					command: "elements",
+				},
+				move |session| {
+					Box::pin(async move {
+						session.goto_target(&target, timeout_ms).await?;
+
+						let js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
+
+						let raw_elements: Vec<RawElement> = if wait {
+							poll_for_elements(session, &js, poll_timeout_ms).await?
+						} else {
+							let raw_result = session.page().evaluate_value(&js).await?;
+							serde_json::from_str(&raw_result)?
+						};
+
+						let elements: Vec<InteractiveElement> = raw_elements
+							.into_iter()
+							.map(|e| InteractiveElement {
+								tag: e.kind,
+								selector: e.selector,
+								text: if e.label.is_empty() || e.label == "(unlabeled)" {
+									None
+								} else {
+									Some(e.label)
+								},
+								href: None,
+								name: e.extra,
+								id: None,
+								x: e.x,
+								y: e.y,
+								width: e.width,
+								height: e.height,
+							})
+							.collect();
+
+						let count = elements.len();
+
+						Ok(ElementsData { elements, count })
+					})
+				},
+			)
+			.await?;
+
+			let inputs = CommandInputs {
+				url: args.target.url_str().map(String::from),
+				..Default::default()
+			};
+
+			Ok(CommandOutcome {
+				inputs,
+				data,
+				delta: ContextDelta {
+					url: args.target.url_str().map(String::from),
+					selector: None,
+					output: None,
+				},
+			})
 		})
 	}
 }
@@ -258,112 +332,6 @@ const EXTRACT_ELEMENTS_JS: &str = r#"
     return elements;
 })()
 "#;
-
-/// Executes the elements command with resolved arguments.
-///
-/// Navigates to the target page, runs element extraction JavaScript, and
-/// returns a list of interactive elements with their selectors and positions.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Navigation fails
-/// - JavaScript evaluation fails
-/// - Response parsing fails
-///
-/// On failure, collects diagnostic artifacts (screenshot, HTML) if `artifacts_dir` is set.
-pub async fn execute_resolved(
-	args: &ElementsResolved,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-	artifacts_dir: Option<&Path>,
-	last_url: Option<&str>,
-) -> Result<()> {
-	let url_display = args.target.url_str().unwrap_or("<current page>");
-	info!(target = "pw", url = %url_display, wait = %args.wait, timeout_ms = %args.timeout_ms, browser = %ctx.browser, "list elements");
-
-	let session = broker
-		.session(
-			SessionRequest::from_context(WaitUntil::NetworkIdle, ctx)
-				.with_preferred_url(args.preferred_url(last_url)),
-		)
-		.await?;
-
-	match extract_elements(&session, args, format, ctx.timeout_ms()).await {
-		Ok(()) => session.close().await,
-		Err(e) => {
-			let artifacts = session
-				.collect_failure_artifacts(artifacts_dir, "elements")
-				.await;
-
-			if !artifacts.is_empty() {
-				let failure = FailureWithArtifacts::new(e.to_command_error())
-					.with_artifacts(artifacts.artifacts);
-				print_failure_with_artifacts("elements", &failure, format);
-				let _ = session.close().await;
-				return Err(PwError::OutputAlreadyPrinted);
-			}
-
-			let _ = session.close().await;
-			Err(e)
-		}
-	}
-}
-
-/// Extracts interactive elements from the page.
-async fn extract_elements(
-	session: &SessionHandle,
-	args: &ElementsResolved,
-	format: OutputFormat,
-	nav_timeout_ms: Option<u64>,
-) -> Result<()> {
-	session
-		.goto_target(&args.target.target, nav_timeout_ms)
-		.await?;
-
-	let js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
-
-	let raw_elements: Vec<RawElement> = if args.wait {
-		poll_for_elements(session, &js, args.timeout_ms).await?
-	} else {
-		let raw_result = session.page().evaluate_value(&js).await?;
-		serde_json::from_str(&raw_result)?
-	};
-
-	let elements: Vec<InteractiveElement> = raw_elements
-		.into_iter()
-		.map(|e| InteractiveElement {
-			tag: e.kind,
-			selector: e.selector,
-			text: if e.label.is_empty() || e.label == "(unlabeled)" {
-				None
-			} else {
-				Some(e.label)
-			},
-			href: None,
-			name: e.extra,
-			id: None,
-			x: e.x,
-			y: e.y,
-			width: e.width,
-			height: e.height,
-		})
-		.collect();
-
-	let count = elements.len();
-
-	let result = ResultBuilder::new("elements")
-		.inputs(CommandInputs {
-			url: args.target.url_str().map(String::from),
-			..Default::default()
-		})
-		.data(ElementsData { elements, count })
-		.build();
-
-	print_result(&result, format);
-	Ok(())
-}
 
 /// Polls for elements until some appear or timeout is reached.
 async fn poll_for_elements(

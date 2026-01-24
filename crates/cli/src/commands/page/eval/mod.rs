@@ -8,7 +8,7 @@ use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, Exe
 use crate::error::{PwError, Result};
 use crate::output::{CommandInputs, EvalData};
 use crate::session_broker::SessionRequest;
-use crate::session_helpers::{with_session, ArtifactsPolicy};
+use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
@@ -91,29 +91,24 @@ impl CommandDef for EvalCommand {
 			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
 				.with_preferred_url(preferred_url);
 
-			let data = with_session(
-				&mut exec,
-				req,
-				ArtifactsPolicy::Never,
-				move |session| {
-					let expression = expression.clone();
-					Box::pin(async move {
-						session.goto_target(&target, timeout_ms).await?;
+			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
+				let expression = expression.clone();
+				Box::pin(async move {
+					session.goto_target(&target, timeout_ms).await?;
 
-						let wrapped_expr = format!("JSON.stringify({})", expression);
-						let raw_result = session.page().evaluate_value(&wrapped_expr).await;
+					let wrapped_expr = format!("JSON.stringify({})", expression);
+					let raw_result = session.page().evaluate_value(&wrapped_expr).await;
 
-						let json_str = raw_result.map_err(|e| PwError::JsEval(e.to_string()))?;
-						let value: serde_json::Value =
-							serde_json::from_str(&json_str).unwrap_or(serde_json::Value::Null);
+					let json_str = raw_result.map_err(|e| PwError::JsEval(e.to_string()))?;
+					let value: serde_json::Value =
+						serde_json::from_str(&json_str).unwrap_or(serde_json::Value::Null);
 
-						Ok(EvalData {
-							result: value,
-							expression,
-						})
+					Ok(EvalData {
+						result: value,
+						expression,
 					})
-				},
-			)
+				})
+			})
 			.await?;
 
 			let inputs = CommandInputs {

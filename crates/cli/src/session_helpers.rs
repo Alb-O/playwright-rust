@@ -32,7 +32,9 @@ where
 		}
 		Err(e) => {
 			if let ArtifactsPolicy::OnError { command } = artifacts {
-				let artifacts = session.collect_failure_artifacts(exec.artifacts_dir, command).await;
+				let artifacts = session
+					.collect_failure_artifacts(exec.artifacts_dir, command)
+					.await;
 
 				if !artifacts.is_empty() {
 					let failure = FailureWithArtifacts::new(e.to_command_error())

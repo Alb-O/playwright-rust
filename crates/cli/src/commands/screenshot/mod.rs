@@ -10,7 +10,7 @@ use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, Exe
 use crate::error::Result;
 use crate::output::{CommandInputs, ScreenshotData};
 use crate::session_broker::SessionRequest;
-use crate::session_helpers::{with_session, ArtifactsPolicy};
+use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
@@ -65,7 +65,9 @@ impl CommandDef for ScreenshotCommand {
 		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
 
 		// Output path resolution is handled by ContextState in the dispatcher
-		let output = raw.output.unwrap_or_else(|| PathBuf::from("screenshot.png"));
+		let output = raw
+			.output
+			.unwrap_or_else(|| PathBuf::from("screenshot.png"));
 		let full_page = raw.full_page.unwrap_or(false);
 
 		Ok(ScreenshotResolved {

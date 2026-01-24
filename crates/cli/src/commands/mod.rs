@@ -367,15 +367,22 @@ async fn dispatch_page_action<'ctx>(
 			url_flag,
 		} => {
 			let raw = page::console::ConsoleRaw::from_cli(url_flag.or(url), timeout_ms);
-			let env = ResolveEnv::new(ctx_state, has_cdp, "console");
-			let resolved = raw.resolve(&env)?;
-			let last_url = ctx_state.last_url();
-			let outcome =
-				page::console::execute_resolved(&resolved, ctx, broker, format, last_url).await;
-			if outcome.is_ok() {
-				ctx_state.record_from_target(&resolved.target, None);
-			}
-			outcome
+			let env = ResolveEnv::new(ctx_state, has_cdp, page::console::ConsoleCommand::NAME);
+			let resolved = page::console::ConsoleCommand::resolve(raw, &env)?;
+			let last_url = ctx_state.last_url().map(str::to_string);
+			let exec = ExecCtx {
+				mode: ExecMode::Cli,
+				ctx,
+				broker,
+				format,
+				artifacts_dir,
+				last_url: last_url.as_deref(),
+			};
+			let outcome = page::console::ConsoleCommand::execute(&resolved, exec).await?;
+			let erased = outcome.erase(page::console::ConsoleCommand::NAME)?;
+			emit_success(erased.command, erased.inputs, erased.data, format);
+			erased.delta.apply(ctx_state);
+			Ok(())
 		}
 		PageAction::Eval {
 			expression,
@@ -446,16 +453,22 @@ async fn dispatch_page_action<'ctx>(
 		} => {
 			let raw =
 				page::coords::CoordsRaw::from_cli(url_flag.or(url), selector_flag.or(selector));
-			let env = ResolveEnv::new(ctx_state, has_cdp, "coords");
-			let resolved = raw.resolve(&env)?;
-			let last_url = ctx_state.last_url();
-			let outcome =
-				page::coords::execute_single_resolved(&resolved, ctx, broker, format, last_url)
-					.await;
-			if outcome.is_ok() {
-				ctx_state.record_from_target(&resolved.target, Some(&resolved.selector));
-			}
-			outcome
+			let env = ResolveEnv::new(ctx_state, has_cdp, page::coords::CoordsCommand::NAME);
+			let resolved = page::coords::CoordsCommand::resolve(raw, &env)?;
+			let last_url = ctx_state.last_url().map(str::to_string);
+			let exec = ExecCtx {
+				mode: ExecMode::Cli,
+				ctx,
+				broker,
+				format,
+				artifacts_dir,
+				last_url: last_url.as_deref(),
+			};
+			let outcome = page::coords::CoordsCommand::execute(&resolved, exec).await?;
+			let erased = outcome.erase(page::coords::CoordsCommand::NAME)?;
+			emit_success(erased.command, erased.inputs, erased.data, format);
+			erased.delta.apply(ctx_state);
+			Ok(())
 		}
 		PageAction::CoordsAll {
 			url,
@@ -465,15 +478,22 @@ async fn dispatch_page_action<'ctx>(
 		} => {
 			let raw =
 				page::coords::CoordsAllRaw::from_cli(url_flag.or(url), selector_flag.or(selector));
-			let env = ResolveEnv::new(ctx_state, has_cdp, "coords-all");
-			let resolved = raw.resolve(&env)?;
-			let last_url = ctx_state.last_url();
-			let outcome =
-				page::coords::execute_all_resolved(&resolved, ctx, broker, format, last_url).await;
-			if outcome.is_ok() {
-				ctx_state.record_from_target(&resolved.target, Some(&resolved.selector));
-			}
-			outcome
+			let env = ResolveEnv::new(ctx_state, has_cdp, page::coords::CoordsAllCommand::NAME);
+			let resolved = page::coords::CoordsAllCommand::resolve(raw, &env)?;
+			let last_url = ctx_state.last_url().map(str::to_string);
+			let exec = ExecCtx {
+				mode: ExecMode::Cli,
+				ctx,
+				broker,
+				format,
+				artifacts_dir,
+				last_url: last_url.as_deref(),
+			};
+			let outcome = page::coords::CoordsAllCommand::execute(&resolved, exec).await?;
+			let erased = outcome.erase(page::coords::CoordsAllCommand::NAME)?;
+			emit_success(erased.command, erased.inputs, erased.data, format);
+			erased.delta.apply(ctx_state);
+			Ok(())
 		}
 		PageAction::Text {
 			url,
@@ -506,15 +526,22 @@ async fn dispatch_page_action<'ctx>(
 			metadata,
 		} => {
 			let raw = page::read::ReadRaw::from_cli(url_flag.or(url), output_format, metadata);
-			let env = ResolveEnv::new(ctx_state, has_cdp, "read");
-			let resolved = raw.resolve(&env)?;
-			let last_url = ctx_state.last_url();
-			let outcome =
-				page::read::execute_resolved(&resolved, ctx, broker, format, last_url).await;
-			if outcome.is_ok() {
-				ctx_state.record_from_target(&resolved.target, None);
-			}
-			outcome
+			let env = ResolveEnv::new(ctx_state, has_cdp, page::read::ReadCommand::NAME);
+			let resolved = page::read::ReadCommand::resolve(raw, &env)?;
+			let last_url = ctx_state.last_url().map(str::to_string);
+			let exec = ExecCtx {
+				mode: ExecMode::Cli,
+				ctx,
+				broker,
+				format,
+				artifacts_dir,
+				last_url: last_url.as_deref(),
+			};
+			let outcome = page::read::ReadCommand::execute(&resolved, exec).await?;
+			let erased = outcome.erase(page::read::ReadCommand::NAME)?;
+			emit_success(erased.command, erased.inputs, erased.data, format);
+			erased.delta.apply(ctx_state);
+			Ok(())
 		}
 		PageAction::Elements {
 			url,
@@ -523,22 +550,22 @@ async fn dispatch_page_action<'ctx>(
 			url_flag,
 		} => {
 			let raw = page::elements::ElementsRaw::from_cli(url_flag.or(url), wait, timeout_ms);
-			let env = ResolveEnv::new(ctx_state, has_cdp, "elements");
-			let resolved = raw.resolve(&env)?;
-			let last_url = ctx_state.last_url();
-			let outcome = page::elements::execute_resolved(
-				&resolved,
+			let env = ResolveEnv::new(ctx_state, has_cdp, page::elements::ElementsCommand::NAME);
+			let resolved = page::elements::ElementsCommand::resolve(raw, &env)?;
+			let last_url = ctx_state.last_url().map(str::to_string);
+			let exec = ExecCtx {
+				mode: ExecMode::Cli,
 				ctx,
 				broker,
 				format,
 				artifacts_dir,
-				last_url,
-			)
-			.await;
-			if outcome.is_ok() {
-				ctx_state.record_from_target(&resolved.target, None);
-			}
-			outcome
+				last_url: last_url.as_deref(),
+			};
+			let outcome = page::elements::ElementsCommand::execute(&resolved, exec).await?;
+			let erased = outcome.erase(page::elements::ElementsCommand::NAME)?;
+			emit_success(erased.command, erased.inputs, erased.data, format);
+			erased.delta.apply(ctx_state);
+			Ok(())
 		}
 		PageAction::Snapshot {
 			url,
@@ -554,22 +581,22 @@ async fn dispatch_page_action<'ctx>(
 				full,
 				Some(max_text_length),
 			);
-			let env = ResolveEnv::new(ctx_state, has_cdp, "snapshot");
-			let resolved = raw.resolve(&env)?;
-			let last_url = ctx_state.last_url();
-			let outcome = page::snapshot::execute_resolved(
-				&resolved,
+			let env = ResolveEnv::new(ctx_state, has_cdp, page::snapshot::SnapshotCommand::NAME);
+			let resolved = page::snapshot::SnapshotCommand::resolve(raw, &env)?;
+			let last_url = ctx_state.last_url().map(str::to_string);
+			let exec = ExecCtx {
+				mode: ExecMode::Cli,
 				ctx,
 				broker,
 				format,
 				artifacts_dir,
-				last_url,
-			)
-			.await;
-			if outcome.is_ok() {
-				ctx_state.record_from_target(&resolved.target, None);
-			}
-			outcome
+				last_url: last_url.as_deref(),
+			};
+			let outcome = page::snapshot::SnapshotCommand::execute(&resolved, exec).await?;
+			let erased = outcome.erase(page::snapshot::SnapshotCommand::NAME)?;
+			emit_success(erased.command, erased.inputs, erased.data, format);
+			erased.delta.apply(ctx_state);
+			Ok(())
 		}
 	}
 }

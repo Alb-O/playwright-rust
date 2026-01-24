@@ -73,7 +73,9 @@ impl CommandDef for NavigateCommand {
 
 			match &args.target.target {
 				Target::Navigate(url) => {
-					session.goto_if_needed(url.as_str(), exec.ctx.timeout_ms()).await?;
+					session
+						.goto_if_needed(url.as_str(), exec.ctx.timeout_ms())
+						.await?;
 				}
 				Target::CurrentPage => {}
 			}
@@ -95,7 +97,8 @@ impl CommandDef for NavigateCommand {
 			let raw_elements: Vec<RawElement> =
 				serde_json::from_str(&session.page().evaluate_value(&elements_js).await?)?;
 
-			let elements: Vec<InteractiveElement> = raw_elements.into_iter().map(Into::into).collect();
+			let elements: Vec<InteractiveElement> =
+				raw_elements.into_iter().map(Into::into).collect();
 			let element_count = elements.len();
 
 			let data = SnapshotData {

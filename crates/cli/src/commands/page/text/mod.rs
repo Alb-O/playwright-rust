@@ -9,7 +9,7 @@ use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, Exe
 use crate::error::{PwError, Result};
 use crate::output::{CommandInputs, TextData};
 use crate::session_broker::SessionRequest;
-use crate::session_helpers::{with_session, ArtifactsPolicy};
+use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
@@ -90,34 +90,29 @@ impl CommandDef for TextCommand {
 			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
 				.with_preferred_url(preferred_url);
 
-			let data = with_session(
-				&mut exec,
-				req,
-				ArtifactsPolicy::Never,
-				move |session| {
-					let selector = selector.clone();
-					Box::pin(async move {
-						session.goto_target(&target, timeout_ms).await?;
+			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
+				let selector = selector.clone();
+				Box::pin(async move {
+					session.goto_target(&target, timeout_ms).await?;
 
-						let locator = session.page().locator(&selector).await;
-						let count = locator.count().await?;
+					let locator = session.page().locator(&selector).await;
+					let count = locator.count().await?;
 
-						if count == 0 {
-							return Err(PwError::ElementNotFound { selector });
-						}
+					if count == 0 {
+						return Err(PwError::ElementNotFound { selector });
+					}
 
-						let text = locator.inner_text().await?;
-						let filtered = filter_garbage(&text);
-						let trimmed = filtered.trim().to_string();
+					let text = locator.inner_text().await?;
+					let filtered = filter_garbage(&text);
+					let trimmed = filtered.trim().to_string();
 
-						Ok(TextData {
-							text: trimmed,
-							selector,
-							match_count: count,
-						})
+					Ok(TextData {
+						text: trimmed,
+						selector,
+						match_count: count,
 					})
-				},
-			)
+				})
+			})
 			.await?;
 
 			let inputs = CommandInputs {

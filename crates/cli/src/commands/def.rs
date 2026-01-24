@@ -3,8 +3,8 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use crate::context::CommandContext;
 use crate::context_store::{ContextState, ContextUpdate};
@@ -60,7 +60,6 @@ impl ContextDelta {
 			url: self.url.as_deref(),
 			selector: self.selector.as_deref(),
 			output: self.output.as_deref(),
-			..Default::default()
 		});
 	}
 }
@@ -100,6 +99,7 @@ pub type BoxFut<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 /// `pub struct XxxCommand; impl CommandDef for XxxCommand { ... }`
 pub trait CommandDef: 'static {
 	const NAME: &'static str;
+	#[allow(dead_code)]
 	const ALIASES: &'static [&'static str] = &[];
 	const INTERACTIVE_ONLY: bool = false;
 
