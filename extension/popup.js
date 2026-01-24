@@ -37,6 +37,11 @@ async function init() {
   }
 
   chrome.runtime.sendMessage({ type: 'get_status' }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.error('Background worker not responding:', chrome.runtime.lastError);
+      showMessage('error', 'Extension not ready. Rebuild WASM: see extension/README.md');
+      return;
+    }
     if (response?.type === 'status') {
       updateStatus(response.connected, response.authenticated, response.server);
     }
@@ -180,7 +185,18 @@ connectBtn.onclick = () => {
 
   saveServer();
   showMessage('info', 'Connecting...');
+
+  // Timeout in case background worker doesn't respond
+  const timeout = setTimeout(() => {
+    showMessage('error', 'Connection timed out. Is the background worker running?');
+  }, 5000);
+
   chrome.runtime.sendMessage({ type: 'connect', server, token }, (response) => {
+    clearTimeout(timeout);
+    if (chrome.runtime.lastError) {
+      showMessage('error', 'Background worker not responding. Rebuild WASM: see extension/README.md');
+      return;
+    }
     if (response?.type === 'error') {
       showMessage('error', response.message);
     }

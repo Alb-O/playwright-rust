@@ -1,5 +1,4 @@
 {
   pname = "pw-cli";
-  devShell.extraPackages = [ ];
-  build.doCheck = false;
+  targets = [ "wasm32-unknown-unknown" ];
 }
