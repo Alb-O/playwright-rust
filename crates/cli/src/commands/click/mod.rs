@@ -1,6 +1,5 @@
 //! Click element command.
 
-use std::path::Path;
 use std::time::Duration;
 
 use pw::WaitUntil;
@@ -8,18 +7,12 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::args;
-use crate::context::CommandContext;
-use crate::error::{PwError, Result};
-use crate::output::{
-	ClickData, CommandInputs, DownloadedFile, FailureWithArtifacts, OutputFormat, ResultBuilder,
-	print_failure_with_artifacts, print_result,
-};
-use crate::session_broker::{SessionBroker, SessionHandle, SessionRequest};
-use crate::target::{Resolve, ResolveEnv, ResolvedTarget, TargetPolicy};
-
-// ---------------------------------------------------------------------------
-// Raw and Resolved Types
-// ---------------------------------------------------------------------------
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
+use crate::error::Result;
+use crate::output::{ClickData, CommandInputs, DownloadedFile};
+use crate::session_broker::SessionRequest;
+use crate::session_helpers::{with_session, ArtifactsPolicy};
+use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -63,25 +56,25 @@ pub struct ClickResolved {
 	pub wait_ms: u64,
 }
 
-impl ClickResolved {
-	pub fn preferred_url<'a>(&'a self, last_url: Option<&'a str>) -> Option<&'a str> {
-		self.target.preferred_url(last_url)
-	}
-}
+pub struct ClickCommand;
 
-impl Resolve for ClickRaw {
-	type Output = ClickResolved;
+impl CommandDef for ClickCommand {
+	const NAME: &'static str = "click";
 
-	fn resolve(self, env: &ResolveEnv<'_>) -> Result<ClickResolved> {
+	type Raw = ClickRaw;
+	type Resolved = ClickResolved;
+	type Data = ClickData;
+
+	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
 		let resolved = args::resolve_url_and_selector(
-			self.url.clone(),
-			self.url_flag,
-			self.selector_flag.or(self.selector),
+			raw.url.clone(),
+			raw.url_flag,
+			raw.selector_flag.or(raw.selector),
 		);
 
 		let target = env.resolve_target(resolved.url, TargetPolicy::AllowCurrentPage)?;
-		let selector = env.resolve_selector(resolved.selector, None)?;
-		let wait_ms = self.wait_ms.unwrap_or(500);
+		let selector = env.resolve_selector(resolved.selector, Some("css=button"))?;
+		let wait_ms = raw.wait_ms.unwrap_or(0);
 
 		Ok(ClickResolved {
 			target,
@@ -89,123 +82,98 @@ impl Resolve for ClickRaw {
 			wait_ms,
 		})
 	}
-}
 
-// ---------------------------------------------------------------------------
-// Execution
-// ---------------------------------------------------------------------------
-
-/// Execute click and return the actual browser URL after the click.
-pub async fn execute_resolved(
-	args: &ClickResolved,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-	artifacts_dir: Option<&Path>,
-	last_url: Option<&str>,
-) -> Result<String> {
-	let url_display = args.target.url_str().unwrap_or("<current page>");
-	info!(target = "pw", url = %url_display, selector = %args.selector, browser = %ctx.browser, "click element");
-
-	let preferred_url = args.preferred_url(last_url);
-	let session = broker
-		.session(
-			SessionRequest::from_context(WaitUntil::NetworkIdle, ctx)
-				.with_preferred_url(preferred_url),
-		)
-		.await?;
-
-	match execute_inner(
-		&session,
-		&args.target,
-		&args.selector,
-		args.wait_ms,
-		format,
-		ctx.timeout_ms(),
-	)
-	.await
+	fn execute<'exec, 'ctx>(
+		args: &'exec Self::Resolved,
+		mut exec: ExecCtx<'exec, 'ctx>,
+	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
 	{
-		Ok(after_url) => {
-			session.close().await?;
-			Ok(after_url)
-		}
-		Err(e) => {
-			let artifacts = session
-				.collect_failure_artifacts(artifacts_dir, "click")
-				.await;
+		Box::pin(async move {
+			let url_display = args.target.url_str().unwrap_or("<current page>");
+			info!(target = "pw", url = %url_display, selector = %args.selector, browser = %exec.ctx.browser, "click element");
 
-			if !artifacts.is_empty() {
-				let failure = FailureWithArtifacts::new(e.to_command_error())
-					.with_artifacts(artifacts.artifacts);
-				print_failure_with_artifacts("click", &failure, format);
-				let _ = session.close().await;
-				return Err(PwError::OutputAlreadyPrinted);
-			}
+			let preferred_url = args.target.preferred_url(exec.last_url);
+			let timeout_ms = exec.ctx.timeout_ms();
+			let target = args.target.target.clone();
+			let selector = args.selector.clone();
+			let selector_for_outcome = selector.clone();
+			let wait_ms = args.wait_ms;
 
-			let _ = session.close().await;
-			Err(e)
-		}
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
+				.with_preferred_url(preferred_url);
+
+			let (after_url, data) = with_session(
+				&mut exec,
+				req,
+				ArtifactsPolicy::OnError { command: "click" },
+				move |session| {
+					let selector = selector.clone();
+					Box::pin(async move {
+						session.goto_target(&target, timeout_ms).await?;
+
+						let before_url = session
+							.page()
+							.evaluate_value("window.location.href")
+							.await
+							.unwrap_or_else(|_| session.page().url());
+
+						let locator = session.page().locator(&selector).await;
+						locator.click(None).await?;
+
+						if wait_ms > 0 {
+							tokio::time::sleep(Duration::from_millis(wait_ms)).await;
+						}
+
+						let after_url = session
+							.page()
+							.evaluate_value("window.location.href")
+							.await
+							.unwrap_or_else(|_| session.page().url());
+
+						let navigated = before_url != after_url;
+
+						let downloads: Vec<DownloadedFile> = session
+							.downloads()
+							.into_iter()
+							.map(|d| DownloadedFile {
+								url: d.url,
+								suggested_filename: d.suggested_filename,
+								path: d.path,
+							})
+							.collect();
+
+						let data = ClickData {
+							before_url,
+							after_url: after_url.clone(),
+							navigated,
+							selector: selector.clone(),
+							downloads,
+						};
+
+						Ok((after_url, data))
+					})
+				},
+			)
+			.await?;
+
+			let inputs = CommandInputs {
+				url: args.target.url_str().map(String::from),
+				selector: Some(selector_for_outcome.clone()),
+				..Default::default()
+			};
+
+			Ok(CommandOutcome {
+				inputs,
+				data,
+				delta: ContextDelta {
+					url: Some(after_url),
+					selector: Some(selector_for_outcome),
+				},
+			})
+		})
 	}
-}
-
-async fn execute_inner(
-	session: &SessionHandle,
-	target: &ResolvedTarget,
-	selector: &str,
-	wait_ms: u64,
-	format: OutputFormat,
-	timeout_ms: Option<u64>,
-) -> Result<String> {
-	session.goto_target(&target.target, timeout_ms).await?;
-
-	let before_url = session
-		.page()
-		.evaluate_value("window.location.href")
-		.await
-		.unwrap_or_else(|_| session.page().url());
-
-	let locator = session.page().locator(selector).await;
-	locator.click(None).await?;
-
-	if wait_ms > 0 {
-		tokio::time::sleep(Duration::from_millis(wait_ms)).await;
-	}
-
-	let after_url = session
-		.page()
-		.evaluate_value("window.location.href")
-		.await
-		.unwrap_or_else(|_| session.page().url());
-	let navigated = before_url != after_url;
-
-	// Collect any downloads that occurred during the click
-	let downloads: Vec<DownloadedFile> = session
-		.downloads()
-		.into_iter()
-		.map(|d| DownloadedFile {
-			url: d.url,
-			suggested_filename: d.suggested_filename,
-			path: d.path,
-		})
-		.collect();
-
-	let result = ResultBuilder::new("click")
-		.inputs(CommandInputs {
-			url: target.url_str().map(String::from),
-			selector: Some(selector.to_string()),
-			..Default::default()
-		})
-		.data(ClickData {
-			before_url,
-			after_url: after_url.clone(),
-			navigated,
-			selector: selector.to_string(),
-			downloads,
-		})
-		.build();
-
-	print_result(&result, format);
-	Ok(after_url)
 }
 
 #[cfg(test)]

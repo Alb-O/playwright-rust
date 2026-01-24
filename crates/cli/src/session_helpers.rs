@@ -10,14 +10,17 @@ pub enum ArtifactsPolicy {
 	OnError { command: &'static str },
 }
 
-pub async fn with_session<T>(
-	exec: &mut ExecCtx<'_>,
+pub async fn with_session<'exec, 'ctx, T>(
+	exec: &mut ExecCtx<'exec, 'ctx>,
 	req: SessionRequest<'_>,
 	artifacts: ArtifactsPolicy,
 	f: impl for<'s> FnOnce(
 		&'s SessionHandle,
 	) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + 's>>,
-) -> Result<T> {
+) -> Result<T>
+where
+	'ctx: 'exec,
+{
 	let session = exec.broker.session(req).await?;
 
 	let res = f(&session).await;

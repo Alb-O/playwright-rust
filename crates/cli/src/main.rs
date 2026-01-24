@@ -12,8 +12,9 @@ async fn main() {
 	let format = cli.format;
 
 	if let Err(err) = commands::dispatch(cli, format).await {
-		// If output was already printed (e.g., with artifacts), just exit
-		if !err.is_output_already_printed() {
+		if let PwError::FailureWithArtifacts { command, failure } = &err {
+			output::print_failure_with_artifacts(command, failure, format);
+		} else if !err.is_output_already_printed() {
 			handle_error(err, format);
 		}
 		std::process::exit(1);

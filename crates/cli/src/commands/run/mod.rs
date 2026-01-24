@@ -82,7 +82,6 @@ use std::io::Write;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
-use super::{click, fill, navigate, page, screenshot, wait};
 use crate::context::CommandContext;
 use crate::context_store::ContextState;
 use crate::error::Result;
@@ -232,10 +231,10 @@ impl BatchResponse {
 ///
 /// Returns `Ok(())` on graceful exit (EOF or quit command). Individual command
 /// errors are reported in the response stream, not as function errors.
-pub async fn execute(
-	ctx: &CommandContext,
+pub async fn execute<'ctx>(
+	ctx: &'ctx CommandContext,
 	ctx_state: &mut ContextState,
-	broker: &mut SessionBroker<'_>,
+	broker: &mut SessionBroker<'ctx>,
 ) -> Result<()> {
 	let stdin = tokio::io::stdin();
 	let mut reader = BufReader::new(stdin);

@@ -8,6 +8,7 @@ pub mod init;
 mod navigate;
 mod page;
 mod protect;
+pub(crate) mod registry;
 mod run;
 mod screenshot;
 mod session;
@@ -20,6 +21,8 @@ use std::path::Path;
 use crate::cli::{
 	AuthAction, Cli, Commands, DaemonAction, PageAction, ProtectAction, SessionAction, TabsAction,
 };
+use crate::commands::def::{CommandDef, ExecCtx, ExecMode};
+use crate::commands::registry::emit_success;
 use crate::context::CommandContext;
 use crate::context_store::{ContextState, ContextUpdate};
 use crate::error::{PwError, Result};
@@ -74,24 +77,24 @@ pub async fn dispatch(cli: Cli, format: OutputFormat) -> Result<()> {
 	result
 }
 
-async fn dispatch_command(
+async fn dispatch_command<'ctx>(
 	command: Commands,
-	ctx: &CommandContext,
+	ctx: &'ctx CommandContext,
 	ctx_state: &mut ContextState,
-	broker: &mut SessionBroker<'_>,
+	broker: &mut SessionBroker<'ctx>,
 	format: OutputFormat,
-	artifacts_dir: Option<&Path>,
+	artifacts_dir: Option<&'ctx Path>,
 ) -> Result<()> {
 	dispatch_command_inner(command, ctx, ctx_state, broker, format, artifacts_dir).await
 }
 
-async fn dispatch_command_inner(
+async fn dispatch_command_inner<'ctx>(
 	command: Commands,
-	ctx: &CommandContext,
+	ctx: &'ctx CommandContext,
 	ctx_state: &mut ContextState,
-	broker: &mut SessionBroker<'_>,
+	broker: &mut SessionBroker<'ctx>,
 	format: OutputFormat,
-	artifacts_dir: Option<&Path>,
+	artifacts_dir: Option<&'ctx Path>,
 ) -> Result<()> {
 	// Whether we have a CDP endpoint (enables --no-context mode to operate on current page)
 	let has_cdp = ctx.cdp_endpoint().is_some();
@@ -99,16 +102,21 @@ async fn dispatch_command_inner(
 	match command {
 		Commands::Navigate { url, url_flag } => {
 			let raw = navigate::NavigateRaw::from_cli(url, url_flag);
-			let env = ResolveEnv::new(ctx_state, has_cdp, "navigate");
-			let resolved = raw.resolve(&env)?;
-			let last_url = ctx_state.last_url();
-			let actual_url =
-				navigate::execute_resolved(&resolved, ctx, broker, format, last_url).await?;
-			// Record the actual browser URL (may differ from input due to redirects)
-			ctx_state.record(ContextUpdate {
-				url: Some(&actual_url),
-				..Default::default()
-			});
+			let env = ResolveEnv::new(ctx_state, has_cdp, navigate::NavigateCommand::NAME);
+			let resolved = navigate::NavigateCommand::resolve(raw, &env)?;
+			let last_url = ctx_state.last_url().map(str::to_string);
+			let exec = ExecCtx {
+				mode: ExecMode::Cli,
+				ctx,
+				broker,
+				format,
+				artifacts_dir,
+				last_url: last_url.as_deref(),
+			};
+			let outcome = navigate::NavigateCommand::execute(&resolved, exec).await?;
+			let erased = outcome.erase(navigate::NavigateCommand::NAME)?;
+			emit_success(erased.command, erased.inputs, erased.data, format);
+			erased.delta.apply(ctx_state);
 			Ok(())
 		}
 		Commands::Screenshot {
@@ -148,18 +156,21 @@ async fn dispatch_command_inner(
 		} => {
 			let raw =
 				click::ClickRaw::from_cli(url, selector, url_flag, selector_flag, Some(wait_ms));
-			let env = ResolveEnv::new(ctx_state, has_cdp, "click");
-			let resolved = raw.resolve(&env)?;
-			let last_url = ctx_state.last_url();
-			let after_url =
-				click::execute_resolved(&resolved, ctx, broker, format, artifacts_dir, last_url)
-					.await?;
-			// Record the actual browser URL after click (may differ if click caused navigation)
-			ctx_state.record(ContextUpdate {
-				url: Some(&after_url),
-				selector: Some(&resolved.selector),
-				..Default::default()
-			});
+			let env = ResolveEnv::new(ctx_state, has_cdp, click::ClickCommand::NAME);
+			let resolved = click::ClickCommand::resolve(raw, &env)?;
+			let last_url = ctx_state.last_url().map(str::to_string);
+			let exec = ExecCtx {
+				mode: ExecMode::Cli,
+				ctx,
+				broker,
+				format,
+				artifacts_dir,
+				last_url: last_url.as_deref(),
+			};
+			let outcome = click::ClickCommand::execute(&resolved, exec).await?;
+			let erased = outcome.erase(click::ClickCommand::NAME)?;
+			emit_success(erased.command, erased.inputs, erased.data, format);
+			erased.delta.apply(ctx_state);
 			Ok(())
 		}
 		Commands::Fill {

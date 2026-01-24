@@ -23,23 +23,23 @@ pub enum ExecMode {
 }
 
 /// Unified execution context; replaces per-command parameter drift.
-pub struct ExecCtx<'a> {
+pub struct ExecCtx<'exec, 'ctx> {
 	pub mode: ExecMode,
 
 	/// Immutable CLI/global context (browser, CDP endpoint, timeouts, etc.).
-	pub ctx: &'a CommandContext,
+	pub ctx: &'ctx CommandContext,
 
 	/// Session factory + session tracking.
-	pub broker: &'a mut SessionBroker<'a>,
+	pub broker: &'exec mut SessionBroker<'ctx>,
 
 	/// Output format selection (json, ndjson, pretty, etc.).
 	pub format: OutputFormat,
 
 	/// Optional directory for artifacts (screenshots, traces) on failure.
-	pub artifacts_dir: Option<&'a std::path::Path>,
+	pub artifacts_dir: Option<&'ctx std::path::Path>,
 
 	/// Last URL from context store (for `Target::CurrentPage` preference).
-	pub last_url: Option<&'a str>,
+	pub last_url: Option<&'exec str>,
 }
 
 /// Declarative mutation of `ContextState` after success.
@@ -109,6 +109,10 @@ pub trait CommandDef: 'static {
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved>;
 
 	/// Execute the command. **Must not print**. Wrapper prints.
-	fn execute<'a>(args: &'a Self::Resolved, exec: ExecCtx<'a>)
-		-> BoxFut<'a, Result<CommandOutcome<Self::Data>>>;
+	fn execute<'exec, 'ctx>(
+		args: &'exec Self::Resolved,
+		exec: ExecCtx<'exec, 'ctx>,
+	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec;
 }
