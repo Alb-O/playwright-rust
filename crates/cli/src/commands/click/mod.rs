@@ -170,6 +170,7 @@ impl CommandDef for ClickCommand {
 				delta: ContextDelta {
 					url: Some(after_url),
 					selector: Some(selector_for_outcome),
+					output: None,
 				},
 			})
 		})

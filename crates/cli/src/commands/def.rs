@@ -48,16 +48,18 @@ pub struct ExecCtx<'exec, 'ctx> {
 pub struct ContextDelta {
 	pub url: Option<String>,
 	pub selector: Option<String>,
+	pub output: Option<std::path::PathBuf>,
 }
 
 impl ContextDelta {
 	pub fn apply(self, state: &mut ContextState) {
-		if self.url.is_none() && self.selector.is_none() {
+		if self.url.is_none() && self.selector.is_none() && self.output.is_none() {
 			return;
 		}
 		state.record(ContextUpdate {
 			url: self.url.as_deref(),
 			selector: self.selector.as_deref(),
+			output: self.output.as_deref(),
 			..Default::default()
 		});
 	}

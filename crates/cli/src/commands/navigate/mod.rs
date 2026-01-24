@@ -121,6 +121,7 @@ impl CommandDef for NavigateCommand {
 				delta: ContextDelta {
 					url: Some(meta.url),
 					selector: None,
+					output: None,
 				},
 			})
 		})

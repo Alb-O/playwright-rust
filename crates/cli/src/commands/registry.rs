@@ -115,4 +115,7 @@ macro_rules! command_registry {
 command_registry! {
 	Navigate => crate::commands::navigate::NavigateCommand { names: ["navigate", "nav"] },
 	Click => crate::commands::click::ClickCommand { names: ["click"] },
+	Fill => crate::commands::fill::FillCommand { names: ["fill"] },
+	Wait => crate::commands::wait::WaitCommand { names: ["wait"] },
+	Screenshot => crate::commands::screenshot::ScreenshotCommand { names: ["screenshot", "ss"] },
 }

@@ -133,19 +133,22 @@ async fn dispatch_command_inner<'ctx>(
 				Some(resolved_output.clone()),
 				full_page,
 			);
-			let env = ResolveEnv::new(ctx_state, has_cdp, "screenshot");
-			let resolved = raw.resolve(&env)?;
-			let last_url = ctx_state.last_url();
-			let outcome =
-				screenshot::execute_resolved(&resolved, ctx, broker, format, last_url).await;
-			if outcome.is_ok() {
-				ctx_state.record(ContextUpdate {
-					url: resolved.target.url_str(),
-					output: Some(&resolved_output),
-					..Default::default()
-				});
-			}
-			outcome
+			let env = ResolveEnv::new(ctx_state, has_cdp, screenshot::ScreenshotCommand::NAME);
+			let resolved = screenshot::ScreenshotCommand::resolve(raw, &env)?;
+			let last_url = ctx_state.last_url().map(str::to_string);
+			let exec = ExecCtx {
+				mode: ExecMode::Cli,
+				ctx,
+				broker,
+				format,
+				artifacts_dir,
+				last_url: last_url.as_deref(),
+			};
+			let outcome = screenshot::ScreenshotCommand::execute(&resolved, exec).await?;
+			let erased = outcome.erase(screenshot::ScreenshotCommand::NAME)?;
+			emit_success(erased.command, erased.inputs, erased.data, format);
+			erased.delta.apply(ctx_state);
+			Ok(())
 		}
 		Commands::Click {
 			url,
@@ -179,14 +182,22 @@ async fn dispatch_command_inner<'ctx>(
 			url,
 		} => {
 			let raw = fill::FillRaw::from_cli(url, selector, Some(text));
-			let env = ResolveEnv::new(ctx_state, has_cdp, "fill");
-			let resolved = raw.resolve(&env)?;
-			let last_url = ctx_state.last_url();
-			let outcome = fill::execute_resolved(&resolved, ctx, broker, format, last_url).await;
-			if outcome.is_ok() {
-				ctx_state.record_from_target(&resolved.target, Some(&resolved.selector));
-			}
-			outcome
+			let env = ResolveEnv::new(ctx_state, has_cdp, fill::FillCommand::NAME);
+			let resolved = fill::FillCommand::resolve(raw, &env)?;
+			let last_url = ctx_state.last_url().map(str::to_string);
+			let exec = ExecCtx {
+				mode: ExecMode::Cli,
+				ctx,
+				broker,
+				format,
+				artifacts_dir,
+				last_url: last_url.as_deref(),
+			};
+			let outcome = fill::FillCommand::execute(&resolved, exec).await?;
+			let erased = outcome.erase(fill::FillCommand::NAME)?;
+			emit_success(erased.command, erased.inputs, erased.data, format);
+			erased.delta.apply(ctx_state);
+			Ok(())
 		}
 		Commands::Wait {
 			url,
@@ -194,14 +205,22 @@ async fn dispatch_command_inner<'ctx>(
 			url_flag,
 		} => {
 			let raw = wait::WaitRaw::from_cli(url_flag.or(url), Some(condition));
-			let env = ResolveEnv::new(ctx_state, has_cdp, "wait");
-			let resolved = raw.resolve(&env)?;
-			let last_url = ctx_state.last_url();
-			let outcome = wait::execute_resolved(&resolved, ctx, broker, format, last_url).await;
-			if outcome.is_ok() {
-				ctx_state.record_from_target(&resolved.target, None);
-			}
-			outcome
+			let env = ResolveEnv::new(ctx_state, has_cdp, wait::WaitCommand::NAME);
+			let resolved = wait::WaitCommand::resolve(raw, &env)?;
+			let last_url = ctx_state.last_url().map(str::to_string);
+			let exec = ExecCtx {
+				mode: ExecMode::Cli,
+				ctx,
+				broker,
+				format,
+				artifacts_dir,
+				last_url: last_url.as_deref(),
+			};
+			let outcome = wait::WaitCommand::execute(&resolved, exec).await?;
+			let erased = outcome.erase(wait::WaitCommand::NAME)?;
+			emit_success(erased.command, erased.inputs, erased.data, format);
+			erased.delta.apply(ctx_state);
+			Ok(())
 		}
 		Commands::Page(action) => {
 			dispatch_page_action(

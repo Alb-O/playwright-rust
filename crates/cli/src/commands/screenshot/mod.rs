@@ -1,24 +1,17 @@
 //! Screenshot capture command.
 
 use std::path::PathBuf;
-use std::time::Instant;
 
 use pw::{ScreenshotOptions, WaitUntil};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::context::CommandContext;
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
 use crate::error::Result;
-use crate::output::{
-	Artifact, ArtifactType, CommandInputs, OutputFormat, ResultBuilder, ScreenshotData,
-	print_result,
-};
-use crate::session_broker::{SessionBroker, SessionRequest};
-use crate::target::{Resolve, ResolveEnv, ResolvedTarget, TargetPolicy};
-
-// ---------------------------------------------------------------------------
-// Raw and Resolved Types
-// ---------------------------------------------------------------------------
+use crate::output::{CommandInputs, ScreenshotData};
+use crate::session_broker::SessionRequest;
+use crate::session_helpers::{with_session, ArtifactsPolicy};
+use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -58,25 +51,22 @@ pub struct ScreenshotResolved {
 	pub full_page: bool,
 }
 
-impl ScreenshotResolved {
-	pub fn preferred_url<'a>(&'a self, last_url: Option<&'a str>) -> Option<&'a str> {
-		self.target.preferred_url(last_url)
-	}
-}
+pub struct ScreenshotCommand;
 
-impl Resolve for ScreenshotRaw {
-	type Output = ScreenshotResolved;
+impl CommandDef for ScreenshotCommand {
+	const NAME: &'static str = "screenshot";
 
-	fn resolve(self, env: &ResolveEnv<'_>) -> Result<ScreenshotResolved> {
-		let url = self.url_flag.or(self.url);
+	type Raw = ScreenshotRaw;
+	type Resolved = ScreenshotResolved;
+	type Data = ScreenshotData;
+
+	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		let url = raw.url_flag.or(raw.url);
 		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
 
 		// Output path resolution is handled by ContextState in the dispatcher
-		// For now, use a default if not provided
-		let output = self
-			.output
-			.unwrap_or_else(|| PathBuf::from("screenshot.png"));
-		let full_page = self.full_page.unwrap_or(false);
+		let output = raw.output.unwrap_or_else(|| PathBuf::from("screenshot.png"));
+		let full_page = raw.full_page.unwrap_or(false);
 
 		Ok(ScreenshotResolved {
 			target,
@@ -84,74 +74,84 @@ impl Resolve for ScreenshotRaw {
 			full_page,
 		})
 	}
-}
 
-// ---------------------------------------------------------------------------
-// Execution
-// ---------------------------------------------------------------------------
+	fn execute<'exec, 'ctx>(
+		args: &'exec Self::Resolved,
+		mut exec: ExecCtx<'exec, 'ctx>,
+	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			let url_display = args.target.url_str().unwrap_or("<current page>");
+			info!(
+				target = "pw",
+				url = %url_display,
+				path = %args.output.display(),
+				full_page = %args.full_page,
+				browser = %exec.ctx.browser,
+				"screenshot"
+			);
 
-/// Execute screenshot with resolved arguments.
-pub async fn execute_resolved(
-	args: &ScreenshotResolved,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-	last_url: Option<&str>,
-) -> Result<()> {
-	let _start = Instant::now();
-	let url_display = args.target.url_str().unwrap_or("<current page>");
-	info!(target = "pw", url = %url_display, path = %args.output.display(), full_page = %args.full_page, browser = %ctx.browser, "screenshot");
+			if let Some(parent) = args.output.parent() {
+				if !parent.as_os_str().is_empty() && !parent.exists() {
+					std::fs::create_dir_all(parent)?;
+				}
+			}
 
-	let preferred_url = args.preferred_url(last_url);
-	let session = broker
-		.session(
-			SessionRequest::from_context(WaitUntil::NetworkIdle, ctx)
-				.with_preferred_url(preferred_url),
-		)
-		.await?;
-	session
-		.goto_target(&args.target.target, ctx.timeout_ms())
-		.await?;
+			let preferred_url = args.target.preferred_url(exec.last_url);
+			let timeout_ms = exec.ctx.timeout_ms();
+			let target = args.target.target.clone();
+			let output = args.output.clone();
+			let full_page = args.full_page;
 
-	if let Some(parent) = args.output.parent() {
-		if !parent.as_os_str().is_empty() && !parent.exists() {
-			std::fs::create_dir_all(parent)?;
-		}
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
+				.with_preferred_url(preferred_url);
+
+			with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
+				let output = output.clone();
+				Box::pin(async move {
+					session.goto_target(&target, timeout_ms).await?;
+
+					let screenshot_opts = ScreenshotOptions {
+						full_page: Some(full_page),
+						..Default::default()
+					};
+
+					session
+						.page()
+						.screenshot_to_file(&output, Some(screenshot_opts))
+						.await?;
+
+					Ok(())
+				})
+			})
+			.await?;
+
+			let data = ScreenshotData {
+				path: args.output.clone(),
+				full_page: args.full_page,
+				width: None,
+				height: None,
+			};
+
+			let inputs = CommandInputs {
+				url: args.target.url_str().map(String::from),
+				output_path: Some(args.output.clone()),
+				..Default::default()
+			};
+
+			Ok(CommandOutcome {
+				inputs,
+				data,
+				delta: ContextDelta {
+					url: args.target.url_str().map(String::from),
+					selector: None,
+					output: Some(args.output.clone()),
+				},
+			})
+		})
 	}
-
-	let screenshot_opts = ScreenshotOptions {
-		full_page: Some(args.full_page),
-		..Default::default()
-	};
-
-	session
-		.page()
-		.screenshot_to_file(&args.output, Some(screenshot_opts))
-		.await?;
-
-	let size_bytes = std::fs::metadata(&args.output).ok().map(|m| m.len());
-
-	let result = ResultBuilder::new("screenshot")
-		.inputs(CommandInputs {
-			url: args.target.url_str().map(String::from),
-			output_path: Some(args.output.clone()),
-			..Default::default()
-		})
-		.data(ScreenshotData {
-			path: args.output.clone(),
-			full_page: args.full_page,
-			width: None,
-			height: None,
-		})
-		.artifact(Artifact {
-			artifact_type: ArtifactType::Screenshot,
-			path: args.output.clone(),
-			size_bytes,
-		})
-		.build();
-
-	print_result(&result, format);
-	session.close().await
 }
 
 #[cfg(test)]

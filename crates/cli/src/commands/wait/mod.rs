@@ -19,15 +19,14 @@ use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::context::CommandContext;
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
 use crate::error::{PwError, Result};
-use crate::output::{CommandInputs, ErrorCode, OutputFormat, ResultBuilder, print_result};
-use crate::session_broker::{SessionBroker, SessionRequest};
-use crate::target::{Resolve, ResolveEnv, ResolvedTarget, TargetPolicy};
+use crate::output::CommandInputs;
+use crate::session_broker::{SessionHandle, SessionRequest};
+use crate::session_helpers::ArtifactsPolicy;
+use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON before resolution.
-///
-/// Use [`Resolve::resolve`] to convert to [`WaitResolved`] for execution.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WaitRaw {
@@ -48,8 +47,6 @@ impl WaitRaw {
 }
 
 /// Resolved inputs ready for execution.
-///
-/// The [`condition`](Self::condition) has been validated as present.
 #[derive(Debug, Clone)]
 pub struct WaitResolved {
 	/// Navigation target (URL or current page).
@@ -59,33 +56,10 @@ pub struct WaitResolved {
 	pub condition: String,
 }
 
-impl WaitResolved {
-	/// Returns the URL for page preference matching.
-	///
-	/// For [`Navigate`](crate::target::Target::Navigate) targets, returns the URL.
-	/// For [`CurrentPage`](crate::target::Target::CurrentPage), returns `last_url` as a hint.
-	pub fn preferred_url<'a>(&'a self, last_url: Option<&'a str>) -> Option<&'a str> {
-		self.target.preferred_url(last_url)
-	}
-}
-
-impl Resolve for WaitRaw {
-	type Output = WaitResolved;
-
-	fn resolve(self, env: &ResolveEnv<'_>) -> Result<WaitResolved> {
-		let target = env.resolve_target(self.url, TargetPolicy::AllowCurrentPage)?;
-		let condition = self
-			.condition
-			.ok_or_else(|| PwError::Context("No condition provided for wait command".into()))?;
-
-		Ok(WaitResolved { target, condition })
-	}
-}
-
 /// Output data for the wait command result.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct WaitData {
+pub struct WaitData {
 	condition: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	waited_ms: Option<u64>,
@@ -93,90 +67,111 @@ struct WaitData {
 	selector_found: Option<bool>,
 }
 
-/// Executes the wait command with resolved arguments.
-///
-/// Interprets the condition and waits accordingly:
-/// - Numeric string: sleep for that many milliseconds
-/// - `"load"`, `"domcontentloaded"`, `"networkidle"`: wait for page load state
-/// - Other strings: treated as CSS selector, polls until element exists
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Navigation fails
-/// - Selector wait times out (30 second limit)
-pub async fn execute_resolved(
-	args: &WaitResolved,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-	last_url: Option<&str>,
-) -> Result<()> {
-	let url_display = args.target.url_str().unwrap_or("<current page>");
-	info!(target = "pw", url = %url_display, condition = %args.condition, browser = %ctx.browser, "wait");
+pub struct WaitCommand;
 
-	let session = broker
-		.session(
-			SessionRequest::from_context(WaitUntil::NetworkIdle, ctx)
-				.with_preferred_url(args.preferred_url(last_url)),
-		)
-		.await?;
-	session
-		.goto_target(&args.target.target, ctx.timeout_ms())
-		.await?;
+impl CommandDef for WaitCommand {
+	const NAME: &'static str = "wait";
 
-	let condition = &args.condition;
-	let url_str = args.target.url_str();
+	type Raw = WaitRaw;
+	type Resolved = WaitResolved;
+	type Data = WaitData;
 
-	if let Ok(ms) = condition.parse::<u64>() {
-		tokio::time::sleep(Duration::from_millis(ms)).await;
+	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
+		let condition = raw
+			.condition
+			.ok_or_else(|| PwError::Context("No condition provided for wait command".into()))?;
 
-		let result = ResultBuilder::new("wait")
-			.inputs(CommandInputs {
-				url: url_str.map(String::from),
-				extra: Some(serde_json::json!({ "condition": condition })),
-				..Default::default()
-			})
-			.data(WaitData {
-				condition: format!("timeout:{ms}ms"),
-				waited_ms: Some(ms),
-				selector_found: None,
-			})
-			.build();
-
-		print_result(&result, format);
-	} else if matches!(
-		condition.as_str(),
-		"load" | "domcontentloaded" | "networkidle"
-	) {
-		let result = ResultBuilder::new("wait")
-			.inputs(CommandInputs {
-				url: url_str.map(String::from),
-				extra: Some(serde_json::json!({ "condition": condition })),
-				..Default::default()
-			})
-			.data(WaitData {
-				condition: format!("loadstate:{condition}"),
-				waited_ms: None,
-				selector_found: None,
-			})
-			.build();
-
-		print_result(&result, format);
-	} else {
-		wait_for_selector(&session, condition, url_str, format).await?;
+		Ok(WaitResolved { target, condition })
 	}
 
-	session.close().await
+	fn execute<'exec, 'ctx>(
+		args: &'exec Self::Resolved,
+		mut exec: ExecCtx<'exec, 'ctx>,
+	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			let url_display = args.target.url_str().unwrap_or("<current page>");
+			info!(target = "pw", url = %url_display, condition = %args.condition, browser = %exec.ctx.browser, "wait");
+
+			let preferred_url = args.target.preferred_url(exec.last_url);
+			let timeout_ms = exec.ctx.timeout_ms();
+			let target = args.target.target.clone();
+			let condition = args.condition.clone();
+
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
+				.with_preferred_url(preferred_url);
+
+			let data = crate::session_helpers::with_session(
+				&mut exec,
+				req,
+				ArtifactsPolicy::Never,
+				move |session| {
+					let condition = condition.clone();
+					Box::pin(async move {
+						session.goto_target(&target, timeout_ms).await?;
+
+						if let Ok(ms) = condition.parse::<u64>() {
+							tokio::time::sleep(Duration::from_millis(ms)).await;
+
+							return Ok(WaitData {
+								condition: format!("timeout:{ms}ms"),
+								waited_ms: Some(ms),
+								selector_found: None,
+							});
+						}
+
+						if matches!(condition.as_str(), "load" | "domcontentloaded" | "networkidle") {
+							return Ok(WaitData {
+								condition: format!("loadstate:{condition}"),
+								waited_ms: None,
+								selector_found: None,
+							});
+						}
+
+						wait_for_selector(session, &condition).await
+					})
+				},
+			)
+			.await?;
+
+			let inputs = build_inputs(args.target.url_str(), args.condition.as_str());
+
+			Ok(CommandOutcome {
+				inputs,
+				data,
+				delta: ContextDelta {
+					url: args.target.url_str().map(String::from),
+					selector: None,
+					output: None,
+				},
+			})
+		})
+	}
+}
+
+fn build_inputs(url_str: Option<&str>, condition: &str) -> CommandInputs {
+	if condition.parse::<u64>().is_ok()
+		|| matches!(condition, "load" | "domcontentloaded" | "networkidle")
+	{
+		CommandInputs {
+			url: url_str.map(String::from),
+			extra: Some(serde_json::json!({ "condition": condition })),
+			..Default::default()
+		}
+	} else {
+		CommandInputs {
+			url: url_str.map(String::from),
+			selector: Some(condition.to_string()),
+			..Default::default()
+		}
+	}
 }
 
 /// Polls for a CSS selector until it appears or times out.
-async fn wait_for_selector(
-	session: &crate::session_broker::SessionHandle,
-	selector: &str,
-	url_str: Option<&str>,
-	format: OutputFormat,
-) -> Result<()> {
+async fn wait_for_selector(session: &SessionHandle, selector: &str) -> Result<WaitData> {
 	let escaped = selector.replace('\\', "\\\\").replace('\'', "\\'");
 	let max_attempts = 30u64;
 
@@ -188,42 +183,15 @@ async fn wait_for_selector(
 			.unwrap_or_else(|_| "false".to_string());
 
 		if visible == "true" {
-			let result = ResultBuilder::new("wait")
-				.inputs(CommandInputs {
-					url: url_str.map(String::from),
-					selector: Some(selector.to_string()),
-					..Default::default()
-				})
-				.data(WaitData {
-					condition: format!("selector:{selector}"),
-					waited_ms: Some(attempt * 1000),
-					selector_found: Some(true),
-				})
-				.build();
-
-			print_result(&result, format);
-			return Ok(());
+			return Ok(WaitData {
+				condition: format!("selector:{selector}"),
+				waited_ms: Some(attempt * 1000),
+				selector_found: Some(true),
+			});
 		}
 
 		tokio::time::sleep(Duration::from_secs(1)).await;
 	}
-
-	let result = ResultBuilder::<WaitData>::new("wait")
-		.inputs(CommandInputs {
-			url: url_str.map(String::from),
-			selector: Some(selector.to_string()),
-			..Default::default()
-		})
-		.error(
-			ErrorCode::Timeout,
-			format!(
-				"Timeout after {}ms waiting for selector: {selector}",
-				max_attempts * 1000
-			),
-		)
-		.build();
-
-	print_result(&result, format);
 
 	Err(PwError::Timeout {
 		ms: max_attempts * 1000,
