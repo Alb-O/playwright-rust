@@ -1,3 +1,9 @@
+//! Persistent context storage for CLI state across invocations.
+//!
+//! Manages two-tier storage: global contexts in `~/.config/pw/cli/` and
+//! project-local contexts in `playwright/.pw-cli/`. Tracks last URL, selector,
+//! output path, and CDP endpoint for command repetition.
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -10,12 +16,13 @@ use crate::context::CommandContext;
 use crate::error::{PwError, Result};
 use crate::types::BrowserKind;
 
-const CONTEXT_SCHEMA_VERSION: u32 = 1;
+#[cfg(test)]
+mod tests;
 
-/// Session timeout in seconds (1 hour). If the last invocation was longer ago,
-/// the session is considered stale and context is automatically refreshed.
+const CONTEXT_SCHEMA_VERSION: u32 = 1;
 const SESSION_TIMEOUT_SECS: u64 = 3600;
 
+/// Whether a context is stored globally or per-project.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ContextScope {
@@ -24,6 +31,7 @@ pub enum ContextScope {
 	Project,
 }
 
+/// Persisted state for a named context.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct StoredContext {
@@ -49,20 +57,23 @@ pub struct StoredContext {
 	pub cdp_endpoint: Option<String>,
 	#[serde(default)]
 	pub last_used_at: Option<u64>,
-	/// URL patterns to protect from CLI access (e.g., PWAs like "discord.com", "slack.com")
+	/// URL patterns to protect from CLI access.
 	#[serde(default)]
 	pub protected_urls: Vec<String>,
 }
 
+/// Tracks which context is active globally and per-project.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ActiveContexts {
 	#[serde(default)]
 	pub global: Option<String>,
+	/// Maps project root paths to their active context names.
 	#[serde(default)]
 	pub projects: HashMap<String, String>,
 }
 
+/// On-disk format for a context store file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextStoreFile {
@@ -83,6 +94,7 @@ impl Default for ContextStoreFile {
 	}
 }
 
+/// A single context store file with its path and scope.
 #[derive(Debug)]
 pub struct ContextStore {
 	pub scope: ContextScope,
@@ -96,10 +108,10 @@ impl ContextStore {
 			.ok()
 			.and_then(|content| serde_json::from_str(&content).ok())
 			.unwrap_or_default();
-
 		Self { scope, path, file }
 	}
 
+	/// Gets or creates a context entry by name.
 	pub fn ensure(&mut self, name: &str, project_root: Option<&Path>) -> &mut StoredContext {
 		self.file
 			.contexts
@@ -107,7 +119,7 @@ impl ContextStore {
 			.or_insert_with(|| StoredContext {
 				scope: self.scope.clone(),
 				project_root: project_root.map(|p| p.to_string_lossy().to_string()),
-				..StoredContext::default()
+				..Default::default()
 			})
 	}
 
@@ -115,21 +127,17 @@ impl ContextStore {
 		self.file.contexts.get(name)
 	}
 
-	pub fn get_mut(&mut self, name: &str) -> Option<&mut StoredContext> {
-		self.file.contexts.get_mut(name)
-	}
-
 	pub fn save(&self) -> Result<()> {
 		if let Some(parent) = self.path.parent() {
 			fs::create_dir_all(parent)?;
 		}
-
 		let json = serde_json::to_string_pretty(&self.file)?;
 		fs::write(&self.path, json)?;
 		Ok(())
 	}
 }
 
+/// Holds both global and optional project context stores.
 #[derive(Debug)]
 pub struct ContextBook {
 	pub global: ContextStore,
@@ -138,19 +146,15 @@ pub struct ContextBook {
 
 impl ContextBook {
 	pub fn new(project_root: Option<&Path>) -> Self {
-		let global_path = global_store_path();
-		let project_store = project_root.map(|root| {
-			let path = project_store_path(root);
-			ContextStore::load(path, ContextScope::Project)
-		});
-
 		Self {
-			global: ContextStore::load(global_path, ContextScope::Global),
-			project: project_store,
+			global: ContextStore::load(global_store_path(), ContextScope::Global),
+			project: project_root
+				.map(|root| ContextStore::load(project_store_path(root), ContextScope::Project)),
 		}
 	}
 }
 
+/// The currently active context with its data loaded.
 #[derive(Debug)]
 pub struct SelectedContext {
 	pub name: String,
@@ -158,6 +162,10 @@ pub struct SelectedContext {
 	pub data: StoredContext,
 }
 
+/// Runtime context state manager.
+///
+/// Handles context selection, URL/selector caching, and persistence.
+/// Auto-refreshes stale sessions after [`SESSION_TIMEOUT_SECS`].
 #[derive(Debug)]
 pub struct ContextState {
 	stores: ContextBook,
@@ -179,33 +187,42 @@ impl ContextState {
 		refresh: bool,
 	) -> Result<Self> {
 		let mut stores = ContextBook::new(project_root.as_deref());
-		let mut selected = None;
-		let base_url_override_clone = base_url_override.clone();
-
-		if !no_context {
-			selected = select_context(
+		let mut selected = if no_context {
+			None
+		} else {
+			select_context(
 				&mut stores,
 				project_root.as_deref(),
 				requested_context.as_deref(),
-			);
+			)
+		};
 
-			if let (Some(ctx), Some(base)) = (&mut selected, base_url_override_clone) {
-				ctx.data.base_url = Some(base);
-			}
+		if let (Some(ctx), Some(base)) = (&mut selected, &base_url_override) {
+			ctx.data.base_url = Some(base.clone());
 		}
 
-		// Auto-refresh if session has been idle for more than SESSION_TIMEOUT_SECS
-		let refresh = refresh || is_session_stale(selected.as_ref());
-
 		Ok(Self {
+			refresh: refresh || is_session_stale(selected.as_ref()),
 			stores,
 			selected,
 			project_root,
 			base_url_override,
 			no_context,
 			no_save,
-			refresh,
 		})
+	}
+
+	#[cfg(test)]
+	pub(crate) fn test_new(stores: ContextBook, selected: Option<SelectedContext>) -> Self {
+		Self {
+			stores,
+			selected,
+			project_root: None,
+			base_url_override: None,
+			no_context: false,
+			no_save: false,
+			refresh: false,
+		}
 	}
 
 	pub fn active_name(&self) -> Option<&str> {
@@ -216,16 +233,11 @@ impl ContextState {
 		if self.no_context {
 			return None;
 		}
-
 		let selected = self.selected.as_ref()?;
 		let dir = match selected.scope {
-			ContextScope::Project => {
-				let root = self.project_root.as_ref()?;
-				project_sessions_dir(root)
-			}
+			ContextScope::Project => project_sessions_dir(self.project_root.as_ref()?),
 			ContextScope::Global => global_sessions_dir(),
 		};
-
 		Some(dir.join(format!("{}.json", selected.name)))
 	}
 
@@ -233,26 +245,17 @@ impl ContextState {
 		self.refresh
 	}
 
-	/// Returns true if context has a URL available (last_url or base_url).
+	/// Returns true if context has a URL available.
 	pub fn has_context_url(&self) -> bool {
 		if self.no_context {
 			return false;
 		}
-
 		if self.base_url_override.is_some() {
 			return true;
 		}
-
-		if let Some(selected) = &self.selected {
-			if !self.refresh && selected.data.last_url.is_some() {
-				return true;
-			}
-			if selected.data.base_url.is_some() {
-				return true;
-			}
-		}
-
-		false
+		self.selected.as_ref().is_some_and(|s| {
+			(!self.refresh && s.data.last_url.is_some()) || s.data.base_url.is_some()
+		})
 	}
 
 	pub fn resolve_selector(
@@ -265,17 +268,14 @@ impl ContextState {
 		}
 
 		if self.no_context {
-			if let Some(fallback) = fallback {
-				return Ok(fallback.to_string());
-			}
-			return Err(PwError::Context(
-				"Selector is required when context usage is disabled".into(),
-			));
+			return fallback.map(String::from).ok_or_else(|| {
+				PwError::Context("Selector is required when context usage is disabled".into())
+			});
 		}
 
 		let Some(selected) = &self.selected else {
 			return fallback
-				.map(|f| f.to_string())
+				.map(String::from)
 				.ok_or_else(|| PwError::Context("No selector available".into()));
 		};
 
@@ -286,15 +286,14 @@ impl ContextState {
 		}
 
 		fallback
-			.map(|f| f.to_string())
+			.map(String::from)
 			.ok_or_else(|| PwError::Context("No selector available".into()))
 	}
 
-	/// Returns the CDP endpoint from the global context.
+	/// Returns the CDP endpoint from the global `default` context.
 	///
-	/// CDP endpoints are system-wide browser connections, stored globally
-	/// rather than per-project to prevent stale endpoint issues when
-	/// switching between project directories.
+	/// CDP endpoints represent system-wide browser connections and are stored
+	/// globally to prevent stale endpoint errors when switching directories.
 	pub fn cdp_endpoint(&self) -> Option<&str> {
 		if self.no_context {
 			return None;
@@ -307,7 +306,7 @@ impl ContextState {
 			.and_then(|ctx| ctx.cdp_endpoint.as_deref())
 	}
 
-	/// Get the last URL from the context (for page selection preference).
+	/// Returns the last URL from the selected context.
 	pub fn last_url(&self) -> Option<&str> {
 		if self.no_context {
 			return None;
@@ -317,23 +316,32 @@ impl ContextState {
 			.and_then(|s| s.data.last_url.as_deref())
 	}
 
-	/// Sets the CDP endpoint in the global context.
+	/// Sets the CDP endpoint in the global `default` context.
 	///
-	/// See [`cdp_endpoint`](Self::cdp_endpoint) for why this is global.
+	/// Also updates [`SelectedContext::data`] if the selected context is the
+	/// global default, ensuring [`persist`](Self::persist) doesn't overwrite
+	/// with stale data.
 	pub fn set_cdp_endpoint(&mut self, endpoint: Option<String>) {
 		if self.no_save || self.no_context {
 			return;
 		}
+
 		self.stores
 			.global
 			.file
 			.contexts
 			.entry("default".to_string())
 			.or_default()
-			.cdp_endpoint = endpoint;
+			.cdp_endpoint = endpoint.clone();
+
+		if let Some(ref mut selected) = self.selected {
+			if selected.name == "default" && selected.scope == ContextScope::Global {
+				selected.data.cdp_endpoint = endpoint;
+			}
+		}
 	}
 
-	/// Get the list of protected URL patterns
+	/// Returns protected URL patterns from the selected context.
 	pub fn protected_urls(&self) -> &[String] {
 		if self.no_context {
 			return &[];
@@ -344,7 +352,7 @@ impl ContextState {
 			.unwrap_or(&[])
 	}
 
-	/// Check if a URL matches any protected pattern
+	/// Returns true if the URL matches any protected pattern.
 	pub fn is_protected(&self, url: &str) -> bool {
 		let url_lower = url.to_lowercase();
 		self.protected_urls()
@@ -352,41 +360,42 @@ impl ContextState {
 			.any(|pattern| url_lower.contains(&pattern.to_lowercase()))
 	}
 
-	/// Add a URL pattern to the protected list
+	/// Adds a URL pattern to the protected list. Returns true if added.
 	pub fn add_protected(&mut self, pattern: String) -> bool {
 		if self.no_save || self.no_context {
 			return false;
 		}
-		if let Some(selected) = self.selected.as_mut() {
-			let pattern_lower = pattern.to_lowercase();
-			if !selected
-				.data
-				.protected_urls
-				.iter()
-				.any(|p| p.to_lowercase() == pattern_lower)
-			{
-				selected.data.protected_urls.push(pattern);
-				return true;
-			}
+		let Some(selected) = self.selected.as_mut() else {
+			return false;
+		};
+		let pattern_lower = pattern.to_lowercase();
+		if selected
+			.data
+			.protected_urls
+			.iter()
+			.any(|p| p.to_lowercase() == pattern_lower)
+		{
+			return false;
 		}
-		false
+		selected.data.protected_urls.push(pattern);
+		true
 	}
 
-	/// Remove a URL pattern from the protected list
+	/// Removes a URL pattern from the protected list. Returns true if removed.
 	pub fn remove_protected(&mut self, pattern: &str) -> bool {
 		if self.no_save || self.no_context {
 			return false;
 		}
-		if let Some(selected) = self.selected.as_mut() {
-			let pattern_lower = pattern.to_lowercase();
-			let before_len = selected.data.protected_urls.len();
-			selected
-				.data
-				.protected_urls
-				.retain(|p| p.to_lowercase() != pattern_lower);
-			return selected.data.protected_urls.len() < before_len;
-		}
-		false
+		let Some(selected) = self.selected.as_mut() else {
+			return false;
+		};
+		let pattern_lower = pattern.to_lowercase();
+		let before_len = selected.data.protected_urls.len();
+		selected
+			.data
+			.protected_urls
+			.retain(|p| p.to_lowercase() != pattern_lower);
+		selected.data.protected_urls.len() < before_len
 	}
 
 	pub fn resolve_output(&self, ctx: &CommandContext, provided: Option<PathBuf>) -> PathBuf {
@@ -394,21 +403,20 @@ impl ContextState {
 			return ctx.screenshot_path(&output);
 		}
 
-		if !self.no_context {
-			if let Some(selected) = &self.selected {
-				if !self.refresh {
-					if let Some(last) = &selected.data.last_output {
-						let candidate = PathBuf::from(last);
-						return ctx.screenshot_path(&candidate);
-					}
-				}
+		if !self.no_context && !self.refresh {
+			if let Some(last) = self
+				.selected
+				.as_ref()
+				.and_then(|s| s.data.last_output.as_ref())
+			{
+				return ctx.screenshot_path(Path::new(last));
 			}
 		}
 
 		ctx.screenshot_path(Path::new("screenshot.png"))
 	}
 
-	/// Apply context changes from command execution.
+	/// Applies context changes from command execution.
 	pub fn apply_delta(&mut self, delta: crate::commands::def::ContextDelta) {
 		if self.no_save || self.no_context {
 			return;
@@ -428,9 +436,7 @@ impl ContextState {
 		selected.data.last_used_at = Some(now_ts());
 	}
 
-	/// Record context from a [`ResolvedTarget`].
-	///
-	/// [`ResolvedTarget`]: crate::target::ResolvedTarget
+	/// Records context from a resolved target.
 	pub fn record_from_target(
 		&mut self,
 		target: &crate::target::ResolvedTarget,
@@ -443,6 +449,7 @@ impl ContextState {
 		});
 	}
 
+	/// Persists the current context state to disk.
 	pub fn persist(&mut self) -> Result<()> {
 		if self.no_save || self.no_context {
 			return Ok(());
@@ -455,38 +462,35 @@ impl ContextState {
 		match selected.scope {
 			ContextScope::Project => {
 				if let Some(store) = self.stores.project.as_mut() {
-					let entry = store.ensure(&selected.name, self.project_root.as_deref());
-					*entry = selected.data.clone();
+					*store.ensure(&selected.name, self.project_root.as_deref()) =
+						selected.data.clone();
 				}
-				if let Some(root) = self.project_root.as_ref() {
-					let key = root.to_string_lossy().to_string();
+				if let Some(root) = &self.project_root {
 					self.stores
 						.global
 						.file
 						.active
 						.projects
-						.insert(key, selected.name.clone());
+						.insert(root.to_string_lossy().to_string(), selected.name.clone());
 				}
 			}
 			ContextScope::Global => {
-				let entry = self
+				*self
 					.stores
 					.global
-					.ensure(&selected.name, self.project_root.as_deref());
-				*entry = selected.data.clone();
+					.ensure(&selected.name, self.project_root.as_deref()) = selected.data.clone();
 				self.stores.global.file.active.global = Some(selected.name.clone());
 			}
 		}
 
 		self.stores.global.save()?;
-		if let Some(store) = self.stores.project.as_ref() {
+		if let Some(store) = &self.stores.project {
 			store.save()?;
 		}
-
 		Ok(())
 	}
 
-	/// Get the effective base URL (override or from context).
+	/// Returns the effective base URL.
 	pub fn base_url(&self) -> Option<&str> {
 		self.base_url_override.as_deref().or_else(|| {
 			self.selected
@@ -494,35 +498,42 @@ impl ContextState {
 				.and_then(|c| c.data.base_url.as_deref())
 		})
 	}
+
+	#[cfg(test)]
+	pub(crate) fn selected(&self) -> Option<&SelectedContext> {
+		self.selected.as_ref()
+	}
 }
 
+/// Selects a context by name, falling back to project-active, global-active, or "default".
 fn select_context(
 	stores: &mut ContextBook,
 	project_root: Option<&Path>,
 	requested: Option<&str>,
 ) -> Option<SelectedContext> {
-	if let Some(name) = requested {
-		return Some(resolve_context_by_name(stores, project_root, name));
-	}
+	let name = requested
+		.map(String::from)
+		.or_else(|| {
+			project_root.and_then(|root| {
+				stores
+					.global
+					.file
+					.active
+					.projects
+					.get(&root.to_string_lossy().to_string())
+					.cloned()
+			})
+		})
+		.or_else(|| stores.global.file.active.global.clone())
+		.unwrap_or_else(|| {
+			stores.global.file.active.global = Some("default".to_string());
+			"default".to_string()
+		});
 
-	if let Some(root) = project_root {
-		let key = root.to_string_lossy().to_string();
-		if let Some(name) = stores.global.file.active.projects.get(&key).cloned() {
-			return Some(resolve_context_by_name(stores, project_root, &name));
-		}
-	}
-
-	if let Some(global_name) = stores.global.file.active.global.clone() {
-		return Some(resolve_context_by_name(stores, project_root, &global_name));
-	}
-
-	// Boot a default global context so users immediately get caching without setup.
-	let default_name = "default".to_string();
-	let context = resolve_context_by_name(stores, project_root, &default_name);
-	stores.global.file.active.global = Some(default_name);
-	Some(context)
+	Some(resolve_context_by_name(stores, project_root, &name))
 }
 
+/// Resolves a context by name from project store first, then global, creating if needed.
 fn resolve_context_by_name(
 	stores: &mut ContextBook,
 	project_root: Option<&Path>,
@@ -546,47 +557,41 @@ fn resolve_context_by_name(
 		};
 	}
 
-	// Create a new context in the project store if available, otherwise global.
 	if let Some(store) = stores.project.as_mut() {
-		let ctx = store.ensure(name, project_root).clone();
+		let data = store.ensure(name, project_root).clone();
 		return SelectedContext {
 			name: name.to_string(),
 			scope: ContextScope::Project,
-			data: ctx,
+			data,
 		};
 	}
 
-	let ctx = stores.global.ensure(name, project_root).clone();
+	let data = stores.global.ensure(name, project_root).clone();
 	SelectedContext {
 		name: name.to_string(),
 		scope: ContextScope::Global,
-		data: ctx,
+		data,
 	}
 }
 
 fn global_store_path() -> PathBuf {
-	let base = std::env::var_os("XDG_CONFIG_HOME")
+	std::env::var_os("XDG_CONFIG_HOME")
 		.map(PathBuf::from)
 		.or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
-		.unwrap_or_else(|| PathBuf::from("."));
-	base.join("pw").join("cli").join("contexts.json")
+		.unwrap_or_else(|| PathBuf::from("."))
+		.join("pw/cli/contexts.json")
 }
 
 fn global_sessions_dir() -> PathBuf {
-	global_store_path()
-		.parent()
-		.map(|p| p.join("sessions"))
-		.unwrap_or_else(|| PathBuf::from("sessions"))
+	global_store_path().with_file_name("sessions")
 }
 
 fn project_store_path(root: &Path) -> PathBuf {
-	root.join(dirs::PLAYWRIGHT)
-		.join(".pw-cli")
-		.join("contexts.json")
+	root.join(dirs::PLAYWRIGHT).join(".pw-cli/contexts.json")
 }
 
 fn project_sessions_dir(root: &Path) -> PathBuf {
-	root.join(dirs::PLAYWRIGHT).join(".pw-cli").join("sessions")
+	root.join(dirs::PLAYWRIGHT).join(".pw-cli/sessions")
 }
 
 fn now_ts() -> u64 {
@@ -597,80 +602,7 @@ fn now_ts() -> u64 {
 }
 
 fn is_session_stale(selected: Option<&SelectedContext>) -> bool {
-	let Some(ctx) = selected else { return false };
-	let Some(last_used) = ctx.data.last_used_at else {
-		return false;
-	};
-	now_ts().saturating_sub(last_used) > SESSION_TIMEOUT_SECS
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	fn test_context_state(stores: ContextBook, selected: Option<SelectedContext>) -> ContextState {
-		ContextState {
-			stores,
-			selected,
-			project_root: None,
-			base_url_override: None,
-			no_context: false,
-			no_save: false,
-			refresh: false,
-		}
-	}
-
-	fn empty_global_store() -> ContextStore {
-		ContextStore {
-			scope: ContextScope::Global,
-			path: PathBuf::from("/tmp/global.json"),
-			file: ContextStoreFile::default(),
-		}
-	}
-
-	#[test]
-	fn cdp_endpoint_reads_from_global_not_project() {
-		let mut store = empty_global_store();
-		store.file.contexts.insert(
-			"default".to_string(),
-			StoredContext {
-				cdp_endpoint: Some("ws://global-endpoint".to_string()),
-				..Default::default()
-			},
-		);
-
-		let selected = SelectedContext {
-			name: "default".to_string(),
-			scope: ContextScope::Project,
-			data: StoredContext {
-				cdp_endpoint: Some("ws://project-endpoint".to_string()),
-				..Default::default()
-			},
-		};
-
-		let state = test_context_state(
-			ContextBook { global: store, project: None },
-			Some(selected),
-		);
-
-		assert_eq!(state.cdp_endpoint(), Some("ws://global-endpoint"));
-	}
-
-	#[test]
-	fn cdp_endpoint_writes_to_global_not_project() {
-		let selected = SelectedContext {
-			name: "default".to_string(),
-			scope: ContextScope::Project,
-			data: StoredContext::default(),
-		};
-
-		let mut state = test_context_state(
-			ContextBook { global: empty_global_store(), project: None },
-			Some(selected),
-		);
-
-		state.set_cdp_endpoint(Some("ws://new-endpoint".to_string()));
-
-		assert_eq!(state.cdp_endpoint(), Some("ws://new-endpoint"));
-	}
+	selected
+		.and_then(|ctx| ctx.data.last_used_at)
+		.is_some_and(|last_used| now_ts().saturating_sub(last_used) > SESSION_TIMEOUT_SECS)
 }
