@@ -16,6 +16,7 @@
 //! pw coords-all --selector "li.item"
 //! ```
 
+use clap::Args;
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -30,16 +31,26 @@ use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 use crate::types::{ElementCoords, IndexedElementCoords};
 
 /// Raw inputs from CLI or batch JSON before resolution.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoordsRaw {
-	/// Target URL, resolved from context if not provided.
+	/// Target URL (positional)
 	#[serde(default)]
 	pub url: Option<String>,
 
-	/// CSS selector for the target element(s).
+	/// CSS selector (positional)
 	#[serde(default)]
 	pub selector: Option<String>,
+
+	/// Target URL (named alternative)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
+	#[serde(default, alias = "url_flag")]
+	pub url_flag: Option<String>,
+
+	/// CSS selector (named alternative)
+	#[arg(long = "selector", short = 's', value_name = "SELECTOR")]
+	#[serde(default, alias = "selector_flag")]
+	pub selector_flag: Option<String>,
 }
 
 /// Resolved inputs ready for execution.
@@ -87,8 +98,9 @@ impl CommandDef for CoordsCommand {
 	type Data = CoordsData;
 
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
-		let selector = env.resolve_selector(raw.selector, None)?;
+		let url = raw.url_flag.or(raw.url);
+		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
+		let selector = env.resolve_selector(raw.selector_flag.or(raw.selector), None)?;
 
 		Ok(CoordsResolved { target, selector })
 	}
@@ -164,8 +176,9 @@ impl CommandDef for CoordsAllCommand {
 	type Data = CoordsAllData;
 
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
-		let selector = env.resolve_selector(raw.selector, None)?;
+		let url = raw.url_flag.or(raw.url);
+		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
+		let selector = env.resolve_selector(raw.selector_flag.or(raw.selector), None)?;
 
 		Ok(CoordsAllResolved { target, selector })
 	}

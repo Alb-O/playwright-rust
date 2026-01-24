@@ -15,6 +15,7 @@
 
 use std::time::Duration;
 
+use clap::Args;
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -27,16 +28,22 @@ use crate::session_helpers::ArtifactsPolicy;
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON before resolution.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WaitRaw {
-	/// Target URL, resolved from context if not provided.
+	/// Target URL (positional)
 	#[serde(default)]
 	pub url: Option<String>,
 
-	/// Wait condition: milliseconds, load state, or CSS selector.
+	/// Condition to wait for (selector, timeout ms, or load state)
+	#[arg(default_value = "networkidle")]
 	#[serde(default)]
 	pub condition: Option<String>,
+
+	/// Target URL (named alternative)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
+	#[serde(default, alias = "url_flag")]
+	pub url_flag: Option<String>,
 }
 
 /// Resolved inputs ready for execution.
@@ -70,7 +77,8 @@ impl CommandDef for WaitCommand {
 	type Data = WaitData;
 
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
+		let url = raw.url_flag.or(raw.url);
+		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
 		let condition = raw
 			.condition
 			.ok_or_else(|| PwError::Context("No condition provided for wait command".into()))?;

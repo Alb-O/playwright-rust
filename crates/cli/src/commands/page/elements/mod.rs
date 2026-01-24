@@ -17,6 +17,7 @@
 //! pw elements https://example.com --wait --timeout-ms 5000
 //! ```
 
+use clap::Args;
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -29,20 +30,27 @@ use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON before resolution.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ElementsRaw {
-	/// Target URL, resolved from context if not provided.
+	/// Target URL (positional)
 	#[serde(default)]
 	pub url: Option<String>,
 
-	/// Whether to poll until elements appear.
+	/// Wait for elements with polling (useful for dynamic pages)
+	#[arg(long)]
 	#[serde(default)]
 	pub wait: Option<bool>,
 
-	/// Timeout in milliseconds when waiting (default: 10000).
+	/// Timeout in milliseconds for --wait mode (default: 10000)
+	#[arg(long, default_value = "10000")]
 	#[serde(default, alias = "timeout_ms")]
 	pub timeout_ms: Option<u64>,
+
+	/// Target URL (named alternative)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
+	#[serde(default, alias = "url_flag")]
+	pub url_flag: Option<String>,
 }
 
 /// Resolved inputs ready for execution.
@@ -70,7 +78,8 @@ impl CommandDef for ElementsCommand {
 	type Data = ElementsData;
 
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
+		let url = raw.url_flag.or(raw.url);
+		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
 
 		Ok(ElementsResolved {
 			target,

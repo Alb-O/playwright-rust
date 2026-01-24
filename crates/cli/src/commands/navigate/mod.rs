@@ -1,5 +1,6 @@
 //! Navigation command.
 
+use clap::Args;
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -16,11 +17,15 @@ use crate::target::{ResolveEnv, ResolvedTarget, Target, TargetPolicy};
 const DEFAULT_MAX_TEXT_LENGTH: usize = 5000;
 
 /// Raw inputs from CLI or batch JSON.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NavigateRaw {
+	/// Target URL (positional, uses context when omitted)
 	#[serde(default)]
 	pub url: Option<String>,
+
+	/// Target URL (named alternative)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
 	#[serde(default, alias = "url_flag")]
 	pub url_flag: Option<String>,
 }

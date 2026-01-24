@@ -1,5 +1,6 @@
 //! HTML content extraction command.
 
+use clap::Args;
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -13,19 +14,24 @@ use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HtmlRaw {
-	/// URL (positional argument).
+	/// Target URL (positional, uses context when omitted)
 	#[serde(default)]
 	pub url: Option<String>,
-	/// Selector (positional argument, may be detected from URL position).
+
+	/// CSS selector (positional, uses last selector or defaults to html)
 	#[serde(default)]
 	pub selector: Option<String>,
-	/// URL via --url flag.
+
+	/// Target URL (named alternative)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
 	#[serde(default, alias = "url_flag")]
 	pub url_flag: Option<String>,
-	/// Selector via --selector flag.
+
+	/// CSS selector (named alternative)
+	#[arg(long = "selector", short = 's', value_name = "SELECTOR")]
 	#[serde(default, alias = "selector_flag")]
 	pub selector_flag: Option<String>,
 }
@@ -59,17 +65,13 @@ impl CommandDef for HtmlCommand {
 	type Data = HtmlData;
 
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		// Smart detection: resolve positional vs flags
 		let resolved = args::resolve_url_and_selector(
 			raw.url.clone(),
 			raw.url_flag,
 			raw.selector_flag.or(raw.selector),
 		);
 
-		// Resolve target using typed target system
 		let target = env.resolve_target(resolved.url, TargetPolicy::AllowCurrentPage)?;
-
-		// Resolve selector with "html" as default (full page)
 		let selector = env.resolve_selector(resolved.selector, Some("html"))?;
 
 		Ok(HtmlResolved { target, selector })
@@ -162,5 +164,4 @@ mod tests {
 		assert_eq!(raw.url_flag, Some("https://example.com".into()));
 		assert_eq!(raw.selector_flag, Some(".content".into()));
 	}
-
 }

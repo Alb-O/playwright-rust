@@ -1,5 +1,6 @@
 //! Text content extraction command.
 
+use clap::Args;
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -13,15 +14,24 @@ use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TextRaw {
+	/// Target URL (positional)
 	#[serde(default)]
 	pub url: Option<String>,
+
+	/// CSS selector (positional)
 	#[serde(default)]
 	pub selector: Option<String>,
+
+	/// Target URL (named alternative)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
 	#[serde(default, alias = "url_flag")]
 	pub url_flag: Option<String>,
+
+	/// CSS selector (named alternative)
+	#[arg(long = "selector", short = 's', value_name = "SELECTOR")]
 	#[serde(default, alias = "selector_flag")]
 	pub selector_flag: Option<String>,
 }

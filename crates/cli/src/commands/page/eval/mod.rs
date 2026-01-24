@@ -1,5 +1,8 @@
 //! JavaScript evaluation command.
 
+use std::path::PathBuf;
+
+use clap::Args;
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
@@ -12,17 +15,31 @@ use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EvalRaw {
-	#[serde(default)]
-	pub url: Option<String>,
-	#[serde(default, alias = "url_flag")]
-	pub url_flag: Option<String>,
+	/// JavaScript expression (positional)
 	#[serde(default)]
 	pub expression: Option<String>,
+
+	/// Target URL (positional, uses context when omitted)
+	#[serde(default)]
+	pub url: Option<String>,
+
+	/// JavaScript expression (named alternative to positional)
+	#[arg(long = "expr", short = 'e', value_name = "EXPRESSION")]
 	#[serde(default, alias = "expression_flag", alias = "expr")]
 	pub expression_flag: Option<String>,
+
+	/// Read JavaScript expression from file
+	#[arg(long = "file", short = 'F', value_name = "FILE")]
+	#[serde(default)]
+	pub file: Option<PathBuf>,
+
+	/// Target URL (named alternative to positional)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
+	#[serde(default, alias = "url_flag")]
+	pub url_flag: Option<String>,
 }
 
 /// Resolved inputs ready for execution.
@@ -45,11 +62,18 @@ impl CommandDef for EvalCommand {
 		let url = raw.url_flag.or(raw.url);
 		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
 
-		let expression = raw.expression_flag.or(raw.expression).ok_or_else(|| {
-			PwError::Context(
-				"expression is required (provide positionally, via --expr, or via --file)".into(),
-			)
-		})?;
+		let expression = raw
+			.file
+			.as_ref()
+			.and_then(|p| std::fs::read_to_string(p).ok())
+			.or(raw.expression_flag)
+			.or(raw.expression)
+			.ok_or_else(|| {
+				PwError::Context(
+					"expression is required (provide positionally, via --expr, or via --file)"
+						.into(),
+				)
+			})?;
 
 		Ok(EvalResolved { target, expression })
 	}

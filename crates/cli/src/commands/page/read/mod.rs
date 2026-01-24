@@ -16,6 +16,7 @@
 //! pw read https://example.com/article --metadata
 //! ```
 
+use clap::Args;
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -30,18 +31,25 @@ use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON before resolution.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReadRaw {
-	/// Target URL, resolved from context if not provided.
+	/// Target URL (positional)
 	#[serde(default)]
 	pub url: Option<String>,
 
-	/// Content output format: `"text"`, `"html"`, or `"markdown"` (default).
-	#[serde(default, alias = "output_format")]
-	pub output_format: Option<String>,
+	/// Target URL (named alternative)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
+	#[serde(default, alias = "url_flag")]
+	pub url_flag: Option<String>,
 
-	/// Whether to include article metadata (title, author, etc.).
+	/// Output format: markdown (default), text, or html
+	#[arg(long, short = 'o', default_value = "markdown", value_enum)]
+	#[serde(default, alias = "output_format")]
+	pub output_format: Option<ReadOutputFormat>,
+
+	/// Include metadata (title, author, etc.) in output
+	#[arg(long, short = 'm')]
 	#[serde(default)]
 	pub metadata: Option<bool>,
 }
@@ -71,16 +79,9 @@ impl CommandDef for ReadCommand {
 	type Data = ReadData;
 
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
-		let output_format = match raw.output_format.as_deref() {
-			Some("text") => ReadOutputFormat::Text,
-			Some("html") => ReadOutputFormat::Html,
-			Some("markdown") | None => ReadOutputFormat::Markdown,
-			Some(other) => {
-				tracing::warn!("Unknown read output format '{}', using markdown", other);
-				ReadOutputFormat::Markdown
-			}
-		};
+		let url = raw.url_flag.or(raw.url);
+		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
+		let output_format = raw.output_format.unwrap_or(ReadOutputFormat::Markdown);
 
 		Ok(ReadResolved {
 			target,
@@ -234,10 +235,10 @@ mod tests {
 
 	#[test]
 	fn read_raw_deserialize_from_json() {
-		let json = r#"{"url": "https://example.com", "output_format": "text", "metadata": true}"#;
+		let json = r#"{"url": "https://example.com", "outputFormat": "text", "metadata": true}"#;
 		let raw: ReadRaw = serde_json::from_str(json).unwrap();
 		assert_eq!(raw.url, Some("https://example.com".into()));
-		assert_eq!(raw.output_format, Some("text".into()));
+		assert_eq!(raw.output_format, Some(ReadOutputFormat::Text));
 		assert_eq!(raw.metadata, Some(true));
 	}
 

@@ -10,7 +10,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::context::CommandContext;
-use crate::context_store::{ContextState, ContextUpdate};
+use crate::context_store::ContextState;
 use crate::error::Result;
 use crate::output::{CommandInputs, OutputFormat};
 use crate::session_broker::SessionBroker;
@@ -46,8 +46,6 @@ pub struct ExecCtx<'exec, 'ctx> {
 }
 
 /// State mutations to apply after successful command execution.
-///
-/// Consolidates repeated `ctx_state.record(ContextUpdate { ... })` calls.
 #[derive(Debug, Clone, Default)]
 pub struct ContextDelta {
 	pub url: Option<String>,
@@ -57,14 +55,7 @@ pub struct ContextDelta {
 
 impl ContextDelta {
 	pub fn apply(self, state: &mut ContextState) {
-		if self.url.is_none() && self.selector.is_none() && self.output.is_none() {
-			return;
-		}
-		state.record(ContextUpdate {
-			url: self.url.as_deref(),
-			selector: self.selector.as_deref(),
-			output: self.output.as_deref(),
-		});
+		state.apply_delta(self);
 	}
 }
 

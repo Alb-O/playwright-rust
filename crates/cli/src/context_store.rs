@@ -158,13 +158,6 @@ pub struct SelectedContext {
 	pub data: StoredContext,
 }
 
-#[derive(Debug, Default)]
-pub struct ContextUpdate<'a> {
-	pub url: Option<&'a str>,
-	pub selector: Option<&'a str>,
-	pub output: Option<&'a Path>,
-}
-
 #[derive(Debug)]
 pub struct ContextState {
 	stores: ContextBook,
@@ -400,32 +393,27 @@ impl ContextState {
 		ctx.screenshot_path(Path::new("screenshot.png"))
 	}
 
-	pub fn record(&mut self, update: ContextUpdate<'_>) {
+	/// Apply context changes from command execution.
+	pub fn apply_delta(&mut self, delta: crate::commands::def::ContextDelta) {
 		if self.no_save || self.no_context {
 			return;
 		}
-
 		let Some(selected) = self.selected.as_mut() else {
 			return;
 		};
-
-		if let Some(url) = update.url {
-			selected.data.last_url = Some(url.to_string());
+		if let Some(url) = delta.url {
+			selected.data.last_url = Some(url);
 		}
-		if let Some(selector) = update.selector {
-			selected.data.last_selector = Some(selector.to_string());
+		if let Some(selector) = delta.selector {
+			selected.data.last_selector = Some(selector);
 		}
-		if let Some(output) = update.output {
+		if let Some(output) = delta.output {
 			selected.data.last_output = Some(output.to_string_lossy().to_string());
 		}
-
 		selected.data.last_used_at = Some(now_ts());
 	}
 
-	/// Record context from a typed [`ResolvedTarget`].
-	///
-	/// For `Target::Navigate`, records the URL. For `Target::CurrentPage`,
-	/// does not record URL (avoids polluting context with sentinel values).
+	/// Record context from a [`ResolvedTarget`].
 	///
 	/// [`ResolvedTarget`]: crate::target::ResolvedTarget
 	pub fn record_from_target(
@@ -433,13 +421,10 @@ impl ContextState {
 		target: &crate::target::ResolvedTarget,
 		selector: Option<&str>,
 	) {
-		// Only record URL for Navigate targets
-		let url = target.url_str();
-
-		self.record(ContextUpdate {
-			url,
-			selector,
-			..Default::default()
+		self.apply_delta(crate::commands::def::ContextDelta {
+			url: target.url_str().map(String::from),
+			selector: selector.map(String::from),
+			output: None,
 		});
 	}
 

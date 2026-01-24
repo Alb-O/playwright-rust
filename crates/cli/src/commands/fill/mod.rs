@@ -9,6 +9,7 @@
 //! pw fill --selector "input[name=email]" --text "user@example.com"
 //! ```
 
+use clap::Args;
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -21,20 +22,21 @@ use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON before resolution.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FillRaw {
-	/// Target URL, resolved from context if not provided.
-	#[serde(default)]
-	pub url: Option<String>,
+	/// Text to fill into the input
+	pub text: Option<String>,
 
-	/// CSS selector for the element to fill.
+	/// CSS selector for the input element
+	#[arg(long = "selector", short = 's', value_name = "SELECTOR")]
 	#[serde(default)]
 	pub selector: Option<String>,
 
-	/// Text to fill into the element.
+	/// Target URL (named alternative)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
 	#[serde(default)]
-	pub text: Option<String>,
+	pub url: Option<String>,
 }
 
 /// Resolved inputs ready for execution.

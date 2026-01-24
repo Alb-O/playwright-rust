@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use clap::Args;
 use pw::{ScreenshotOptions, WaitUntil};
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -14,17 +15,27 @@ use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScreenshotRaw {
+	/// Target URL (positional, uses context when omitted)
 	#[serde(default)]
 	pub url: Option<String>,
-	#[serde(default, alias = "url_flag")]
-	pub url_flag: Option<String>,
+
+	/// Output file path (uses context or defaults when omitted)
+	#[arg(short, long, value_name = "FILE")]
 	#[serde(default)]
 	pub output: Option<PathBuf>,
+
+	/// Capture the full scrollable page instead of just the viewport
+	#[arg(long)]
 	#[serde(default, alias = "full_page")]
 	pub full_page: Option<bool>,
+
+	/// Target URL (named alternative)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
+	#[serde(default, alias = "url_flag")]
+	pub url_flag: Option<String>,
 }
 
 /// Resolved inputs ready for execution.
@@ -48,7 +59,6 @@ impl CommandDef for ScreenshotCommand {
 		let url = raw.url_flag.or(raw.url);
 		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
 
-		// Output path resolution is handled by ContextState in the dispatcher
 		let output = raw
 			.output
 			.unwrap_or_else(|| PathBuf::from("screenshot.png"));

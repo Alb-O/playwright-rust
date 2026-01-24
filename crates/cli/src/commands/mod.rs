@@ -1,28 +1,30 @@
 mod auth;
-mod click;
+pub(crate) mod click;
 mod connect;
 mod daemon;
 pub(crate) mod def;
 pub(crate) mod dispatch;
-mod fill;
+pub(crate) mod fill;
 pub mod init;
-mod navigate;
-mod page;
+pub(crate) mod navigate;
+pub(crate) mod page;
 mod protect;
 pub(crate) mod registry;
 mod run;
-mod screenshot;
+pub(crate) mod screenshot;
 mod session;
 mod tabs;
 pub mod test;
-mod wait;
+pub(crate) mod wait;
 
 use std::path::Path;
 
-use crate::cli::{AuthAction, Cli, Commands, DaemonAction, ProtectAction, SessionAction, TabsAction};
+use crate::cli::{
+	AuthAction, Cli, Commands, DaemonAction, ProtectAction, SessionAction, TabsAction,
+};
 use crate::commands::def::ExecMode;
 use crate::context::CommandContext;
-use crate::context_store::{ContextState, ContextUpdate};
+use crate::context_store::ContextState;
 use crate::error::{PwError, Result};
 use crate::output::OutputFormat;
 use crate::relay;
@@ -53,7 +55,15 @@ pub async fn dispatch(cli: Cli, format: OutputFormat) -> Result<()> {
 		Commands::Run => run::execute(&ctx, &mut ctx_state, &mut broker).await,
 		Commands::Relay { .. } => unreachable!(),
 		command => {
-			dispatch_command(command, &ctx, &mut ctx_state, &mut broker, format, cli.artifacts_dir.as_deref()).await
+			dispatch_command(
+				command,
+				&ctx,
+				&mut ctx_state,
+				&mut broker,
+				format,
+				cli.artifacts_dir.as_deref(),
+			)
+			.await
 		}
 	};
 
@@ -74,18 +84,23 @@ async fn dispatch_command<'ctx>(
 	let has_cdp = ctx.cdp_endpoint().is_some();
 
 	let command = match command {
-		Commands::Screenshot { url, output, full_page, url_flag } => Commands::Screenshot {
-			url,
-			output: Some(ctx_state.resolve_output(ctx, output)),
-			full_page,
-			url_flag,
-		},
+		Commands::Screenshot(mut args) => {
+			args.output = Some(ctx_state.resolve_output(ctx, args.output));
+			Commands::Screenshot(args)
+		}
 		cmd => cmd,
 	};
 
 	if let Some((id, args)) = command.into_registry_args() {
 		return dispatch::dispatch_registry_command(
-			id, args, ExecMode::Cli, ctx, ctx_state, broker, format, artifacts_dir,
+			id,
+			args,
+			ExecMode::Cli,
+			ctx,
+			ctx_state,
+			broker,
+			format,
+			artifacts_dir,
 		)
 		.await;
 	}
@@ -108,7 +123,6 @@ async fn dispatch_ad_hoc<'ctx>(
 				output,
 				timeout,
 			} => {
-				// Resolve output path with project context
 				let resolved_output = resolve_auth_output(ctx, &output);
 				let raw = auth::LoginRaw::from_cli(url, resolved_output.clone(), timeout);
 				let env = ResolveEnv::new(ctx_state, has_cdp, "auth-login");
@@ -116,10 +130,10 @@ async fn dispatch_ad_hoc<'ctx>(
 				let last_url = ctx_state.last_url();
 				let outcome = auth::login_resolved(&resolved, ctx, broker, last_url).await;
 				if outcome.is_ok() {
-					ctx_state.record(ContextUpdate {
-						url: resolved.target.url_str(),
-						output: Some(&resolved_output),
-						..Default::default()
+					ctx_state.apply_delta(def::ContextDelta {
+						url: resolved.target.url_str().map(String::from),
+						output: Some(resolved_output),
+						selector: None,
 					});
 				}
 				outcome
@@ -217,11 +231,11 @@ async fn dispatch_ad_hoc<'ctx>(
 		},
 		Commands::Test { .. } => unreachable!("handled earlier"),
 		// Registry-backed commands should have been handled above
-		Commands::Navigate { .. }
-		| Commands::Screenshot { .. }
-		| Commands::Click { .. }
-		| Commands::Fill { .. }
-		| Commands::Wait { .. }
+		Commands::Navigate(_)
+		| Commands::Screenshot(_)
+		| Commands::Click(_)
+		| Commands::Fill(_)
+		| Commands::Wait(_)
 		| Commands::Page(_) => {
 			unreachable!("registry command reached ad-hoc dispatch")
 		}

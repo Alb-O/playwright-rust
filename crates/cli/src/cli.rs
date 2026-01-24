@@ -156,70 +156,20 @@ pub struct Cli {
 pub enum Commands {
 	/// Navigate to URL and show page snapshot (text, elements, metadata)
 	#[command(alias = "nav")]
-	Navigate {
-		/// Target URL (positional, uses context when omitted)
-		url: Option<String>,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-	},
+	Navigate(#[command(flatten)] crate::commands::navigate::NavigateRaw),
 
 	/// Take screenshot
 	#[command(alias = "ss")]
-	Screenshot {
-		/// Target URL (positional, uses context when omitted)
-		url: Option<String>,
-		/// Output file path (uses context or defaults when omitted)
-		#[arg(short, long, value_name = "FILE")]
-		output: Option<PathBuf>,
-		/// Capture the full scrollable page instead of just the viewport
-		#[arg(long)]
-		full_page: bool,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-	},
+	Screenshot(#[command(flatten)] crate::commands::screenshot::ScreenshotRaw),
 
 	/// Click element and show resulting URL
-	Click {
-		/// Target URL (positional)
-		url: Option<String>,
-		/// CSS selector (positional)
-		selector: Option<String>,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-		/// CSS selector (named alternative)
-		#[arg(long = "selector", short = 's', value_name = "SELECTOR")]
-		selector_flag: Option<String>,
-		/// Time to wait for navigation after click (milliseconds)
-		#[arg(long, default_value = "500")]
-		wait_ms: u64,
-	},
+	Click(#[command(flatten)] crate::commands::click::ClickRaw),
 
 	/// Fill text into an input field (works with React and other frameworks)
-	Fill {
-		/// Text to fill into the input
-		text: String,
-		/// CSS selector for the input element
-		#[arg(long = "selector", short = 's', value_name = "SELECTOR")]
-		selector: Option<String>,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url: Option<String>,
-	},
+	Fill(#[command(flatten)] crate::commands::fill::FillRaw),
 
 	/// Wait for condition (selector, timeout, or load state)
-	Wait {
-		/// Target URL (positional)
-		url: Option<String>,
-		/// Condition to wait for (selector, timeout ms, or load state)
-		#[arg(default_value = "networkidle")]
-		condition: String,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-	},
+	Wait(#[command(flatten)] crate::commands::wait::WaitRaw),
 
 	/// Page content extraction commands (text, html, snapshot, elements, etc.)
 	#[command(subcommand)]
@@ -371,7 +321,10 @@ pub enum InitTemplate {
 }
 
 /// Output format for the read command
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum, serde::Serialize)]
+#[derive(
+	Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
 pub enum ReadOutputFormat {
 	/// Plain text
 	Text,
@@ -387,149 +340,33 @@ pub enum ReadOutputFormat {
 pub enum PageAction {
 	/// Capture console messages and errors
 	#[command(alias = "con")]
-	Console {
-		/// Target URL (positional, uses context when omitted)
-		url: Option<String>,
-		/// Time to wait for console messages (ms)
-		#[arg(default_value = "3000")]
-		timeout_ms: u64,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-	},
+	Console(#[command(flatten)] crate::commands::page::console::ConsoleRaw),
 
 	/// Evaluate JavaScript and return result
-	///
-	/// The expression can be provided positionally, via --expr/-e, or read from a file.
-	/// When using named flags, the order doesn't matter.
-	Eval {
-		/// JavaScript expression (positional). Required unless --expr or --file is used.
-		expression: Option<String>,
-		/// Target URL (positional, uses context when omitted)
-		url: Option<String>,
-		/// JavaScript expression (named alternative to positional)
-		#[arg(long = "expr", short = 'e', value_name = "EXPRESSION")]
-		expression_flag: Option<String>,
-		/// Read JavaScript expression from file (avoids shell argument limits for large scripts)
-		#[arg(long = "file", short = 'F', value_name = "FILE")]
-		file: Option<PathBuf>,
-		/// Target URL (named alternative to positional)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-	},
+	Eval(#[command(flatten)] crate::commands::page::eval::EvalRaw),
 
 	/// Get HTML content (full page or specific selector)
-	Html {
-		/// Target URL (positional, uses context when omitted)
-		url: Option<String>,
-		/// CSS selector (positional, uses last selector or defaults to html)
-		selector: Option<String>,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-		/// CSS selector (named alternative)
-		#[arg(long = "selector", short = 's', value_name = "SELECTOR")]
-		selector_flag: Option<String>,
-	},
+	Html(#[command(flatten)] crate::commands::page::html::HtmlRaw),
 
 	/// Get coordinates for first matching element
-	Coords {
-		/// Target URL (positional)
-		url: Option<String>,
-		/// CSS selector (positional)
-		selector: Option<String>,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-		/// CSS selector (named alternative)
-		#[arg(long = "selector", short = 's', value_name = "SELECTOR")]
-		selector_flag: Option<String>,
-	},
+	Coords(#[command(flatten)] crate::commands::page::coords::CoordsRaw),
 
 	/// Get coordinates and info for all matching elements
-	CoordsAll {
-		/// Target URL (positional)
-		url: Option<String>,
-		/// CSS selector (positional)
-		selector: Option<String>,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-		/// CSS selector (named alternative)
-		#[arg(long = "selector", short = 's', value_name = "SELECTOR")]
-		selector_flag: Option<String>,
-	},
+	CoordsAll(#[command(flatten)] crate::commands::page::coords::CoordsRaw),
 
 	/// Get text content of element
-	Text {
-		/// Target URL (positional)
-		url: Option<String>,
-		/// CSS selector (positional)
-		selector: Option<String>,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-		/// CSS selector (named alternative)
-		#[arg(long = "selector", short = 's', value_name = "SELECTOR")]
-		selector_flag: Option<String>,
-	},
+	Text(#[command(flatten)] crate::commands::page::text::TextRaw),
 
 	/// Extract readable content from a web page
-	///
-	/// Removes clutter (ads, navigation, sidebars) and extracts the main article content.
-	/// Useful for reading articles, blog posts, and documentation.
-	Read {
-		/// Target URL (positional)
-		url: Option<String>,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-		/// Output format: markdown (default), text, or html
-		#[arg(long, short = 'o', default_value = "markdown", value_enum)]
-		output_format: ReadOutputFormat,
-		/// Include metadata (title, author, etc.) in output
-		#[arg(long, short = 'm')]
-		metadata: bool,
-	},
+	Read(#[command(flatten)] crate::commands::page::read::ReadRaw),
 
 	/// List interactive elements (buttons, links, inputs, selects)
 	#[command(alias = "els")]
-	Elements {
-		/// Target URL (positional)
-		url: Option<String>,
-		/// Wait for elements with polling (useful for dynamic pages)
-		#[arg(long)]
-		wait: bool,
-		/// Timeout in milliseconds for --wait mode (default: 10000)
-		#[arg(long, default_value = "10000")]
-		timeout_ms: u64,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-	},
+	Elements(#[command(flatten)] crate::commands::page::elements::ElementsRaw),
 
 	/// Get a comprehensive page model (URL, title, elements, text) in one call
-	///
-	/// Returns structured page state that gives AI agents full context without
-	/// multiple round-trips. Includes interactive elements with stable selectors
-	/// and visible text content.
 	#[command(alias = "snap")]
-	Snapshot {
-		/// Target URL (positional)
-		url: Option<String>,
-		/// Target URL (named alternative)
-		#[arg(long = "url", short = 'u', value_name = "URL")]
-		url_flag: Option<String>,
-		/// Skip interactive element extraction (faster, text-focused)
-		#[arg(long)]
-		text_only: bool,
-		/// Include full page text instead of just visible content
-		#[arg(long)]
-		full: bool,
-		/// Maximum text length to extract (default: 5000)
-		#[arg(long, default_value = "5000")]
-		max_text_length: usize,
-	},
+	Snapshot(#[command(flatten)] crate::commands::page::snapshot::SnapshotRaw),
 }
 
 #[derive(Subcommand, Debug)]
@@ -650,64 +487,15 @@ impl Commands {
 	) -> Option<(crate::commands::registry::CommandId, serde_json::Value)> {
 		use crate::commands::registry::CommandId as Id;
 
-		let result = match self {
-			Commands::Navigate { url, url_flag } => (
-				Id::Navigate,
-				serde_json::json!({ "url": url, "urlFlag": url_flag }),
-			),
-			Commands::Screenshot {
-				url,
-				output,
-				full_page,
-				url_flag,
-			} => (
-				Id::Screenshot,
-				serde_json::json!({
-					"url": url,
-					"output": output,
-					"fullPage": full_page,
-					"urlFlag": url_flag
-				}),
-			),
-			Commands::Click {
-				url,
-				selector,
-				url_flag,
-				selector_flag,
-				wait_ms,
-			} => (
-				Id::Click,
-				serde_json::json!({
-					"url": url,
-					"selector": selector,
-					"urlFlag": url_flag,
-					"selectorFlag": selector_flag,
-					"waitMs": wait_ms
-				}),
-			),
-			Commands::Fill {
-				text,
-				selector,
-				url,
-			} => (
-				Id::Fill,
-				serde_json::json!({ "text": text, "selector": selector, "url": url }),
-			),
-			Commands::Wait {
-				url,
-				condition,
-				url_flag,
-			} => {
-				let resolved_url = url_flag.clone().or_else(|| url.clone());
-				(
-					Id::Wait,
-					serde_json::json!({ "url": resolved_url, "condition": condition }),
-				)
-			}
+		Some(match self {
+			Commands::Navigate(args) => (Id::Navigate, serde_json::to_value(args).ok()?),
+			Commands::Screenshot(args) => (Id::Screenshot, serde_json::to_value(args).ok()?),
+			Commands::Click(args) => (Id::Click, serde_json::to_value(args).ok()?),
+			Commands::Fill(args) => (Id::Fill, serde_json::to_value(args).ok()?),
+			Commands::Wait(args) => (Id::Wait, serde_json::to_value(args).ok()?),
 			Commands::Page(action) => return action.into_registry_args(),
 			_ => return None,
-		};
-		Some(result)
+		})
 	}
 }
 
@@ -720,66 +508,17 @@ impl PageAction {
 	) -> Option<(crate::commands::registry::CommandId, serde_json::Value)> {
 		use crate::commands::registry::CommandId as Id;
 
-		let result = match self {
-			PageAction::Console { url, timeout_ms, url_flag } => (
-				Id::PageConsole,
-				serde_json::json!({ "url": url_flag.clone().or_else(|| url.clone()), "timeoutMs": timeout_ms }),
-			),
-			PageAction::Eval { expression, url, expression_flag, file, url_flag } => {
-				let expr = file
-					.as_ref()
-					.and_then(|p| std::fs::read_to_string(p).ok())
-					.or_else(|| expression_flag.clone())
-					.or_else(|| expression.clone());
-				(
-					Id::PageEval,
-					serde_json::json!({ "url": url, "urlFlag": url_flag, "expression": expr }),
-				)
-			}
-			PageAction::Html { url, selector, url_flag, selector_flag } => (
-				Id::PageHtml,
-				serde_json::json!({ "url": url, "selector": selector, "urlFlag": url_flag, "selectorFlag": selector_flag }),
-			),
-			PageAction::Coords { url, selector, url_flag, selector_flag } => (
-				Id::PageCoords,
-				serde_json::json!({
-					"url": url_flag.clone().or_else(|| url.clone()),
-					"selector": selector_flag.clone().or_else(|| selector.clone())
-				}),
-			),
-			PageAction::CoordsAll { url, selector, url_flag, selector_flag } => (
-				Id::PageCoordsAll,
-				serde_json::json!({
-					"url": url_flag.clone().or_else(|| url.clone()),
-					"selector": selector_flag.clone().or_else(|| selector.clone())
-				}),
-			),
-			PageAction::Text { url, selector, url_flag, selector_flag } => (
-				Id::PageText,
-				serde_json::json!({ "url": url, "selector": selector, "urlFlag": url_flag, "selectorFlag": selector_flag }),
-			),
-			PageAction::Read { url, url_flag, output_format, metadata } => (
-				Id::PageRead,
-				serde_json::json!({
-					"url": url_flag.clone().or_else(|| url.clone()),
-					"outputFormat": output_format,
-					"metadata": metadata
-				}),
-			),
-			PageAction::Elements { url, wait, timeout_ms, url_flag } => (
-				Id::PageElements,
-				serde_json::json!({
-					"url": url_flag.clone().or_else(|| url.clone()),
-					"wait": wait,
-					"timeoutMs": timeout_ms
-				}),
-			),
-			PageAction::Snapshot { url, url_flag, text_only, full, max_text_length } => (
-				Id::PageSnapshot,
-				serde_json::json!({ "url": url, "urlFlag": url_flag, "textOnly": text_only, "full": full, "maxTextLength": max_text_length }),
-			),
-		};
-		Some(result)
+		Some(match self {
+			PageAction::Console(args) => (Id::PageConsole, serde_json::to_value(args).ok()?),
+			PageAction::Eval(args) => (Id::PageEval, serde_json::to_value(args).ok()?),
+			PageAction::Html(args) => (Id::PageHtml, serde_json::to_value(args).ok()?),
+			PageAction::Coords(args) => (Id::PageCoords, serde_json::to_value(args).ok()?),
+			PageAction::CoordsAll(args) => (Id::PageCoordsAll, serde_json::to_value(args).ok()?),
+			PageAction::Text(args) => (Id::PageText, serde_json::to_value(args).ok()?),
+			PageAction::Read(args) => (Id::PageRead, serde_json::to_value(args).ok()?),
+			PageAction::Elements(args) => (Id::PageElements, serde_json::to_value(args).ok()?),
+			PageAction::Snapshot(args) => (Id::PageSnapshot, serde_json::to_value(args).ok()?),
+		})
 	}
 }
 
@@ -799,15 +538,10 @@ mod tests {
 		let cli = Cli::try_parse_from(args).unwrap();
 
 		match cli.command {
-			Commands::Screenshot {
-				url,
-				output,
-				full_page,
-				..
-			} => {
-				assert_eq!(url.as_deref(), Some("https://example.com"));
-				assert_eq!(output, Some(PathBuf::from("/tmp/test.png")));
-				assert!(!full_page);
+			Commands::Screenshot(args) => {
+				assert_eq!(args.url.as_deref(), Some("https://example.com"));
+				assert_eq!(args.output, Some(PathBuf::from("/tmp/test.png")));
+				assert_eq!(args.full_page, None);
 			}
 			_ => panic!("Expected Screenshot command"),
 		}
@@ -819,15 +553,10 @@ mod tests {
 		let cli = Cli::try_parse_from(args).unwrap();
 
 		match cli.command {
-			Commands::Screenshot {
-				url,
-				output,
-				full_page,
-				..
-			} => {
-				assert_eq!(url.as_deref(), Some("https://example.com"));
-				assert_eq!(output, None);
-				assert!(!full_page);
+			Commands::Screenshot(args) => {
+				assert_eq!(args.url.as_deref(), Some("https://example.com"));
+				assert_eq!(args.output, None);
+				assert_eq!(args.full_page, None);
 			}
 			_ => panic!("Expected Screenshot command"),
 		}
@@ -839,9 +568,9 @@ mod tests {
 		let cli = Cli::try_parse_from(args).unwrap();
 
 		match cli.command {
-			Commands::Page(PageAction::Html { url, selector, .. }) => {
-				assert_eq!(url.as_deref(), Some("https://example.com"));
-				assert_eq!(selector.as_deref(), Some("div.content"));
+			Commands::Page(PageAction::Html(args)) => {
+				assert_eq!(args.url.as_deref(), Some("https://example.com"));
+				assert_eq!(args.selector.as_deref(), Some("div.content"));
 			}
 			_ => panic!("Expected Page Html command"),
 		}
@@ -853,9 +582,9 @@ mod tests {
 		let cli = Cli::try_parse_from(args).unwrap();
 
 		match cli.command {
-			Commands::Wait { url, condition, .. } => {
-				assert_eq!(url.as_deref(), Some("https://example.com"));
-				assert_eq!(condition, "networkidle");
+			Commands::Wait(args) => {
+				assert_eq!(args.url.as_deref(), Some("https://example.com"));
+				assert_eq!(args.condition.as_deref(), Some("networkidle"));
 			}
 			_ => panic!("Expected Wait command"),
 		}
@@ -925,19 +654,13 @@ mod tests {
 		let cli = Cli::try_parse_from(args).unwrap();
 
 		match cli.command {
-			Commands::Click {
-				url,
-				selector,
-				url_flag,
-				selector_flag,
-				..
-			} => {
+			Commands::Click(args) => {
 				// Positional args should be None
-				assert!(url.is_none());
-				assert!(selector.is_none());
+				assert!(args.url.is_none());
+				assert!(args.selector.is_none());
 				// Named flags should have values
-				assert_eq!(url_flag.as_deref(), Some("https://example.com"));
-				assert_eq!(selector_flag.as_deref(), Some("button.submit"));
+				assert_eq!(args.url_flag.as_deref(), Some("https://example.com"));
+				assert_eq!(args.selector_flag.as_deref(), Some("button.submit"));
 			}
 			_ => panic!("Expected Click command"),
 		}
@@ -958,17 +681,11 @@ mod tests {
 		let cli = Cli::try_parse_from(args).unwrap();
 
 		match cli.command {
-			Commands::Page(PageAction::Eval {
-				expression,
-				url,
-				expression_flag,
-				url_flag,
-				..
-			}) => {
-				assert!(expression.is_none());
-				assert!(url.is_none());
-				assert_eq!(expression_flag.as_deref(), Some("document.title"));
-				assert_eq!(url_flag.as_deref(), Some("https://example.com"));
+			Commands::Page(PageAction::Eval(args)) => {
+				assert!(args.expression.is_none());
+				assert!(args.url.is_none());
+				assert_eq!(args.expression_flag.as_deref(), Some("document.title"));
+				assert_eq!(args.url_flag.as_deref(), Some("https://example.com"));
 			}
 			_ => panic!("Expected Page Eval command"),
 		}

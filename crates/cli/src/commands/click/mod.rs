@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use clap::Args;
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -15,17 +16,29 @@ use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClickRaw {
+	/// Target URL (positional)
 	#[serde(default)]
 	pub url: Option<String>,
+
+	/// CSS selector (positional)
 	#[serde(default)]
 	pub selector: Option<String>,
+
+	/// Target URL (named alternative)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
 	#[serde(default, alias = "url_flag")]
 	pub url_flag: Option<String>,
+
+	/// CSS selector (named alternative)
+	#[arg(long = "selector", short = 's', value_name = "SELECTOR")]
 	#[serde(default, alias = "selector_flag")]
 	pub selector_flag: Option<String>,
+
+	/// Time to wait for navigation after click (milliseconds)
+	#[arg(long, default_value = "500")]
 	#[serde(default, alias = "wait_ms")]
 	pub wait_ms: Option<u64>,
 }

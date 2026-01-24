@@ -12,6 +12,7 @@
 
 use std::time::Duration;
 
+use clap::Args;
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
@@ -26,16 +27,22 @@ use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 use crate::types::ConsoleMessage;
 
 /// Raw inputs from CLI or batch JSON before resolution.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConsoleRaw {
-	/// Target URL, resolved from context if not provided.
+	/// Target URL (positional, uses context when omitted)
 	#[serde(default)]
 	pub url: Option<String>,
 
-	/// How long to capture messages before returning (default: 3000ms).
+	/// Time to wait for console messages (ms)
+	#[arg(default_value = "3000")]
 	#[serde(default, alias = "timeout_ms")]
 	pub timeout_ms: Option<u64>,
+
+	/// Target URL (named alternative)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
+	#[serde(default, alias = "url_flag")]
+	pub url_flag: Option<String>,
 }
 
 /// Resolved inputs ready for execution.
@@ -70,7 +77,8 @@ impl CommandDef for ConsoleCommand {
 	type Data = ConsoleData;
 
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
+		let url = raw.url_flag.or(raw.url);
+		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
 
 		Ok(ConsoleResolved {
 			target,

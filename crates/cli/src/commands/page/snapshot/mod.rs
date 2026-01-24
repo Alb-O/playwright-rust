@@ -25,6 +25,7 @@
 //! pw snapshot --max-text-length 10000
 //! ```
 
+use clap::Args;
 use pw::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -37,34 +38,30 @@ use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON before resolution.
-///
-/// Accepts both camelCase (JSON) and snake_case (CLI) field names via serde aliases.
-///
-/// # Example
-///
-/// ```ignore
-/// let raw = SnapshotRaw {
-///     url: Some("https://example.com".into()),
-///     text_only: Some(true),
-///     ..Default::default()
-/// };
-/// ```
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SnapshotRaw {
-	/// Target URL, resolved from context if not provided.
+	/// Target URL (positional)
 	#[serde(default)]
 	pub url: Option<String>,
 
-	/// When `true`, skips interactive element extraction for faster text-only snapshots.
+	/// Target URL (named alternative)
+	#[arg(long = "url", short = 'u', value_name = "URL")]
+	#[serde(default, alias = "url_flag")]
+	pub url_flag: Option<String>,
+
+	/// Skip interactive element extraction (faster, text-focused)
+	#[arg(long)]
 	#[serde(default)]
 	pub text_only: Option<bool>,
 
-	/// When `true`, includes all page text rather than just viewport-visible content.
+	/// Include full page text instead of just visible content
+	#[arg(long)]
 	#[serde(default)]
 	pub full: Option<bool>,
 
-	/// Maximum characters of text to extract. Defaults to 5000.
+	/// Maximum text length to extract (default: 5000)
+	#[arg(long, default_value = "5000")]
 	#[serde(default, alias = "max_text_length")]
 	pub max_text_length: Option<usize>,
 }
@@ -99,7 +96,8 @@ impl CommandDef for SnapshotCommand {
 	type Data = SnapshotData;
 
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = env.resolve_target(raw.url, TargetPolicy::AllowCurrentPage)?;
+		let url = raw.url_flag.or(raw.url);
+		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
 
 		Ok(SnapshotResolved {
 			target,
