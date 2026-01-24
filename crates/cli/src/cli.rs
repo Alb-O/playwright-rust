@@ -311,9 +311,9 @@ pub enum Commands {
         /// Remote debugging port (default: 9222)
         #[arg(long, short, default_value = "9222")]
         port: u16,
-        /// Chrome profile directory to use (for --launch)
+        /// Browser user data directory (for --launch)
         #[arg(long)]
-        profile: Option<String>,
+        user_data_dir: Option<PathBuf>,
     },
 
     /// Manage browser tabs

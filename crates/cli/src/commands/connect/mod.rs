@@ -20,7 +20,7 @@ pub struct ConnectOptions {
     pub discover: bool,
     pub kill: bool,
     pub port: u16,
-    pub profile: Option<String>,
+    pub user_data_dir: Option<std::path::PathBuf>,
 }
 
 /// Response from Chrome DevTools Protocol /json/version endpoint
@@ -89,25 +89,6 @@ fn find_chrome_executable() -> Option<String> {
     None
 }
 
-/// Get the Chrome profile directory path
-fn get_profile_dir(profile: Option<&str>) -> Option<String> {
-    let base_dir = if cfg!(target_os = "macos") {
-        dirs::home_dir().map(|h| h.join("Library/Application Support/Google/Chrome"))
-    } else if cfg!(target_os = "windows") {
-        dirs::data_local_dir().map(|d| d.join("Google/Chrome/User Data"))
-    } else {
-        // Linux
-        dirs::config_dir().map(|c| c.join("google-chrome"))
-    };
-
-    base_dir.map(|base| {
-        if let Some(profile_name) = profile {
-            base.join(profile_name).to_string_lossy().to_string()
-        } else {
-            base.to_string_lossy().to_string()
-        }
-    })
-}
 
 /// Fetch CDP endpoint from a remote debugging port
 async fn fetch_cdp_endpoint(port: u16) -> Result<CdpVersionInfo> {
@@ -166,7 +147,7 @@ async fn discover_chrome(port: u16) -> Result<CdpVersionInfo> {
 }
 
 /// Launch Chrome with remote debugging enabled
-async fn launch_chrome(port: u16, profile: Option<&str>) -> Result<CdpVersionInfo> {
+async fn launch_chrome(port: u16, user_data_dir: Option<&std::path::Path>) -> Result<CdpVersionInfo> {
     let chrome_path = find_chrome_executable().ok_or_else(|| {
         PwError::Context(
             "Could not find Chrome/Chromium executable. \n\
@@ -181,9 +162,8 @@ async fn launch_chrome(port: u16, profile: Option<&str>) -> Result<CdpVersionInf
         "--no-default-browser-check".to_string(),
     ];
 
-    // Add profile directory if available
-    if let Some(profile_dir) = get_profile_dir(profile) {
-        args.push(format!("--user-data-dir={}", profile_dir));
+    if let Some(dir) = user_data_dir {
+        args.push(format!("--user-data-dir={}", dir.display()));
     }
 
     // Spawn Chrome as a detached process
@@ -322,7 +302,7 @@ pub async fn run(
         discover,
         kill,
         port,
-        profile,
+        user_data_dir,
     } = opts;
 
     if kill {
@@ -368,7 +348,7 @@ pub async fn run(
 
     // Launch Chrome with remote debugging
     if launch {
-        let info = launch_chrome(port, profile.as_deref()).await?;
+        let info = launch_chrome(port, user_data_dir.as_deref()).await?;
         ctx_state.set_cdp_endpoint(Some(info.web_socket_debugger_url.clone()));
 
         let result = ResultBuilder::<serde_json::Value>::new("connect")

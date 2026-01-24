@@ -280,7 +280,7 @@ async fn dispatch_command_inner(
             discover,
             kill,
             port,
-            profile,
+            user_data_dir,
         } => {
             connect::run(
                 ctx_state,
@@ -292,7 +292,7 @@ async fn dispatch_command_inner(
                     discover,
                     kill,
                     port,
-                    profile,
+                    user_data_dir,
                 },
             )
             .await

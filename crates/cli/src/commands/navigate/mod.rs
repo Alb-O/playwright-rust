@@ -84,6 +84,8 @@ pub async fn execute_resolved(
         Target::CurrentPage => {}
     }
 
+    session.page().bring_to_front().await?;
+
     let meta_js = format!("JSON.stringify({})", EXTRACT_META_JS);
     let meta: PageMeta = serde_json::from_str(&session.page().evaluate_value(&meta_js).await?)?;
 
