@@ -6,10 +6,9 @@ use std::sync::Arc;
 use pw_runtime::{Error, Result};
 use tokio::sync::broadcast;
 
+use super::{ConsoleMessage, Page};
 use crate::handlers::{HandlerEntry, HandlerFn, HandlerFuture, Subscription, next_handler_id};
 use crate::{Dialog, Download};
-
-use super::{ConsoleMessage, Page};
 
 impl Page {
 	/// Registers a download event handler.

@@ -5,12 +5,11 @@ use std::sync::Arc;
 
 use pw_runtime::Result;
 
+use super::Page;
+use crate::Route;
 use crate::handlers::{
 	HandlerEntry, HandlerFn, HandlerFuture, RouteMatcher, RouteMeta, Subscription, next_handler_id,
 };
-use crate::Route;
-
-use super::Page;
 
 impl Page {
 	/// Registers a route handler for network interception.

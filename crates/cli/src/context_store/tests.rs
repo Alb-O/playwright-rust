@@ -1,6 +1,6 @@
+use super::ContextState;
 use super::storage::LoadedState;
 use super::types::{CliCache, CliConfig, CliSecrets};
-use super::ContextState;
 
 fn test_state() -> LoadedState {
 	LoadedState {
@@ -172,10 +172,7 @@ fn resolve_selector_from_cache() {
 
 	let ctx_state = ContextState::test_new(state);
 
-	assert_eq!(
-		ctx_state.resolve_selector(None, None).unwrap(),
-		"#cached"
-	);
+	assert_eq!(ctx_state.resolve_selector(None, None).unwrap(), "#cached");
 }
 
 #[test]

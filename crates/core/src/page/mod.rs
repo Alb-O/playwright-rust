@@ -17,10 +17,9 @@ use serde::Deserialize;
 use serde_json::Value;
 use tokio::sync::broadcast;
 
+pub use crate::handlers::Subscription;
 use crate::handlers::{HandlerMap, RouteMeta};
 use crate::{Dialog, Download, Route};
-
-pub use crate::handlers::Subscription;
 
 /// A browser tab or window within a [`BrowserContext`](crate::BrowserContext).
 ///

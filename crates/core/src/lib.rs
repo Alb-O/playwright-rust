@@ -155,7 +155,6 @@ mod init;
 mod object_factory;
 
 pub mod accessibility;
-mod handlers;
 pub mod action_options;
 pub mod artifact;
 pub mod browser;
@@ -169,6 +168,7 @@ pub mod element_handle;
 pub mod events;
 pub mod file_payload;
 pub mod frame;
+mod handlers;
 pub mod keyboard;
 pub mod launch_options;
 pub mod locator;

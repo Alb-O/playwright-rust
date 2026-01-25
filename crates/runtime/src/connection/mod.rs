@@ -21,17 +21,15 @@ mod object_store;
 #[cfg(test)]
 mod tests;
 
-pub use object_store::ObjectStore;
-
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
 use dashmap::DashMap;
+pub use object_store::ObjectStore;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::{Mutex as TokioMutex, mpsc, oneshot};
@@ -260,7 +258,11 @@ struct CancelGuard {
 
 impl CancelGuard {
 	fn new(id: u32, callbacks: CallbackMap) -> Self {
-		Self { id, callbacks, completed: false }
+		Self {
+			id,
+			callbacks,
+			completed: false,
+		}
 	}
 
 	fn complete(&mut self) {
@@ -518,7 +520,10 @@ impl Connection {
 		let initializer = event.params["initializer"].clone();
 
 		let parent_obj = self.objects.try_get(&event.guid).ok_or_else(|| {
-			tracing::debug!("Parent object not found for type={type_name}, parent_guid={}", event.guid);
+			tracing::debug!(
+				"Parent object not found for type={type_name}, parent_guid={}",
+				event.guid
+			);
 			Error::ProtocolError(format!("Parent object not found: {}", event.guid))
 		})?;
 
@@ -533,13 +538,21 @@ impl Connection {
 		})?;
 
 		let object = factory
-			.create_object(parent_or_conn, type_name.clone(), object_guid.clone(), initializer)
+			.create_object(
+				parent_or_conn,
+				type_name.clone(),
+				object_guid.clone(),
+				initializer,
+			)
 			.await
 			.inspect_err(|e| {
-				tracing::debug!("Failed to create object type={type_name}, guid={object_guid}, error={e}");
+				tracing::debug!(
+					"Failed to create object type={type_name}, guid={object_guid}, error={e}"
+				);
 			})?;
 
-		self.register_object(Arc::clone(&object_guid), object.clone()).await;
+		self.register_object(Arc::clone(&object_guid), object.clone())
+			.await;
 		parent_obj.add_child(Arc::clone(&object_guid), object);
 		tracing::debug!("Created object: type={type_name}, guid={object_guid}");
 

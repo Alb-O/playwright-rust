@@ -74,7 +74,12 @@ impl ContextState {
 		if self.no_context {
 			return None;
 		}
-		let profile = self.state.cache.active_profile.as_deref().unwrap_or("default");
+		let profile = self
+			.state
+			.cache
+			.active_profile
+			.as_deref()
+			.unwrap_or("default");
 		let dir = self.state.paths.sessions_dir(self.state.is_project)?;
 		Some(dir.join(format!("{profile}.json")))
 	}

@@ -103,7 +103,13 @@ impl LoadedState {
 
 		let secrets = load_json::<CliSecrets>(&paths.global_secrets).unwrap_or_default();
 
-		Ok(Self { config, cache, secrets, is_project, paths })
+		Ok(Self {
+			config,
+			cache,
+			secrets,
+			is_project,
+			paths,
+		})
 	}
 
 	pub fn save(&self) -> Result<()> {
@@ -149,8 +155,9 @@ fn save_secrets(path: &Path, secrets: &CliSecrets) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
 	use tempfile::TempDir;
+
+	use super::*;
 
 	#[test]
 	fn test_state_paths_global_only() {
