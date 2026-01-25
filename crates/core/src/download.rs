@@ -103,7 +103,7 @@ impl Download {
 	/// # Example
 	///
 	/// ```ignore
-	/// # use pw::protocol::Download;
+	/// # use pw_rs::protocol::Download;
 	/// # async fn example(download: Download) -> Result<(), Box<dyn std::error::Error>> {
 	/// download.save_as("/path/to/save/file.pdf").await?;
 	/// # Ok(())

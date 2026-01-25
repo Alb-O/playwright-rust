@@ -9,7 +9,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use pw::protocol::{BrowserContextOptions, Viewport};
+//! use pw_rs::protocol::{BrowserContextOptions, Viewport};
 //!
 //! // Create context with video recording enabled
 //! let options = BrowserContextOptions::builder()

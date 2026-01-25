@@ -9,7 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use pw::dirs;
+use pw_rs::dirs;
 use serde::{Deserialize, Serialize};
 
 use crate::context::CommandContext;

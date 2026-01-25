@@ -48,9 +48,9 @@ use crate::{
 /// # Example
 ///
 /// ```ignore
-/// # use pw::server::object_factory::create_object;
-/// # use pw::server::channel_owner::ParentOrConnection;
-/// # use pw::server::connection::ConnectionLike;
+/// # use pw_rs::server::object_factory::create_object;
+/// # use pw_rs::server::channel_owner::ParentOrConnection;
+/// # use pw_rs::server::connection::ConnectionLike;
 /// # use std::sync::Arc;
 /// # use serde_json::json;
 /// # async fn example(connection: Arc<dyn ConnectionLike>) -> Result<(), Box<dyn std::error::Error>> {

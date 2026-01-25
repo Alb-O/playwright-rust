@@ -16,7 +16,7 @@ const DRIVER_BASE_URL: &str = "https://playwright.azureedge.net/builds/driver";
 /// npm registry URL for playwright package
 const PLAYWRIGHT_NPM_URL: &str = "https://registry.npmjs.org/playwright/-/playwright-";
 
-/// Directory name constants - must match pw::dirs in lib.rs
+/// Directory name constants - must match pw_rs::dirs in lib.rs
 mod dir_names {
 	/// Main playwright directory under project root
 	pub const PLAYWRIGHT: &str = "playwright";

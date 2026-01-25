@@ -236,7 +236,7 @@ where
 	/// # Example
 	///
 	/// ```ignore
-	/// # use pw::server::transport::PipeTransport;
+	/// # use pw_rs::server::transport::PipeTransport;
 	/// # use tokio::process::Command;
 	/// # #[tokio::main]
 	/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {

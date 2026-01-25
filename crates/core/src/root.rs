@@ -38,8 +38,8 @@ use serde_json::Value;
 /// # Example
 ///
 /// ```ignore
-/// # use pw::protocol::Root;
-/// # use pw::server::connection::ConnectionLike;
+/// # use pw_rs::protocol::Root;
+/// # use pw_rs::server::connection::ConnectionLike;
 /// # use std::sync::Arc;
 /// # async fn example(connection: Arc<dyn ConnectionLike>) -> Result<(), Box<dyn std::error::Error>> {
 /// // Create root object with connection

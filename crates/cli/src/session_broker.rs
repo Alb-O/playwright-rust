@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use pw::{StorageState, WaitUntil};
+use pw_rs::{StorageState, WaitUntil};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -438,11 +438,11 @@ impl SessionHandle {
 		}
 	}
 
-	pub fn page(&self) -> &pw::Page {
+	pub fn page(&self) -> &pw_rs::Page {
 		self.session.page()
 	}
 
-	pub fn context(&self) -> &pw::BrowserContext {
+	pub fn context(&self) -> &pw_rs::BrowserContext {
 		self.session.context()
 	}
 
@@ -454,7 +454,7 @@ impl SessionHandle {
 		self.session.cdp_endpoint()
 	}
 
-	pub fn browser(&self) -> &pw::Browser {
+	pub fn browser(&self) -> &pw_rs::Browser {
 		self.session.browser()
 	}
 

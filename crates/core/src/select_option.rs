@@ -9,7 +9,7 @@
 /// # Example
 ///
 /// ```ignore
-/// use pw::protocol::SelectOption;
+/// use pw_rs::protocol::SelectOption;
 ///
 /// // Select by value
 /// let opt = SelectOption::Value("option1".to_string());

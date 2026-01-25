@@ -29,7 +29,7 @@ use crate::Frame;
 /// # Examples
 ///
 /// ```ignore
-/// use pw::protocol::{Playwright, SelectOption};
+/// use pw_rs::protocol::{Playwright, SelectOption};
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {

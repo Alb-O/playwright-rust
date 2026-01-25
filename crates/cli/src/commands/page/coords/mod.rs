@@ -17,7 +17,7 @@
 //! ```
 
 use clap::Args;
-use pw::WaitUntil;
+use pw_rs::WaitUntil;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 

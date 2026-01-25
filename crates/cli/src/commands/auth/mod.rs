@@ -12,7 +12,7 @@ mod listen;
 use std::path::{Path, PathBuf};
 
 pub use listen::listen;
-use pw::{StorageState, WaitUntil};
+use pw_rs::{StorageState, WaitUntil};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -233,7 +233,7 @@ pub async fn cookies_resolved(
 	session.close().await
 }
 
-fn print_cookies_table(cookies: &[pw::Cookie], url: &str) {
+fn print_cookies_table(cookies: &[pw_rs::Cookie], url: &str) {
 	if cookies.is_empty() {
 		println!("No cookies found for {url}");
 		return;

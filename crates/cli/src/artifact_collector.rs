@@ -7,7 +7,7 @@
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use pw::Page;
+use pw_rs::Page;
 use tracing::{debug, warn};
 
 use crate::output::{Artifact, ArtifactType};

@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use pw::{BrowserContextOptions, GotoOptions, Playwright, StorageState, Subscription, WaitUntil};
+use pw_rs::{
+	BrowserContextOptions, GotoOptions, Playwright, StorageState, Subscription, WaitUntil,
+};
 use tracing::debug;
 
 use crate::context::{BlockConfig, DownloadConfig, HarConfig};
@@ -87,13 +89,13 @@ pub struct SessionOptions<'a> {
 
 pub struct BrowserSession {
 	_playwright: Playwright,
-	browser: pw::Browser,
-	context: pw::BrowserContext,
-	page: pw::Page,
+	browser: pw_rs::Browser,
+	context: pw_rs::BrowserContext,
+	page: pw_rs::Page,
 	wait_until: WaitUntil,
 	ws_endpoint: Option<String>,
 	cdp_endpoint: Option<String>,
-	launched_server: Option<pw::LaunchedServer>,
+	launched_server: Option<pw_rs::LaunchedServer>,
 	keep_server_running: bool,
 	keep_browser_running: bool,
 	/// Active HAR recording, if any
@@ -242,7 +244,7 @@ impl BrowserSession {
 			playwright.keep_server_running();
 			keep_server_running = true;
 
-			let launch_options = pw::LaunchOptions {
+			let launch_options = pw_rs::LaunchOptions {
 				headless: Some(headless),
 				..Default::default()
 			};
@@ -281,7 +283,7 @@ impl BrowserSession {
 
 			(browser, context)
 		} else {
-			let launch_options = pw::LaunchOptions {
+			let launch_options = pw_rs::LaunchOptions {
 				headless: Some(headless),
 				..Default::default()
 			};
@@ -379,7 +381,7 @@ impl BrowserSession {
 				har_path = %path.display(),
 				"starting HAR recording"
 			);
-			let options = pw::HarStartOptions {
+			let options = pw_rs::HarStartOptions {
 				content: har_config.content_policy,
 				mode: har_config.mode,
 				url_glob: har_config.url_filter.clone(),
@@ -556,7 +558,7 @@ impl BrowserSession {
 			playwright.keep_server_running();
 		}
 
-		let launch_options = pw::LaunchOptions {
+		let launch_options = pw_rs::LaunchOptions {
 			headless: Some(headless),
 			remote_debugging_port: Some(remote_debugging_port),
 			// Prevent browser from closing on signals (for persistent sessions)
@@ -624,11 +626,11 @@ impl BrowserSession {
 			})
 	}
 
-	pub fn page(&self) -> &pw::Page {
+	pub fn page(&self) -> &pw_rs::Page {
 		&self.page
 	}
 
-	pub fn context(&self) -> &pw::BrowserContext {
+	pub fn context(&self) -> &pw_rs::BrowserContext {
 		&self.context
 	}
 
@@ -640,7 +642,7 @@ impl BrowserSession {
 		self.cdp_endpoint.as_deref()
 	}
 
-	pub fn browser(&self) -> &pw::Browser {
+	pub fn browser(&self) -> &pw_rs::Browser {
 		&self.browser
 	}
 

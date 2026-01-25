@@ -12,7 +12,7 @@
 /// # Example
 ///
 /// ```ignore
-/// # use pw::protocol::FilePayload;
+/// # use pw_rs::protocol::FilePayload;
 /// let file = FilePayload::builder()
 ///     .name("document.pdf".to_string())
 ///     .mime_type("application/pdf".to_string())

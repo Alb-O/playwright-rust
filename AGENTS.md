@@ -85,7 +85,7 @@ Order imports in groups separated by blank lines:
 
 1. Standard library (`std::`)
 2. External crates
-3. Workspace crates (`pw::`, `pw_protocol::`, `pw_runtime::`)
+3. Workspace crates (`pw_rs::`, `pw_protocol::`, `pw_runtime::`)
 4. Crate-internal (`crate::`, `super::`)
 
 ```rust
@@ -95,7 +95,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::info;
 
-use pw::WaitUntil;
+use pw_rs::WaitUntil;
 
 use crate::context::CommandContext;
 use crate::error::Result;

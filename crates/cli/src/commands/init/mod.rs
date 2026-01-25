@@ -20,7 +20,7 @@ mod templates;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use pw::dirs;
+use pw_rs::dirs;
 
 use crate::cli::InitTemplate;
 use crate::error::{PwError, Result};

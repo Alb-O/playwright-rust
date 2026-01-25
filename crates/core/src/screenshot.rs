@@ -9,7 +9,7 @@ use serde::Serialize;
 /// # Example
 ///
 /// ```ignore
-/// use pw::protocol::ScreenshotType;
+/// use pw_rs::protocol::ScreenshotType;
 ///
 /// let screenshot_type = ScreenshotType::Jpeg;
 /// ```
@@ -29,7 +29,7 @@ pub enum ScreenshotType {
 /// # Example
 ///
 /// ```ignore
-/// use pw::protocol::ScreenshotClip;
+/// use pw_rs::protocol::ScreenshotClip;
 ///
 /// let clip = ScreenshotClip {
 ///     x: 10.0,
@@ -59,7 +59,7 @@ pub struct ScreenshotClip {
 /// # Example
 ///
 /// ```ignore
-/// use pw::protocol::{ScreenshotOptions, ScreenshotType, ScreenshotClip};
+/// use pw_rs::protocol::{ScreenshotOptions, ScreenshotType, ScreenshotClip};
 ///
 /// // JPEG with quality
 /// let options = ScreenshotOptions::builder()

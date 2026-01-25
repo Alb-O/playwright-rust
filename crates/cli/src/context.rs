@@ -4,7 +4,7 @@
 
 use std::path::{Path, PathBuf};
 
-use pw::{HarContentPolicy, HarMode};
+use pw_rs::{HarContentPolicy, HarMode};
 
 use crate::output::CdpEndpointSource;
 use crate::project::Project;
@@ -39,7 +39,7 @@ impl HarConfig {
 /// - `*://ads.*/**` - block ad domains
 /// - `*://google-analytics.com/**` - block analytics
 ///
-/// [`Page::route`]: pw::Page::route
+/// [`Page::route`]: pw_rs::Page::route
 #[derive(Debug, Clone, Default)]
 pub struct BlockConfig {
 	/// URL glob patterns to block.
@@ -351,7 +351,7 @@ impl CommandContext {
 mod tests {
 	use std::fs;
 
-	use pw::dirs;
+	use pw_rs::dirs;
 	use tempfile::TempDir;
 
 	use super::*;

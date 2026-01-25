@@ -21,7 +21,7 @@ use crate::{BrowserContext, Page};
 /// # Example
 ///
 /// ```ignore
-/// use pw::protocol::Playwright;
+/// use pw_rs::protocol::Playwright;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {

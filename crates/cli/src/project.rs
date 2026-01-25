@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use pw::dirs;
+use pw_rs::dirs;
 use tracing::debug;
 
 /// Paths extracted from a playwright project configuration

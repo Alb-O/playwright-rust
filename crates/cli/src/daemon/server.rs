@@ -3,7 +3,7 @@ use std::net::TcpListener as StdTcpListener;
 use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow};
-use pw::{LaunchOptions, Playwright};
+use pw_rs::{LaunchOptions, Playwright};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 #[cfg(windows)]
 use tokio::net::TcpListener;
@@ -24,7 +24,7 @@ const PORT_RANGE_END: u16 = 10221;
 
 struct BrowserInstance {
 	info: BrowserInfo,
-	browser: pw::Browser,
+	browser: pw_rs::Browser,
 }
 
 struct DaemonState {

@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use pw::{HarContentPolicy, HarMode};
+use pw_rs::{HarContentPolicy, HarMode};
 
 use crate::cli::Cli;
 use crate::context::{

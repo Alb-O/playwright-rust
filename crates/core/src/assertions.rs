@@ -23,7 +23,7 @@ const DEFAULT_POLL_INTERVAL: Duration = Duration::from_millis(100);
 /// # Example
 ///
 /// ```ignore
-/// use pw::{expect, protocol::Playwright};
+/// use pw_rs::{expect, protocol::Playwright};
 /// use std::time::Duration;
 ///
 /// #[tokio::main]

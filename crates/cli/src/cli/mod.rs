@@ -9,7 +9,7 @@ use crate::output::OutputFormat;
 use crate::styles::cli_styles;
 use crate::types::BrowserKind;
 
-/// HAR content policy (CLI wrapper for pw::HarContentPolicy)
+/// HAR content policy (CLI wrapper for pw_rs::HarContentPolicy)
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum)]
 pub enum CliHarContentPolicy {
 	/// Include content inline (base64)
@@ -21,17 +21,17 @@ pub enum CliHarContentPolicy {
 	Omit,
 }
 
-impl From<CliHarContentPolicy> for pw::HarContentPolicy {
+impl From<CliHarContentPolicy> for pw_rs::HarContentPolicy {
 	fn from(policy: CliHarContentPolicy) -> Self {
 		match policy {
-			CliHarContentPolicy::Embed => pw::HarContentPolicy::Embed,
-			CliHarContentPolicy::Attach => pw::HarContentPolicy::Attach,
-			CliHarContentPolicy::Omit => pw::HarContentPolicy::Omit,
+			CliHarContentPolicy::Embed => pw_rs::HarContentPolicy::Embed,
+			CliHarContentPolicy::Attach => pw_rs::HarContentPolicy::Attach,
+			CliHarContentPolicy::Omit => pw_rs::HarContentPolicy::Omit,
 		}
 	}
 }
 
-/// HAR recording mode (CLI wrapper for pw::HarMode)
+/// HAR recording mode (CLI wrapper for pw_rs::HarMode)
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum)]
 pub enum CliHarMode {
 	/// Store all content
@@ -41,11 +41,11 @@ pub enum CliHarMode {
 	Minimal,
 }
 
-impl From<CliHarMode> for pw::HarMode {
+impl From<CliHarMode> for pw_rs::HarMode {
 	fn from(mode: CliHarMode) -> Self {
 		match mode {
-			CliHarMode::Full => pw::HarMode::Full,
-			CliHarMode::Minimal => pw::HarMode::Minimal,
+			CliHarMode::Full => pw_rs::HarMode::Full,
+			CliHarMode::Minimal => pw_rs::HarMode::Minimal,
 		}
 	}
 }

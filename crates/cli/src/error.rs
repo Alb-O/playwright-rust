@@ -54,7 +54,7 @@ pub enum PwError {
 	Json(#[from] serde_json::Error),
 
 	#[error(transparent)]
-	Playwright(#[from] pw::Error),
+	Playwright(#[from] pw_rs::Error),
 
 	#[error(transparent)]
 	Anyhow(#[from] anyhow::Error),

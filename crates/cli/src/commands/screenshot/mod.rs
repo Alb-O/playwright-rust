@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use clap::Args;
-use pw::{ScreenshotOptions, WaitUntil};
+use pw_rs::{ScreenshotOptions, WaitUntil};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 

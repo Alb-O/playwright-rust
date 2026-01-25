@@ -9,7 +9,7 @@ use serde::Serialize;
 /// # Example
 ///
 /// ```ignore
-/// use pw::protocol::click::MouseButton;
+/// use pw_rs::protocol::click::MouseButton;
 ///
 /// let button = MouseButton::Right;
 /// ```
@@ -29,7 +29,7 @@ pub enum MouseButton {
 /// # Example
 ///
 /// ```ignore
-/// use pw::protocol::click::KeyboardModifier;
+/// use pw_rs::protocol::click::KeyboardModifier;
 ///
 /// let modifiers = vec![KeyboardModifier::Shift, KeyboardModifier::Control];
 /// ```
@@ -54,7 +54,7 @@ pub enum KeyboardModifier {
 /// # Example
 ///
 /// ```ignore
-/// use pw::protocol::click::Position;
+/// use pw_rs::protocol::click::Position;
 ///
 /// let position = Position { x: 10.0, y: 20.0 };
 /// ```
@@ -75,7 +75,7 @@ pub struct Position {
 /// # Example
 ///
 /// ```ignore
-/// use pw::protocol::click::{ClickOptions, MouseButton, KeyboardModifier, Position};
+/// use pw_rs::protocol::click::{ClickOptions, MouseButton, KeyboardModifier, Position};
 ///
 /// // Right-click with modifiers
 /// let options = ClickOptions::builder()

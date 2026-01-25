@@ -34,7 +34,7 @@ use crate::error::Result;
 
 /// Abstracts page operations for testing.
 ///
-/// Mirrors the subset of [`pw::Page`] methods used by CLI commands.
+/// Mirrors the subset of [`pw_rs::Page`] methods used by CLI commands.
 /// Implement this trait to create custom test doubles, or use the provided
 /// [`MockPage`] implementation.
 #[async_trait]
@@ -66,7 +66,7 @@ pub trait PageLike: Send + Sync {
 
 /// Abstracts locator operations for testing.
 ///
-/// Mirrors the subset of [`pw::Locator`] methods used by CLI commands.
+/// Mirrors the subset of [`pw_rs::Locator`] methods used by CLI commands.
 /// Locators represent a way to find element(s) on the page at any moment.
 #[async_trait]
 pub trait LocatorLike: Send + Sync {

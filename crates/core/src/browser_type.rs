@@ -28,8 +28,8 @@ use crate::{Browser, BrowserContext, LaunchOptions};
 /// # Example
 ///
 /// ```ignore
-/// # use pw::protocol::Playwright;
-/// # use pw::api::LaunchOptions;
+/// # use pw_rs::protocol::Playwright;
+/// # use pw_rs::api::LaunchOptions;
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let playwright = Playwright::launch().await?;

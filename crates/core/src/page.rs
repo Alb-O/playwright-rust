@@ -29,7 +29,7 @@ use crate::{Dialog, Download, Route};
 /// # Example
 ///
 /// ```ignore
-/// use pw::protocol::{Playwright, ScreenshotOptions, ScreenshotType};
+/// use pw_rs::protocol::{Playwright, ScreenshotOptions, ScreenshotType};
 /// use std::path::PathBuf;
 ///
 /// #[tokio::main]

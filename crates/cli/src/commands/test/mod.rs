@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use pw::pw_runtime::{self, TestRunnerPaths};
+use pw_rs::pw_runtime::{self, TestRunnerPaths};
 
 use crate::error::{PwError, Result};
 
