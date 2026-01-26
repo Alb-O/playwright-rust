@@ -186,8 +186,8 @@ export def "chatgpt paste" [
 # Attach text as a document file (triggers ChatGPT's file attachment UI)
 # Uses pw eval --file to handle large text (avoids shell argument limits)
 export def "chatgpt attach" [
-    --file (-f): path        # Read text from file (alternative to pipeline input)
-    --name (-n): string      # Filename for attachment (defaults to --file basename or "document.txt")
+    ...files: path           # Files to attach
+    --name (-n): string      # Filename for pipeline input (defaults to "document.txt")
     --prompt (-p): string    # Optional prompt to add after attachment
     --send (-s)              # Also send after attaching
 ]: [string -> record, nothing -> record] {
@@ -196,42 +196,51 @@ export def "chatgpt attach" [
     
     ensure-tab
     
-    # Get text from --file or pipeline input
-    let text = if $file != null {
-        open $file
-    } else if ($pipeline_input | is-not-empty) {
-        $pipeline_input
-    } else {
-        error make { msg: "chatgpt attach requires either --file or pipeline input" }
+    mut attachments = []
+    
+    # Handle positional files
+    for f in $files {
+        $attachments = ($attachments | append {
+            name: ($f | path basename),
+            content: (open $f)
+        })
     }
     
-    # Default name to file basename if --file used, otherwise "document.txt"
-    let name = if ($name | is-not-empty) {
-        $name
-    } else if $file != null {
-        $file | path basename
-    } else {
-        "document.txt"
+    # Handle pipeline input
+    if ($pipeline_input | is-not-empty) {
+        let name = if ($name | is-not-empty) { $name } else { "document.txt" }
+        $attachments = ($attachments | append {
+            name: $name,
+            content: $pipeline_input
+        })
+    }
+    
+    if ($attachments | is-empty) {
+        error make { msg: "chatgpt attach requires files (positional args) or pipeline input" }
     }
 
     # Build JS with embedded text using concatenation (avoids nushell interpolation issues)
-    let js_text = ($text | to json)
-    let js_name = ($name | to json)
+    let attachments_json = ($attachments | to json)
 
     let js_head = "(function() {
         const el = document.querySelector(\"#prompt-textarea\");
         if (!el) return { error: \"textarea not found\" };
         el.focus();
 
-        const text = "
-    let js_mid = ";
-        const filename = "
+        const attachments = "
     let js_tail = ";
 
-        // Create file and DataTransfer
+        // Create DataTransfer
         const dt = new DataTransfer();
-        const file = new File([text], filename, { type: \"text/plain\" });
-        dt.items.add(file);
+        const filenames = [];
+        let totalSize = 0;
+
+        for (const item of attachments) {
+            const file = new File([item.content], item.name, { type: \"text/plain\" });
+            dt.items.add(file);
+            filenames.push(item.name);
+            totalSize += item.content.length;
+        }
 
         // Dispatch paste event with file
         const pasteEvent = new ClipboardEvent(\"paste\", {
@@ -241,10 +250,10 @@ export def "chatgpt attach" [
         });
 
         el.dispatchEvent(pasteEvent);
-        return { attached: true, filename: filename, size: text.length };
+        return { attached: true, filenames: filenames, size: totalSize };
     })()"
 
-    let js = ($js_head + $js_text + $js_mid + $js_name + $js_tail)
+    let js = ($js_head + $attachments_json + $js_tail)
 
     # Write JS to temp file and execute via --file flag
     let tmp_js = (mktemp --suffix .js)
@@ -279,9 +288,9 @@ export def "chatgpt attach" [
             error make { msg: "send button did not enable (attachment still uploading?)" }
         }
         pw eval "document.querySelector('[data-testid=\"send-button\"]')?.click()"
-        { attached: true, sent: true, filename: $name, size: ($text | str length) }
+        { attached: true, sent: true, filenames: $result.filenames, size: $result.size }
     } else {
-        { attached: true, sent: false, filename: $name, size: ($text | str length) }
+        { attached: true, sent: false, filenames: $result.filenames, size: $result.size }
     }
 }
 

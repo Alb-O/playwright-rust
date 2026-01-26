@@ -66,18 +66,18 @@ chatgpt send --file prompt.md
 
 ### chatgpt attach
 
-Attach file as document. Best for large text (250KB+).
+Attach one or multiple files as documents. Best for large text (250KB+).
 
 ```bash
-chatgpt attach --file codemap.md --prompt "Review this" --send
+chatgpt attach file1.rs file2.rs --prompt "Review these" --send
+chatgpt attach src/*.rs --send
 open file.txt | chatgpt attach --name "doc.txt"
 ```
 
-From bash, use `--file` for complex text (avoids shell escaping issues):
+From bash, use positional arguments to pass multiple files:
 
 ```bash
-nu -I ~/.claude/skills/pw-chatgpt/scripts -c 'use chatgpt.nu *; chatgpt ask --file prompt.md'
-nu -I ~/.claude/skills/pw-chatgpt/scripts -c 'use chatgpt.nu *; chatgpt attach --file doc.md --send'
+nu -I ~/.claude/skills/pw-chatgpt/scripts -c 'use chatgpt.nu *; chatgpt attach file1.md file2.md --send'
 ```
 
 ### chatgpt paste
@@ -158,7 +158,7 @@ For agent-to-ChatGPT collaboration (e.g., planning, code review):
 Example workflow:
 
 ```bash
-chatgpt attach --file codemap.md --prompt "Review this codebase structure" --send
+chatgpt attach codemap.md --prompt "Review this codebase structure" --send
 chatgpt wait
 chatgpt get-response
 # ... discuss, iterate ...
