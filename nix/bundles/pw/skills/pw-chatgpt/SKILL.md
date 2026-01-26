@@ -67,6 +67,7 @@ chatgpt send --file prompt.md
 ### chatgpt attach
 
 Attach one or multiple files as documents. Best for large text (250KB+).
+Maximum 10 files per command.
 
 ```bash
 chatgpt attach file1.rs file2.rs --prompt "Review these" --send

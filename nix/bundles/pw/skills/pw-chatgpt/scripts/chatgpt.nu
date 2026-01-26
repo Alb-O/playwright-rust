@@ -218,6 +218,10 @@ export def "chatgpt attach" [
     if ($attachments | is-empty) {
         error make { msg: "chatgpt attach requires files (positional args) or pipeline input" }
     }
+    
+    if ($attachments | length) > 10 {
+        error make { msg: "Maximum 10 attachments allowed per command" }
+    }
 
     # Build JS with embedded text using concatenation (avoids nushell interpolation issues)
     let attachments_json = ($attachments | to json)
