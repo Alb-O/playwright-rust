@@ -48,10 +48,14 @@ if user claims session already open, get history. otherwise, you can immediately
 4. get plan - request comprehensive design/plan once ready.
 5. download - use `chatgpt download` for plans/code.
 
-## workflow
+## workflow - including files
 
 1. write msg to temp file e.g. `tmp/chatgpt_prompt.txt`
-2. send prompt + files:
+	* this is a seperate tool call; use the write tool for this
+	* this temp file will be the preamble prompt; you may explain files included, but this text will not contain them
+2. send prompt + files
+	* gather files to send in conjunction with the preamble prompt file
+	* final command will look like:
 
 ```bash
 $ nu -I ~/.claude/skills/pw-chatgpt/scripts -c 'use chatgpt.nu *; 
