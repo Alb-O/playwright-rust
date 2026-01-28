@@ -1,39 +1,39 @@
 #!/usr/bin/env nu
-# chatgpt.nu - ChatGPT interaction workflows
+# pp.nu - Navigator interaction workflows for the Driver
 #
 # Usage:
 #   use pw.nu
-#   use chatgpt.nu *
-#   chatgpt send "Explain quantum computing"
-#   chatgpt set-model thinking
+#   use pp.nu *
+#   pp send "Explain quantum computing"
+#   pp set-model thinking
 #
 # Deduplication: send skips re-sending if the last user message matches.
-# This prevents retry spam if an agent disconnects mid-operation. Use --force to bypass.
+# This prevents retry spam if the driver disconnects mid-operation. Use --force to bypass.
 
 use pw.nu
 
 const BASE_URL = "https://chatgpt.com"
 const DEFAULT_MODEL = "thinking"  # Default to GPT-5.2 Thinking
 
-# Ensure we're on THE ChatGPT tab (close extras, switch to remaining one)
+# Ensure we're on THE Navigator tab (close extras, switch to remaining one)
 def ensure-tab []: nothing -> nothing {
     # List all tabs
     let tabs = (pw tabs).data.tabs
-    let chatgpt_tabs = ($tabs | where { $in.url | str contains "chatgpt.com" })
+    let navigator_tabs = ($tabs | where { $in.url | str contains "chatgpt.com" })
 
-    if ($chatgpt_tabs | length) == 0 {
+    if ($navigator_tabs | length) == 0 {
         return
     }
 
-    # If multiple ChatGPT tabs, close all but the first one
-    if ($chatgpt_tabs | length) > 1 {
+    # If multiple Navigator tabs, close all but the first one
+    if ($navigator_tabs | length) > 1 {
         # Close extras (keep the first one)
-        for tab in ($chatgpt_tabs | skip 1) {
+        for tab in ($navigator_tabs | skip 1) {
             pw tabs close ($tab.index | into string) | ignore
         }
     }
 
-    # Switch to the ChatGPT tab
+    # Switch to the Navigator tab
     pw tabs switch "chatgpt.com" | ignore
 }
 
@@ -48,8 +48,8 @@ def get-current-model []: nothing -> string {
     (pw eval $js).data.result
 }
 
-# Get the last user message text (for deduplication)
-def last-user-message []: nothing -> string {
+# Get the last driver message text (for deduplication)
+def last-driver-message []: nothing -> string {
     let js = "(() => {
         const msgs = document.querySelectorAll('[data-message-author-role=\"user\"]');
         if (msgs.length === 0) return null;
@@ -60,7 +60,7 @@ def last-user-message []: nothing -> string {
 
 # Set model mode via dropdown (Auto, Instant, Thinking)
 # Uses single eval with polling since dropdowns close between pw commands
-export def "chatgpt set-model" [
+export def "pp set-model" [
     mode: string  # "auto", "instant", or "thinking"
 ]: nothing -> record {
     ensure-tab
@@ -112,16 +112,16 @@ def has-thinking-pill []: nothing -> bool {
     (pw eval $js).data.result
 }
 
-# Refresh page (use when ChatGPT UI gets stuck)
-export def "chatgpt refresh" []: nothing -> record {
+# Refresh page (use when Navigator UI gets stuck)
+export def "pp refresh" []: nothing -> record {
     ensure-tab
     pw eval "location.reload()"
     sleep 3sec
     { refreshed: true }
 }
 
-# Start a new temporary chat
-export def "chatgpt new" [
+# Start a new temporary chat with the Navigator
+export def "pp new" [
     --model (-m): string  # Model to set (auto, instant, thinking). Defaults to thinking.
 ]: nothing -> record {
     ensure-tab
@@ -132,7 +132,7 @@ export def "chatgpt new" [
     pw wait-for "#prompt-textarea"
     sleep 500ms
     let mode = if ($model | is-empty) { $DEFAULT_MODEL } else { $model }
-    chatgpt set-model $mode
+    pp set-model $mode
     { new_chat: true, model: (get-current-model) }
 }
 
@@ -161,8 +161,8 @@ def insert-text [text: string, --clear (-c)]: nothing -> record {
     (pw eval $js).data.result
 }
 
-# Paste text from stdin into ChatGPT composer (inline, no attachment)
-export def "chatgpt paste" [
+# Paste text from stdin into Navigator composer (inline, no attachment)
+export def "pp paste" [
     --send (-s)  # Also send after pasting
     --clear (-c) # Clear existing content first
 ]: string -> record {
@@ -183,9 +183,9 @@ export def "chatgpt paste" [
     }
 }
 
-# Attach text as a document file (triggers ChatGPT's file attachment UI)
+# Attach text as a document file (triggers Navigator's file attachment UI)
 # Uses pw eval --file to handle large text (avoids shell argument limits)
-export def "chatgpt attach" [
+export def "pp attach" [
     ...files: path           # Files to attach
     --name (-n): string      # Filename for pipeline input (defaults to "document.txt")
     --prompt (-p): string    # Optional prompt to add after attachment
@@ -216,7 +216,7 @@ export def "chatgpt attach" [
     }
     
     if ($attachments | is-empty) {
-        error make { msg: "chatgpt attach requires files (positional args) or pipeline input" }
+        error make { msg: "pp attach requires files (positional args) or pipeline input" }
     }
     
     if ($attachments | length) > 10 {
@@ -228,7 +228,7 @@ export def "chatgpt attach" [
 
     let js_head = "(function() {
         // Reset result global
-        window._chatgpt_attach_result = null;
+        window._pp_attach_result = null;
 
         const el = document.querySelector(\"#prompt-textarea\");
         if (!el) return { error: \"textarea not found\" };
@@ -264,9 +264,9 @@ export def "chatgpt attach" [
                 }
                 
                 // Store result
-                window._chatgpt_attach_result = { attached: true, filenames: filenames, size: totalSize };
+                window._pp_attach_result = { attached: true, filenames: filenames, size: totalSize };
             } catch (err) {
-                window._chatgpt_attach_result = { error: err.toString() };
+                window._pp_attach_result = { error: err.toString() };
             }
         })();
 
@@ -290,7 +290,7 @@ export def "chatgpt attach" [
     # Wait up to 30s (supports many files)
     for _ in 1..60 {
         sleep 500ms
-        let check = (pw eval "window._chatgpt_attach_result").data.result
+        let check = (pw eval "window._pp_attach_result").data.result
         if ($check != null) {
             $result = $check
             break
@@ -331,8 +331,8 @@ export def "chatgpt attach" [
     }
 }
 
-# Send a message to ChatGPT
-export def "chatgpt send" [
+# Send a message to the Navigator
+export def "pp send" [
     message?: string       # Message to send (or use --file or stdin)
     --model (-m): string   # Set model before sending (auto, instant, thinking)
     --new (-n)             # Start new temporary chat
@@ -359,17 +359,17 @@ export def "chatgpt send" [
         sleep 500ms
         # Set default model for new chats (unless overridden)
         if ($model | is-empty) {
-            chatgpt set-model $DEFAULT_MODEL
+            pp set-model $DEFAULT_MODEL
         }
     }
 
     if ($model | is-not-empty) {
-        chatgpt set-model $model
+        pp set-model $model
     }
 
-    # Deduplication: skip if last user message matches (prevents retry spam)
+    # Deduplication: skip if last driver message matches (prevents retry spam)
     if not $force and not $new {
-        let last_msg = (last-user-message)
+        let last_msg = (last-driver-message)
         if ($last_msg | is-not-empty) and ($last_msg | str trim) == ($msg | str trim) {
             return { success: true, message: $msg, model: (get-current-model), already_sent: true }
         }
@@ -415,14 +415,14 @@ def is-generating []: nothing -> bool {
     (pw eval $js).data.result
 }
 
-# Get count of assistant messages
+# Get count of Navigator messages
 def message-count []: nothing -> int {
     let js = "document.querySelectorAll(\"[data-message-author-role='assistant']\").length"
     (pw eval $js).data.result
 }
 
-# Wait for ChatGPT response to complete
-export def "chatgpt wait" [
+# Wait for Navigator response to complete
+export def "pp wait" [
     --timeout (-t): int = 1200000  # Timeout in ms (default: 20 minutes for thinking model)
 ]: nothing -> any {
     ensure-tab
@@ -451,7 +451,7 @@ export def "chatgpt wait" [
             error make { msg: "streaming timeout" }
         }
         if not (is-generating) {
-            return (chatgpt get-response)
+            return (pp get-response)
         }
         sleep 300ms
     }
@@ -459,8 +459,8 @@ export def "chatgpt wait" [
     error make { msg: "loop exhausted" }
 }
 
-# Get the last response from ChatGPT
-export def "chatgpt get-response" []: nothing -> any {
+# Get the last response from the Navigator
+export def "pp get-response" []: nothing -> any {
     ensure-tab
     let js = "(() => {
         const messages = document.querySelectorAll(\"[data-message-author-role='assistant']\");
@@ -471,9 +471,9 @@ export def "chatgpt get-response" []: nothing -> any {
     (pw eval $js).data.result
 }
 
-# Get conversation history (all user and assistant messages)
-export def "chatgpt history" [
-    --last (-l): int      # Only return last N messages (user+assistant pairs count as 2)
+# Get conversation history (all driver and navigator messages)
+export def "pp history" [
+    --last (-l): int      # Only return last N messages (driver+navigator pairs count as 2)
     --json (-j)           # Output as JSON (structured data)
     --raw (-r)            # Output raw records (for nushell piping)
 ]: nothing -> any {
@@ -501,15 +501,15 @@ export def "chatgpt history" [
     } else {
         # Transcript format (default)
         $filtered | each { |msg|
-            let role_label = if $msg.role == "user" { "USER" } else { "ASSISTANT" }
+            let role_label = if $msg.role == "user" { "DRIVER" } else { "NAVIGATOR" }
             $"--- ($role_label) ---\n($msg.text)\n"
         } | str join "\n"
     }
 }
 
-# Download a sandbox file from ChatGPT
+# Download a sandbox file from the Navigator
 # Fetches files generated by the Code Interpreter (python_user_visible)
-export def "chatgpt download" [
+export def "pp download" [
     --output (-o): path   # Save to file (defaults to stdout)
     --index (-i): int     # Which download link to use (0-indexed, default: last)
     --list (-l)           # List available download links instead of downloading
@@ -652,4 +652,3 @@ export def "chatgpt download" [
         $content
     }
 }
-

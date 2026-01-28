@@ -5,7 +5,7 @@ ai agent skills for `pw` (playwright cli).
 ## skills
 
 - `pw` - core cli usage
-- `pw-chatgpt` - agent-to-chatgpt conversation (send messages, attach files, download artifacts)
+- `pw-pair-programming` - driver-to-navigator pair programming (send messages, attach files, download artifacts)
 - `pw-higgsfield` - higgsfield ai image/video generation
 
 ## structure
