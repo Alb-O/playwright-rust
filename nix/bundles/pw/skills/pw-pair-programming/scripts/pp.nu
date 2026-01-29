@@ -158,7 +158,12 @@ def insert-text [text: string, --clear (-c)]: nothing -> record {
         return { inserted: el.textContent.length };
     })()"
 
-    (pw eval $js).data.result
+    # Use --file to avoid command-line limits for large text
+    let tmp_js = (mktemp --suffix .js)
+    $js | save -f $tmp_js
+    let result = (pw eval --file $tmp_js).data.result
+    rm $tmp_js
+    $result
 }
 
 # Paste text from stdin into Navigator composer (inline, no attachment)
@@ -341,7 +346,7 @@ export def "pp send" [
 ]: nothing -> record {
     # Resolve message: --file > positional > stdin
     let msg = if ($file | is-not-empty) {
-        open $file
+        open --raw $file | into string
     } else if ($message | is-not-empty) {
         $message
     } else {
