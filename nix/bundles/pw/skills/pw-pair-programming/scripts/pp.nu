@@ -152,11 +152,16 @@ def insert-text [text: string, --clear (-c)]: nothing -> record {
         const el = document.querySelector('#prompt-textarea');
         if (!el) return { error: 'textarea not found' };
         el.focus();
-        if (" + $do_clear + ") el.textContent = '';
-        el.textContent = " + $js_text + ";
+        if (" + $do_clear + ") el.innerHTML = '';
+        const text = " + $js_text + ";
+        const escaped = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        el.innerHTML = escaped.replace(/\n/g, '<br>');
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
-        return { inserted: el.textContent.length };
+        return { inserted: el.innerText.length };
     })()"
 
     # Use --file to avoid command-line limits for large text
