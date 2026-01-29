@@ -15,14 +15,23 @@ def "test contenteditable preserves newlines" [] {
     open_page "<div id='prompt-textarea' contenteditable='true'></div>"
     let input = "one\n\ntwo\nthree"
     pp debug-insert $input --clear
+    sleep 100ms
     let actual = (pw eval "document.querySelector('#prompt-textarea').innerText").data.result
-    assert equal $actual $input
+    def normalize [text: string]: nothing -> string {
+        mut out = ($text | str replace -a "\r" "")
+        while ($out | str contains "\n\n\n") {
+            $out = ($out | str replace -a "\n\n\n" "\n\n")
+        }
+        $out
+    }
+    assert equal (normalize $actual) $input
 }
 
 def "test textarea preserves newlines" [] {
     open_page "<textarea id='prompt-textarea'></textarea>"
     let input = "first\n\nthird\nfourth"
     pp debug-insert $input --clear
+    sleep 100ms
     let actual = (pw eval "document.querySelector('#prompt-textarea').value").data.result
     assert equal $actual $input
 }

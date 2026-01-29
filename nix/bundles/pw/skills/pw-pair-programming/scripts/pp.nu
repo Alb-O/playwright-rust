@@ -149,7 +149,7 @@ def insert-text [text: string, --clear (-c), --selector (-s): string = "#prompt-
     let do_clear = if $clear { "true" } else { "false" }
     rm $tmp
 
-    let js = "(function() {
+    let js = "(async function() {
         const el = document.querySelector(" + $js_selector + ");
         if (!el) return { error: 'textarea not found' };
         el.focus();
@@ -163,15 +163,19 @@ def insert-text [text: string, --clear (-c), --selector (-s): string = "#prompt-
                 el.value = (el.value || '') + text;
             }
         } else {
-            if (" + $do_clear + ") el.innerHTML = '';
-            const normalized = text.split('\\r').join('');
-            const lines = normalized.split(String.fromCharCode(10));
-            const frag = document.createDocumentFragment();
-            for (let i = 0; i < lines.length; i++) {
-                if (i > 0) frag.appendChild(document.createElement('br'));
-                if (lines[i].length > 0) frag.appendChild(document.createTextNode(lines[i]));
+            el.focus();
+            if (" + $do_clear + ") {
+                document.execCommand('selectAll');
+                document.execCommand('delete');
             }
-            el.appendChild(frag);
+            const dt = new DataTransfer();
+            dt.setData('text/plain', text);
+            const pasteEvent = new ClipboardEvent('paste', {
+                bubbles: true,
+                cancelable: true,
+                clipboardData: dt
+            });
+            el.dispatchEvent(pasteEvent);
         }
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -215,9 +219,9 @@ export def "pp paste" [
     if $send {
         # Click send button
         pw eval "document.querySelector('[data-testid=\"send-button\"]')?.click()"
-        { pasted: true, sent: true, length: $result.inserted }
+        { pasted: true, sent: true, length: ($result.inserted? | default ($result.length? | default 0)) }
     } else {
-        { pasted: true, sent: false, length: $result.inserted }
+        { pasted: true, sent: false, length: ($result.inserted? | default ($result.length? | default 0)) }
     }
 }
 
