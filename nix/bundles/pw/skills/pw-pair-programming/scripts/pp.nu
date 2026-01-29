@@ -138,30 +138,44 @@ export def "pp new" [
 
 # Insert text into composer (bypasses attachment conversion for large text)
 # Use execCommand which handles newlines and doesn't trigger file attachment
-def insert-text [text: string, --clear (-c)]: nothing -> record {
+def insert-text [text: string, --clear (-c), --selector (-s): string = "#prompt-textarea"]: nothing -> record {
     # Write text to temp file to avoid shell escaping issues
     let tmp = (mktemp)
     $text | save -f $tmp
 
-    # Read and insert via JS
-    let js_text = (open $tmp | to json)
+    # Read and insert via JS (base64 to avoid JS parse issues)
+    let js_b64 = (open --raw $tmp | encode base64 | into string | str replace -a "\n" "" | to json)
+    let js_selector = ($selector | to json)
     let do_clear = if $clear { "true" } else { "false" }
     rm $tmp
 
     let js = "(function() {
-        const el = document.querySelector('#prompt-textarea');
+        const el = document.querySelector(" + $js_selector + ");
         if (!el) return { error: 'textarea not found' };
         el.focus();
-        if (" + $do_clear + ") el.innerHTML = '';
-        const text = " + $js_text + ";
-        const escaped = text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-        el.innerHTML = escaped.replace(/\n/g, '<br>');
+        const b64 = " + $js_b64 + ";
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        const text = new TextDecoder().decode(bytes);
+        if (el.tagName === 'TEXTAREA') {
+            if (" + $do_clear + ") {
+                el.value = text;
+            } else {
+                el.value = (el.value || '') + text;
+            }
+        } else {
+            if (" + $do_clear + ") el.innerHTML = '';
+            const normalized = text.split('\\r').join('');
+            const lines = normalized.split(String.fromCharCode(10));
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < lines.length; i++) {
+                if (i > 0) frag.appendChild(document.createElement('br'));
+                if (lines[i].length > 0) frag.appendChild(document.createTextNode(lines[i]));
+            }
+            el.appendChild(frag);
+        }
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
-        return { inserted: el.innerText.length };
+        return { inserted: text.length };
     })()"
 
     # Use --file to avoid command-line limits for large text
@@ -170,6 +184,19 @@ def insert-text [text: string, --clear (-c)]: nothing -> record {
     let result = (pw eval --file $tmp_js).data.result
     rm $tmp_js
     $result
+}
+
+# Test helper: insert text into a selector without ensure-tab
+export def "pp debug-insert" [
+    text: string
+    --selector (-s): string = "#prompt-textarea"
+    --clear (-c)
+]: nothing -> record {
+    if $clear {
+        insert-text $text --selector $selector --clear
+    } else {
+        insert-text $text --selector $selector
+    }
 }
 
 # Paste text from stdin into Navigator composer (inline, no attachment)
