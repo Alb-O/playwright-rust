@@ -688,6 +688,7 @@ export def "pp download" [
     let content = $content_result.content
 
     if ($output | is-not-empty) {
+        mkdir ($output | path dirname)
         $content | save -f $output
         { saved: $output, size: ($content | str length), file: ($link.sandboxPath | path basename) }
     } else {
