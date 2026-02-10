@@ -19,6 +19,23 @@ setup: requires cdp connection to debug-enabled browser with an active session; 
 nu -I ~/.claude/skills/pw-pair-programming/scripts -c 'use pp.nu *; pp send "Hello"'
 ```
 
+## quickstart (`pp brief`)
+
+```bash
+cat <<'EOF' > /tmp/navigator_prompt.txt
+review this implementation and propose a better design.
+focus on correctness risks and test strategy.
+EOF
+
+nu -I ~/.claude/skills/pw-pair-programming/scripts -c '
+use pp.nu *;
+pp brief --preamble-file /tmp/navigator_prompt.txt \
+  src/main.rs \
+  "slice:src/parser.rs:45:67:parse_expr logic" \
+  --wait
+'
+```
+
 ## session connection
 
 when the driver has an open navigator tab and wants to continue a previous session:
@@ -33,11 +50,13 @@ if session already open, get history. otherwise, you can immediately start sendi
 ## commands
 
 `pp send` msg. `--file` for prompt file.
+`pp compose` build msg from preamble file + code context entries.
+`pp brief` compose + send in one command. `--wait` for response.
 `pp attach` docs (max 10). `--prompt` msg, `--send` trigger.
 `pp paste` inline text. `--send` trigger, `--clear` reset.
 `pp new` start fresh. `--model=thinking` (default).
 `pp set-model` change default (`auto` | `instant` | `thinking`).
-`pp wait` wait for completion and print response. `--timeout` (default 600000).
+`pp wait` wait for completion and print response. `--timeout` (default 1200000).
 `pp get-response` print last navigator message.
 `pp history` transcript. `--last n` exchange, `--json` json.
 `pp refresh` reload ui when stuck.
@@ -74,44 +93,52 @@ key principle: treat the navigator as a senior engineer pairing with you. show w
 
 ## workflow - including files
 
-1. driver writes msg to temp file e.g. `/tmp/navigator_prompt.txt`
-	* reliable method:
-	  ```bash
-	  cat <<'EOF' > /tmp/navigator_prompt.txt
-	  <your navigator prompt text>
-	  EOF
-	  ```
-	* this temp file will be the preamble prompt; you may explain files included
-2. send prompt + files to navigator
-	* gather files to send in conjunction with the preamble prompt file
+1. write preamble message to a temp file (always do this for reliability):
+	```bash
+	cat <<'EOF' > /tmp/navigator_prompt.txt
+	<what you need from navigator, plus task context>
+	EOF
+	```
+2. run `pp brief` with files/snippets and optional `--wait`:
 
-### basic: full files
+### common case: full files
 
 ```bash
-nu -I ~/.claude/skills/pw-pair-programming/scripts -c 'use pp.nu *; 
-let prompt = ((open --raw tmp/navigator_prompt.txt)
-    + "\n\n[FILE: src/main.rs]\n" + (open --raw src/main.rs)
-    + "\n\n[FILE: src/lib.rs]\n" + (open --raw src/lib.rs));
-$prompt | pp send; pp wait'
+nu -I ~/.claude/skills/pw-pair-programming/scripts -c '
+use pp.nu *;
+pp brief --preamble-file /tmp/navigator_prompt.txt src/main.rs src/lib.rs --wait
+'
 ```
 
-### advanced: slicing specific line ranges (concise + low-error)
-
-use `lines | slice` to extract specific sections. this pattern avoids `+` parsing issues and keeps everything on one line.
+### focused case: include only critical ranges
 
 ```bash
-nu -I ~/.claude/skills/pw-pair-programming/scripts -c 'use pp.nu *; def snip [path: path, start: int, end: int]: nothing -> string { open --raw $path | lines | slice (($start - 1)..($end - 1)) | str join "\n" }; let preamble = (open --raw tmp/navigator_prompt.txt); let parts = [ $preamble, "\n\n[FILE: src/config.rs]\n", (open --raw src/config.rs), "\n\n[FILE: src/parser.rs (lines 45-67 - parse_expr fn)]\n", (snip src/parser.rs 45 67), "\n\n[FILE: src/handler.rs (lines 120-135 - error handling)]\n", (snip src/handler.rs 120 135) ]; ($parts | str join "") | pp send; pp wait'
+nu -I ~/.claude/skills/pw-pair-programming/scripts -c '
+use pp.nu *;
+pp brief --preamble-file /tmp/navigator_prompt.txt \
+  src/config.rs \
+  "slice:src/parser.rs:45:67:parse_expr fn" \
+  "slice:src/handler.rs:120:135:error handling" \
+  --wait
+'
 ```
 
-syntax notes:
-- function signature: `def snip [...]: nothing -> string { ... }` (note the `: nothing ->` part)
-- use `--raw` with `open` to avoid auto-parsing
-- prefer `($parts | str join "")` when building strings
-- nushell ranges are 0-indexed, so subtract 1 from line numbers
-- `range` is old nushell, don't try to use it
+entry format for `pp compose` / `pp brief`:
+- full file: `src/main.rs` (or `file:src/main.rs`)
+- line slice: `slice:path:start:end[:label]`
+
+optional dry-run when you want to inspect payload before sending:
+
+```bash
+nu -I ~/.claude/skills/pw-pair-programming/scripts -c '
+use pp.nu *;
+pp compose --preamble-file /tmp/navigator_prompt.txt src/main.rs "slice:src/parser.rs:45:67" \
+  | save -f /tmp/navigator_payload.txt
+'
+```
 
 ## gotchas
 
-- always write messages to the navigator using files instead of inline shell
+- always write preamble messages to files instead of inline shell
 - always timeout 10min+ for navigator responses; thinking model takes time
 - attachment filenames show as uuids in ui but content works

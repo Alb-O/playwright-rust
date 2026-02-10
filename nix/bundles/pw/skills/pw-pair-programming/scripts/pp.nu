@@ -244,6 +244,159 @@ export def "pp paste" [
     }
 }
 
+# Parse slice entry syntax: "path:start:end[:label]"
+def parse-slice-entry [entry: string]: nothing -> record {
+    let parsed = ($entry | parse --regex '^(?<path>.+):(?<start>\d+):(?<end>\d+)(?::(?<label>.+))?$')
+    if ($parsed | is-empty) {
+        error make { msg: $"Invalid slice entry: ($entry). Expected: slice:path:start:end[:label]" }
+    }
+
+    let row = ($parsed | first)
+    let start = ($row.start | into int)
+    let end = ($row.end | into int)
+
+    if $start < 1 {
+        error make { msg: $"Slice start must be >= 1: ($entry)" }
+    }
+    if $end < $start {
+        error make { msg: $"Slice end must be >= start: ($entry)" }
+    }
+
+    {
+        path_text: $row.path
+        path: ($row.path | into string)
+        start: $start
+        end: $end
+        label: ($row.label? | default "")
+    }
+}
+
+# Read a 1-indexed line range from a file.
+def read-slice [file_path: path, start: int, end: int]: nothing -> string {
+    let lines = (open --raw $file_path | lines)
+    let line_count = ($lines | length)
+
+    if $line_count == 0 {
+        error make { msg: $"Cannot slice empty file: ($file_path)" }
+    }
+    if $start > $line_count {
+        error make {
+            msg: $"Slice start ($start) exceeds file length ($line_count): ($file_path)"
+        }
+    }
+    if $end > $line_count {
+        error make {
+            msg: $"Slice end ($end) exceeds file length ($line_count): ($file_path)"
+        }
+    }
+
+    $lines | slice (($start - 1)..($end - 1)) | str join "\n"
+}
+
+# Compose a Navigator message from a prompt preamble + code context entries.
+# Entry formats:
+#   - full file: "src/main.rs" or "file:src/main.rs"
+#   - line slice: "slice:src/parser.rs:45:67:optional label"
+export def "pp compose" [
+    --preamble-file (-p): path  # Required prompt preamble file
+    ...entries: string          # File and slice entries
+]: nothing -> string {
+    if ($preamble_file | is-empty) {
+        error make { msg: "pp compose requires --preamble-file" }
+    }
+    if not (($preamble_file | path exists)) {
+        error make { msg: $"Preamble file not found: ($preamble_file)" }
+    }
+
+    mut parts = [(open --raw $preamble_file | into string)]
+
+    for entry in $entries {
+        if ($entry | str starts-with "slice:") {
+            let spec = ($entry | str substring ("slice:" | str length)..)
+            let parsed = (parse-slice-entry $spec)
+            let file_path = $parsed.path
+            if not ($file_path | path exists) {
+                error make { msg: $"Slice file not found: ($parsed.path_text)" }
+            }
+
+            let snippet = (read-slice $file_path $parsed.start $parsed.end)
+            let header = if ($parsed.label | is-empty) {
+                $"[FILE: ($parsed.path_text) | lines ($parsed.start)-($parsed.end)]"
+            } else {
+                $"[FILE: ($parsed.path_text) | lines ($parsed.start)-($parsed.end) | ($parsed.label)]"
+            }
+            $parts = ($parts | append $"\n\n($header)\n($snippet)")
+        } else {
+            let file_text = if ($entry | str starts-with "file:") {
+                $entry | str substring ("file:" | str length)..
+            } else {
+                $entry
+            }
+
+            let file_path = $file_text
+            if not ($file_path | path exists) {
+                error make { msg: $"File not found: ($file_text)" }
+            }
+            let content = (open --raw $file_path | into string)
+            $parts = ($parts | append $"\n\n[FILE: ($file_text)]\n($content)")
+        }
+    }
+
+    $parts | str join ""
+}
+
+# One-shot helper: compose and send a Navigator brief.
+export def "pp brief" [
+    --preamble-file (-p): path    # Prompt preamble file
+    --wait (-w)                   # Wait for Navigator response
+    --timeout (-t): int = 1200000 # Wait timeout in ms when --wait is set
+    --model (-m): string          # Optional model override
+    --new (-n)                    # Start new temporary chat before sending
+    --force                       # Send even if last message matches
+    ...entries: string            # File and slice entries
+]: nothing -> any {
+    let message = (pp compose --preamble-file $preamble_file ...$entries)
+
+    let sent = if $new {
+        if ($model | is-not-empty) {
+            if $force {
+                $message | pp send --new --model $model --force
+            } else {
+                $message | pp send --new --model $model
+            }
+        } else {
+            if $force {
+                $message | pp send --new --force
+            } else {
+                $message | pp send --new
+            }
+        }
+    } else {
+        if ($model | is-not-empty) {
+            if $force {
+                $message | pp send --model $model --force
+            } else {
+                $message | pp send --model $model
+            }
+        } else {
+            if $force {
+                $message | pp send --force
+            } else {
+                $message | pp send
+            }
+        }
+    }
+
+    if $wait {
+        {
+            sent: $sent
+            response: (pp wait --timeout $timeout)
+        }
+    } else {
+        $sent
+    }
+}
+
 # Attach text as a document file (triggers Navigator's file attachment UI)
 # Uses pw eval --file to handle large text (avoids shell argument limits)
 export def "pp attach" [
