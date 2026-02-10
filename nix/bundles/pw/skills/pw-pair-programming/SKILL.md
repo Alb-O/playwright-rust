@@ -89,7 +89,9 @@ iteration:
 - "i hit [issue]. suggestions?"
 - "this works but feels off. improvements?"
 
-key principle: treat the navigator as a senior engineer pairing with you. show work incrementally, ask for direction, validate assumptions early. check in after each significant change.
+key principles:
+- treat the navigator as a senior engineer pairing with you. show work incrementally, ask for direction, validate assumptions early.
+- DO NOT ask the navigator to provide 'minimal diffs/patches', 'small/minimal tweaks' etc. allow navigator to cook thorough code without any worry for diff churn. 
 
 ## workflow - including files
 
