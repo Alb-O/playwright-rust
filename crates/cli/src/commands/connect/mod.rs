@@ -3,10 +3,11 @@
 //! This command enables control of a real browser (with your cookies, extensions, etc.)
 //! to bypass bot detection systems like Cloudflare.
 
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use pw_rs::dirs;
+use pw_rs::{Playwright, StorageState, dirs};
 use serde::Deserialize;
 use serde_json::json;
 use tracing::debug;
@@ -24,7 +25,77 @@ pub struct ConnectOptions {
 	pub discover: bool,
 	pub kill: bool,
 	pub port: u16,
-	pub user_data_dir: Option<std::path::PathBuf>,
+	pub user_data_dir: Option<PathBuf>,
+	pub auth_file: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone)]
+struct AuthApplySummary {
+	auth_file: PathBuf,
+	cookies_applied: usize,
+	origins_present: usize,
+}
+
+fn load_auth_state(auth_file: &Path) -> Result<StorageState> {
+	StorageState::from_file(auth_file)
+		.map_err(|e| PwError::BrowserLaunch(format!("Failed to load auth file: {}", e)))
+}
+
+async fn apply_auth_state_to_cdp(
+	endpoint: &str,
+	auth_file: &Path,
+	state: StorageState,
+) -> Result<AuthApplySummary> {
+	let cookies_applied = state.cookies.len();
+	let origins_present = state.origins.len();
+
+	let playwright = Playwright::launch()
+		.await
+		.map_err(|e| PwError::BrowserLaunch(format!("Failed to start Playwright: {}", e)))?;
+	let connected = playwright
+		.chromium()
+		.connect_over_cdp(endpoint)
+		.await
+		.map_err(|e| {
+			PwError::Context(format!(
+				"Failed to connect over CDP for auth injection: {}",
+				e
+			))
+		})?;
+
+	let context = connected.default_context.ok_or_else(|| {
+		PwError::Context(
+			"Connected browser did not expose a default context for auth injection".into(),
+		)
+	})?;
+
+	if cookies_applied > 0 {
+		context.add_cookies(state.cookies).await.map_err(|e| {
+			PwError::Context(format!(
+				"Failed to inject auth cookies from {}: {}",
+				auth_file.display(),
+				e
+			))
+		})?;
+	}
+
+	Ok(AuthApplySummary {
+		auth_file: auth_file.to_path_buf(),
+		cookies_applied,
+		origins_present,
+	})
+}
+
+async fn maybe_apply_auth(
+	endpoint: &str,
+	auth_file: Option<&Path>,
+) -> Result<Option<AuthApplySummary>> {
+	let Some(path) = auth_file else {
+		return Ok(None);
+	};
+	let state = load_auth_state(path)?;
+	let summary = apply_auth_state_to_cdp(endpoint, path, state).await?;
+	Ok(Some(summary))
 }
 
 /// Response from Chrome DevTools Protocol /json/version endpoint
@@ -359,6 +430,7 @@ pub async fn run(
 		kill,
 		port,
 		user_data_dir,
+		auth_file,
 	} = opts;
 
 	if kill {
@@ -406,6 +478,8 @@ pub async fn run(
 	if launch {
 		let launch_data_dir = resolve_user_data_dir(ctx_state, user_data_dir.as_deref())?;
 		let info = launch_chrome(port, Some(launch_data_dir.as_path())).await?;
+		let auth_applied =
+			maybe_apply_auth(&info.web_socket_debugger_url, auth_file.as_deref()).await?;
 		ctx_state.set_cdp_endpoint(Some(info.web_socket_debugger_url.clone()));
 
 		let result = ResultBuilder::<serde_json::Value>::new("connect")
@@ -415,7 +489,21 @@ pub async fn run(
 				"browser": info.browser,
 				"port": port,
 				"user_data_dir": launch_data_dir,
-				"message": format!("Chrome launched and connected on port {}", port)
+				"auth": auth_applied.as_ref().map(|s| json!({
+					"file": s.auth_file,
+					"cookiesApplied": s.cookies_applied,
+					"originsPresent": s.origins_present
+				})),
+				"message": if let Some(summary) = &auth_applied {
+					format!(
+						"Chrome launched and connected on port {} (applied {} auth cookies from {})",
+						port,
+						summary.cookies_applied,
+						summary.auth_file.display()
+					)
+				} else {
+					format!("Chrome launched and connected on port {}", port)
+				}
 			}))
 			.build();
 		print_result(&result, format);
@@ -425,6 +513,8 @@ pub async fn run(
 	// Discover existing Chrome instance
 	if discover {
 		let info = discover_chrome(port).await?;
+		let auth_applied =
+			maybe_apply_auth(&info.web_socket_debugger_url, auth_file.as_deref()).await?;
 		ctx_state.set_cdp_endpoint(Some(info.web_socket_debugger_url.clone()));
 
 		let result = ResultBuilder::<serde_json::Value>::new("connect")
@@ -432,7 +522,20 @@ pub async fn run(
 				"action": "discovered",
 				"endpoint": info.web_socket_debugger_url,
 				"browser": info.browser,
-				"message": "Connected to existing Chrome instance"
+				"auth": auth_applied.as_ref().map(|s| json!({
+					"file": s.auth_file,
+					"cookiesApplied": s.cookies_applied,
+					"originsPresent": s.origins_present
+				})),
+				"message": if let Some(summary) = &auth_applied {
+					format!(
+						"Connected to existing Chrome instance (applied {} auth cookies from {})",
+						summary.cookies_applied,
+						summary.auth_file.display()
+					)
+				} else {
+					"Connected to existing Chrome instance".to_string()
+				}
 			}))
 			.build();
 		print_result(&result, format);
@@ -482,6 +585,9 @@ pub async fn run(
 
 #[cfg(test)]
 mod tests {
+	use std::fs;
+	use std::path::Path;
+
 	use tempfile::TempDir;
 
 	use super::*;
@@ -532,5 +638,40 @@ mod tests {
 		let dir = resolve_user_data_dir(&ctx_state, Some(std::path::Path::new("profiles/debug")));
 		let expected = temp.path().join("profiles/debug");
 		assert_eq!(dir.unwrap(), expected);
+	}
+
+	#[test]
+	fn load_auth_state_errors_for_missing_file() {
+		let err = load_auth_state(Path::new("/definitely/missing/auth.json")).unwrap_err();
+		assert!(err.to_string().contains("Failed to load auth file"));
+	}
+
+	#[test]
+	fn load_auth_state_accepts_storage_state_file() {
+		let temp = TempDir::new().unwrap();
+		let auth = temp.path().join("auth.json");
+		fs::write(
+			&auth,
+			r#"{
+  "cookies": [
+    {
+      "name": "session",
+      "value": "token",
+      "domain": ".example.com",
+      "path": "/",
+      "expires": -1.0,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}"#,
+		)
+		.unwrap();
+
+		let state = load_auth_state(&auth).unwrap();
+		assert_eq!(state.cookies.len(), 1);
+		assert_eq!(state.origins.len(), 0);
 	}
 }

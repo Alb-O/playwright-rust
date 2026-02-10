@@ -208,6 +208,7 @@ async fn dispatch_ad_hoc<'ctx>(
 					kill,
 					port,
 					user_data_dir,
+					auth_file: ctx.auth_file().map(std::path::Path::to_path_buf),
 				},
 			)
 			.await
