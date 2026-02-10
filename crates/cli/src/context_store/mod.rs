@@ -17,7 +17,7 @@ pub mod types;
 mod tests;
 
 pub use storage::LoadedState;
-pub use types::{CliCache, CliConfig, Defaults};
+pub use types::{CliCache, CliConfig, Defaults, HarDefaults};
 
 const SESSION_TIMEOUT_SECS: u64 = 3600;
 
@@ -178,6 +178,46 @@ impl ContextState {
 			return &[];
 		}
 		&self.state.config.protected_urls
+	}
+
+	/// Returns persisted HAR defaults from config.
+	pub fn har_defaults(&self) -> Option<&HarDefaults> {
+		if self.no_context {
+			return None;
+		}
+		self.state.config.har.as_ref()
+	}
+
+	/// Sets persisted HAR defaults. Returns `true` when the value changed.
+	pub fn set_har_defaults(&mut self, har: HarDefaults) -> bool {
+		if self.no_save || self.no_context {
+			return false;
+		}
+		let changed = self.state.config.har.as_ref() != Some(&har);
+		self.state.config.har = Some(har);
+		changed
+	}
+
+	/// Clears persisted HAR defaults. Returns `true` when a value was removed.
+	pub fn clear_har_defaults(&mut self) -> bool {
+		if self.no_save || self.no_context {
+			return false;
+		}
+		self.state.config.har.take().is_some()
+	}
+
+	/// Builds effective runtime HAR config from persisted defaults.
+	pub fn effective_har_config(&self) -> crate::context::HarConfig {
+		let Some(har) = self.har_defaults() else {
+			return crate::context::HarConfig::default();
+		};
+		crate::context::HarConfig {
+			path: Some(har.path.clone()),
+			content_policy: Some(har.content_policy),
+			mode: Some(har.mode),
+			omit_content: har.omit_content,
+			url_filter: har.url_filter.clone(),
+		}
 	}
 
 	/// Returns true if the URL matches any protected pattern.

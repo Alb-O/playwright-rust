@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 
+use pw_rs::{HarContentPolicy, HarMode};
+
 use super::ContextState;
 use super::storage::{LoadedState, StatePaths};
-use super::types::{CliCache, CliConfig};
+use super::types::{CliCache, CliConfig, HarDefaults, SCHEMA_VERSION};
 
 fn test_state() -> LoadedState {
 	let root = PathBuf::from("/tmp/test-workspace");
@@ -78,6 +80,64 @@ fn protected_urls_from_config() {
 	assert_eq!(ctx_state.protected_urls(), &["admin", "settings"]);
 	assert!(ctx_state.is_protected("https://example.com/admin/dashboard"));
 	assert!(!ctx_state.is_protected("https://example.com/public"));
+}
+
+#[test]
+fn har_defaults_round_trip() {
+	let state = test_state();
+	let mut ctx_state = ContextState::test_new(state, "ws1".to_string(), "default".to_string());
+	let expected = HarDefaults {
+		path: PathBuf::from("network.har"),
+		content_policy: HarContentPolicy::Embed,
+		mode: HarMode::Minimal,
+		omit_content: true,
+		url_filter: Some("*.api.example.com".to_string()),
+	};
+
+	assert!(ctx_state.set_har_defaults(expected.clone()));
+	assert_eq!(ctx_state.har_defaults(), Some(&expected));
+
+	let effective = ctx_state.effective_har_config();
+	assert_eq!(effective.path, Some(PathBuf::from("network.har")));
+	assert_eq!(effective.content_policy, Some(HarContentPolicy::Embed));
+	assert_eq!(effective.mode, Some(HarMode::Minimal));
+	assert!(effective.omit_content);
+	assert_eq!(effective.url_filter.as_deref(), Some("*.api.example.com"));
+}
+
+#[test]
+fn clear_har_defaults_removes_state() {
+	let state = test_state();
+	let mut ctx_state = ContextState::test_new(state, "ws1".to_string(), "default".to_string());
+	assert!(ctx_state.set_har_defaults(HarDefaults {
+		path: PathBuf::from("network.har"),
+		content_policy: HarContentPolicy::Attach,
+		mode: HarMode::Full,
+		omit_content: false,
+		url_filter: None,
+	}));
+	assert!(ctx_state.clear_har_defaults());
+	assert_eq!(ctx_state.har_defaults(), None);
+	assert_eq!(ctx_state.effective_har_config().path, None);
+}
+
+#[test]
+fn cli_config_with_har_round_trips() {
+	let config = CliConfig {
+		schema: SCHEMA_VERSION,
+		har: Some(HarDefaults {
+			path: PathBuf::from("network.har"),
+			content_policy: HarContentPolicy::Attach,
+			mode: HarMode::Full,
+			omit_content: false,
+			url_filter: Some("*.internal".to_string()),
+		}),
+		..Default::default()
+	};
+
+	let json = serde_json::to_string(&config).unwrap();
+	let decoded: CliConfig = serde_json::from_str(&json).unwrap();
+	assert_eq!(decoded, config);
 }
 
 #[test]
@@ -167,6 +227,8 @@ fn no_context_mode_disables_everything() {
 	assert_eq!(ctx_state.cdp_endpoint(), None);
 	assert_eq!(ctx_state.last_url(), None);
 	assert!(ctx_state.protected_urls().is_empty());
+	assert_eq!(ctx_state.har_defaults(), None);
+	assert_eq!(ctx_state.effective_har_config().path, None);
 	assert!(!ctx_state.has_context_url());
 }
 

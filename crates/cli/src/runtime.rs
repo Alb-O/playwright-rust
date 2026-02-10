@@ -6,8 +6,6 @@
 
 use std::path::PathBuf;
 
-use pw_rs::{HarContentPolicy, HarMode};
-
 use crate::cli::Cli;
 use crate::context::{
 	BlockConfig, CommandContext, CommandContextConfig, DownloadConfig, HarConfig,
@@ -49,12 +47,6 @@ pub struct RuntimeConfig {
 	pub refresh_context: bool,
 	pub base_url: Option<String>,
 	pub artifacts_dir: Option<PathBuf>,
-	// HAR recording configuration
-	pub har_path: Option<PathBuf>,
-	pub har_content_policy: Option<HarContentPolicy>,
-	pub har_mode: Option<HarMode>,
-	pub har_omit_content: bool,
-	pub har_url_filter: Option<String>,
 	// Request blocking configuration
 	pub block_patterns: Vec<String>,
 	pub block_file: Option<PathBuf>,
@@ -66,13 +58,6 @@ pub struct RuntimeConfig {
 
 impl From<&Cli> for RuntimeConfig {
 	fn from(cli: &Cli) -> Self {
-		// Only set HAR options if path is provided
-		let (har_content_policy, har_mode) = if cli.har.is_some() {
-			(Some(cli.har_content.into()), Some(cli.har_mode.into()))
-		} else {
-			(None, None)
-		};
-
 		Self {
 			auth: cli.auth.clone(),
 			browser: cli.browser,
@@ -87,11 +72,6 @@ impl From<&Cli> for RuntimeConfig {
 			refresh_context: cli.refresh_context,
 			base_url: cli.base_url.clone(),
 			artifacts_dir: cli.artifacts_dir.clone(),
-			har_path: cli.har.clone(),
-			har_content_policy,
-			har_mode,
-			har_omit_content: cli.har_omit_content,
-			har_url_filter: cli.har_url_filter.clone(),
 			block_patterns: cli.block.clone(),
 			block_file: cli.block_file.clone(),
 			downloads_dir: cli.downloads_dir.clone(),
@@ -159,14 +139,8 @@ pub fn build_runtime(config: &RuntimeConfig) -> Result<RuntimeContext> {
 		(None, CdpEndpointSource::None)
 	};
 
-	// Step 4: Build HAR configuration
-	let har_config = HarConfig {
-		path: config.har_path.clone(),
-		content_policy: config.har_content_policy,
-		mode: config.har_mode,
-		omit_content: config.har_omit_content,
-		url_filter: config.har_url_filter.clone(),
-	};
+	// Step 4: Build HAR configuration from persisted context
+	let har_config: HarConfig = ctx_state.effective_har_config();
 
 	// Step 5: Build block configuration (CLI patterns + optional file)
 	let mut block_patterns = config.block_patterns.clone();
@@ -227,11 +201,6 @@ mod tests {
 			refresh_context: false,
 			base_url: None,
 			artifacts_dir: None,
-			har_path: None,
-			har_content_policy: None,
-			har_mode: None,
-			har_omit_content: false,
-			har_url_filter: None,
 			block_patterns: Vec::new(),
 			block_file: None,
 			downloads_dir: None,
@@ -259,11 +228,6 @@ mod tests {
 			refresh_context: false,
 			base_url: None,
 			artifacts_dir: None,
-			har_path: None,
-			har_content_policy: None,
-			har_mode: None,
-			har_omit_content: false,
-			har_url_filter: None,
 			block_patterns: Vec::new(),
 			block_file: None,
 			downloads_dir: None,
@@ -292,11 +256,6 @@ mod tests {
 			refresh_context: false,
 			base_url: None,
 			artifacts_dir: None,
-			har_path: None,
-			har_content_policy: None,
-			har_mode: None,
-			har_omit_content: false,
-			har_url_filter: None,
 			block_patterns: Vec::new(),
 			block_file: None,
 			downloads_dir: None,
@@ -327,11 +286,6 @@ mod tests {
 			refresh_context: false,
 			base_url: None,
 			artifacts_dir: None,
-			har_path: None,
-			har_content_policy: None,
-			har_mode: None,
-			har_omit_content: false,
-			har_url_filter: None,
 			block_patterns: Vec::new(),
 			block_file: None,
 			downloads_dir: None,
@@ -371,11 +325,6 @@ mod tests {
 			refresh_context: false,
 			base_url: None,
 			artifacts_dir: None,
-			har_path: None,
-			har_content_policy: None,
-			har_mode: None,
-			har_omit_content: false,
-			har_url_filter: None,
 			block_patterns: Vec::new(),
 			block_file: None,
 			downloads_dir: None,
@@ -385,5 +334,61 @@ mod tests {
 		let rt = build_runtime(&config).unwrap();
 		assert_eq!(rt.ctx.workspace_root(), std::path::Path::new(&ws));
 		assert_eq!(rt.ctx_state.workspace_root(), std::path::Path::new(&ws));
+	}
+
+	#[test]
+	fn build_runtime_uses_persisted_har_config() {
+		let tmp = tempfile::TempDir::new().unwrap();
+		let ws = tmp.path();
+		let config_path = ws
+			.join(pw_rs::dirs::PLAYWRIGHT)
+			.join(crate::workspace::STATE_VERSION_DIR)
+			.join("namespaces")
+			.join("default")
+			.join("config.json");
+		std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+		let persisted = serde_json::json!({
+			"schema": crate::context_store::types::SCHEMA_VERSION,
+			"har": {
+				"path": "network.har",
+				"contentPolicy": "embed",
+				"mode": "minimal",
+				"omitContent": true,
+				"urlFilter": "*.api.example.com",
+			}
+		});
+		std::fs::write(
+			&config_path,
+			serde_json::to_string_pretty(&persisted).unwrap(),
+		)
+		.unwrap();
+
+		let config = RuntimeConfig {
+			auth: None,
+			browser: BrowserKind::Chromium,
+			cdp_endpoint: None,
+			launch_server: false,
+			no_daemon: false,
+			no_project: true,
+			workspace: Some(ws.to_string_lossy().to_string()),
+			namespace: "default".to_string(),
+			no_context: false,
+			no_save_context: true,
+			refresh_context: false,
+			base_url: None,
+			artifacts_dir: None,
+			block_patterns: Vec::new(),
+			block_file: None,
+			downloads_dir: None,
+			timeout_ms: None,
+		};
+
+		let rt = build_runtime(&config).unwrap();
+		let har = rt.ctx.har_config();
+		assert_eq!(har.path, Some(ws.join("network.har")));
+		assert_eq!(har.content_policy, Some(pw_rs::HarContentPolicy::Embed));
+		assert_eq!(har.mode, Some(pw_rs::HarMode::Minimal));
+		assert!(har.omit_content);
+		assert_eq!(har.url_filter.as_deref(), Some("*.api.example.com"));
 	}
 }

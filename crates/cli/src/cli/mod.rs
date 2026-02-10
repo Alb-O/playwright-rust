@@ -119,26 +119,6 @@ pub struct Cli {
 	#[arg(long, global = true, value_name = "DIR")]
 	pub artifacts_dir: Option<std::path::PathBuf>,
 
-	/// Record network activity to HAR (HTTP Archive) file
-	#[arg(long, global = true, value_name = "FILE")]
-	pub har: Option<PathBuf>,
-
-	/// HAR content policy: embed (inline base64), attach (separate files), or omit
-	#[arg(long, global = true, value_enum, default_value = "attach")]
-	pub har_content: CliHarContentPolicy,
-
-	/// HAR recording mode: full (all content) or minimal (essential for replay)
-	#[arg(long, global = true, value_enum, default_value = "full")]
-	pub har_mode: CliHarMode,
-
-	/// Omit request/response content from HAR recording
-	#[arg(long, global = true)]
-	pub har_omit_content: bool,
-
-	/// URL pattern filter for HAR recording (glob pattern)
-	#[arg(long, global = true, value_name = "PATTERN")]
-	pub har_url_filter: Option<String>,
-
 	/// Block requests matching URL pattern (glob, can be used multiple times)
 	#[arg(long, global = true, value_name = "PATTERN", action = clap::ArgAction::Append)]
 	pub block: Vec<String>,
@@ -285,6 +265,12 @@ pub enum Commands {
 	/// important tabs like Discord, Slack, etc.
 	#[command(subcommand)]
 	Protect(ProtectAction),
+
+	/// Manage persistent HAR recording configuration
+	Har {
+		#[command(subcommand)]
+		action: HarAction,
+	},
 
 	/// Run commands from stdin in batch mode (for AI agents)
 	///
@@ -483,6 +469,31 @@ pub enum ProtectAction {
 	},
 	/// List all protected URL patterns
 	List,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum HarAction {
+	/// Persist HAR recording settings for this workspace/namespace
+	Set {
+		/// Path to write HAR output for subsequent commands
+		file: PathBuf,
+		/// HAR content policy: embed (inline base64), attach (separate files), or omit
+		#[arg(long, value_enum, default_value = "attach")]
+		content: CliHarContentPolicy,
+		/// HAR recording mode: full (all content) or minimal (essential for replay)
+		#[arg(long, value_enum, default_value = "full")]
+		mode: CliHarMode,
+		/// Omit request/response content from HAR recording
+		#[arg(long)]
+		omit_content: bool,
+		/// URL pattern filter for HAR recording (glob pattern)
+		#[arg(long, value_name = "PATTERN")]
+		url_filter: Option<String>,
+	},
+	/// Show current HAR recording settings
+	Show,
+	/// Clear persisted HAR settings
+	Clear,
 }
 
 impl Commands {

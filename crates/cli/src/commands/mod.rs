@@ -5,6 +5,7 @@ mod daemon;
 pub(crate) mod def;
 pub(crate) mod dispatch;
 pub(crate) mod fill;
+mod har;
 pub mod init;
 pub(crate) mod navigate;
 pub(crate) mod page;
@@ -20,7 +21,7 @@ pub(crate) mod wait;
 use std::path::Path;
 
 use crate::cli::{
-	AuthAction, Cli, Commands, DaemonAction, ProtectAction, SessionAction, TabsAction,
+	AuthAction, Cli, Commands, DaemonAction, HarAction, ProtectAction, SessionAction, TabsAction,
 };
 use crate::commands::def::ExecMode;
 use crate::context::CommandContext;
@@ -230,6 +231,25 @@ async fn dispatch_ad_hoc<'ctx>(
 			ProtectAction::Add { pattern } => protect::add(ctx_state, format, pattern),
 			ProtectAction::Remove { pattern } => protect::remove(ctx_state, format, &pattern),
 			ProtectAction::List => protect::list(ctx_state, format),
+		},
+		Commands::Har { action } => match action {
+			HarAction::Set {
+				file,
+				content,
+				mode,
+				omit_content,
+				url_filter,
+			} => har::set(
+				ctx_state,
+				format,
+				file,
+				content,
+				mode,
+				omit_content,
+				url_filter,
+			),
+			HarAction::Show => har::show(ctx_state, format),
+			HarAction::Clear => har::clear(ctx_state, format),
 		},
 		Commands::Test { .. } => unreachable!("handled earlier"),
 		// Registry-backed commands should have been handled above

@@ -1,11 +1,14 @@
 //! CLI state types: [`CliConfig`] and [`CliCache`].
 
+use std::path::PathBuf;
+
+use pw_rs::{HarContentPolicy, HarMode};
 use serde::{Deserialize, Serialize};
 
 use crate::types::BrowserKind;
 
 /// Schema version for config/cache files.
-pub const SCHEMA_VERSION: u32 = 3;
+pub const SCHEMA_VERSION: u32 = 4;
 
 /// Default settings applied for a namespace.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -21,6 +24,19 @@ pub struct Defaults {
 	pub cdp_endpoint: Option<String>,
 }
 
+/// Persisted HAR recording defaults scoped to a namespace.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct HarDefaults {
+	pub path: PathBuf,
+	pub content_policy: HarContentPolicy,
+	pub mode: HarMode,
+	#[serde(default)]
+	pub omit_content: bool,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub url_filter: Option<String>,
+}
+
 /// Durable CLI configuration scoped to a namespace.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +45,8 @@ pub struct CliConfig {
 	pub schema: u32,
 	#[serde(default)]
 	pub defaults: Defaults,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub har: Option<HarDefaults>,
 	#[serde(default, skip_serializing_if = "Vec::is_empty")]
 	pub protected_urls: Vec<String>,
 }

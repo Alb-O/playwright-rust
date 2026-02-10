@@ -219,41 +219,63 @@ fn parse_page_eval_with_named_flags() {
 }
 
 #[test]
-fn parse_har_flags() {
+fn parse_har_set_command_full_options() {
 	let args = vec![
 		"pw",
-		"--har",
+		"har",
+		"set",
 		"network.har",
-		"--har-content",
+		"--content",
 		"embed",
-		"--har-mode",
+		"--mode",
 		"minimal",
-		"--har-omit-content",
-		"--har-url-filter",
+		"--omit-content",
+		"--url-filter",
 		"*.api.example.com",
-		"navigate",
-		"https://example.com",
 	];
 	let cli = Cli::try_parse_from(args).unwrap();
 
-	assert_eq!(
-		cli.har.as_deref(),
-		Some(std::path::Path::new("network.har"))
-	);
-	assert_eq!(cli.har_content, CliHarContentPolicy::Embed);
-	assert_eq!(cli.har_mode, CliHarMode::Minimal);
-	assert!(cli.har_omit_content);
-	assert_eq!(cli.har_url_filter.as_deref(), Some("*.api.example.com"));
+	match cli.command {
+		Commands::Har {
+			action:
+				HarAction::Set {
+					file,
+					content,
+					mode,
+					omit_content,
+					url_filter,
+				},
+		} => {
+			assert_eq!(file, PathBuf::from("network.har"));
+			assert_eq!(content, CliHarContentPolicy::Embed);
+			assert_eq!(mode, CliHarMode::Minimal);
+			assert!(omit_content);
+			assert_eq!(url_filter.as_deref(), Some("*.api.example.com"));
+		}
+		_ => panic!("Expected Har Set command"),
+	}
 }
 
 #[test]
-fn parse_har_defaults() {
-	let args = vec!["pw", "navigate", "https://example.com"];
+fn parse_har_show_command() {
+	let args = vec!["pw", "har", "show"];
 	let cli = Cli::try_parse_from(args).unwrap();
+	match cli.command {
+		Commands::Har {
+			action: HarAction::Show,
+		} => {}
+		_ => panic!("Expected Har Show command"),
+	}
+}
 
-	assert!(cli.har.is_none());
-	assert_eq!(cli.har_content, CliHarContentPolicy::Attach);
-	assert_eq!(cli.har_mode, CliHarMode::Full);
-	assert!(!cli.har_omit_content);
-	assert!(cli.har_url_filter.is_none());
+#[test]
+fn parse_har_clear_command() {
+	let args = vec!["pw", "har", "clear"];
+	let cli = Cli::try_parse_from(args).unwrap();
+	match cli.command {
+		Commands::Har {
+			action: HarAction::Clear,
+		} => {}
+		_ => panic!("Expected Har Clear command"),
+	}
 }

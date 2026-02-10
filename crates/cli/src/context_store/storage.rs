@@ -132,7 +132,7 @@ mod tests {
 		let path = tmp.path().join("test.json");
 
 		let config = CliConfig {
-			schema: 3,
+			schema: super::super::types::SCHEMA_VERSION,
 			defaults: super::super::types::Defaults {
 				browser: Some(crate::types::BrowserKind::Firefox),
 				..Default::default()
