@@ -7,7 +7,7 @@ use pw_rs::dirs;
 
 use super::types::{CliCache, CliConfig};
 use crate::error::Result;
-use crate::workspace::STATE_VERSION_DIR;
+use crate::workspace::{STATE_VERSION_DIR, ensure_state_gitignore_for};
 
 /// File paths for namespace-scoped CLI state.
 ///
@@ -82,6 +82,7 @@ fn load_json<T: serde::de::DeserializeOwned>(path: &Path) -> Option<T> {
 }
 
 fn save_json<T: serde::Serialize>(path: &Path, data: &T) -> Result<()> {
+	ensure_state_gitignore_for(path)?;
 	if let Some(parent) = path.parent() {
 		fs::create_dir_all(parent)?;
 	}
@@ -142,5 +143,28 @@ mod tests {
 		save_json(&path, &config).unwrap();
 		let loaded: CliConfig = load_json(&path).unwrap();
 		assert_eq!(loaded, config);
+	}
+
+	#[test]
+	fn test_save_json_creates_state_gitignore_when_under_state_root() {
+		let tmp = TempDir::new().unwrap();
+		let path = tmp
+			.path()
+			.join("playwright")
+			.join(STATE_VERSION_DIR)
+			.join("namespaces")
+			.join("default")
+			.join("cache.json");
+
+		let cache = CliCache::default();
+		save_json(&path, &cache).unwrap();
+
+		let gitignore = tmp
+			.path()
+			.join("playwright")
+			.join(STATE_VERSION_DIR)
+			.join(".gitignore");
+		assert!(gitignore.exists());
+		assert_eq!(fs::read_to_string(gitignore).unwrap(), "*\n");
 	}
 }

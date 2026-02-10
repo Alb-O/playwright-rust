@@ -14,7 +14,7 @@ use tracing::debug;
 use crate::context_store::ContextState;
 use crate::error::{PwError, Result};
 use crate::output::{OutputFormat, ResultBuilder, print_result};
-use crate::workspace::STATE_VERSION_DIR;
+use crate::workspace::{STATE_VERSION_DIR, ensure_state_root_gitignore};
 
 /// Options for the connect command.
 pub struct ConnectOptions {
@@ -242,10 +242,12 @@ fn resolve_user_data_dir(
 			ctx_state.workspace_root().join(dir)
 		}
 	} else {
-		ctx_state
+		let state_root = ctx_state
 			.workspace_root()
 			.join(dirs::PLAYWRIGHT)
-			.join(STATE_VERSION_DIR)
+			.join(STATE_VERSION_DIR);
+		ensure_state_root_gitignore(&state_root)?;
+		state_root
 			.join("namespaces")
 			.join(ctx_state.namespace())
 			.join("connect-user-data")
@@ -503,6 +505,13 @@ mod tests {
 			dir.ends_with("playwright/.pw-cli-v3/namespaces/agent-a/connect-user-data"),
 			"resolved path was {}",
 			dir.display()
+		);
+		assert!(
+			temp.path()
+				.join("playwright")
+				.join(".pw-cli-v3")
+				.join(".gitignore")
+				.exists()
 		);
 	}
 

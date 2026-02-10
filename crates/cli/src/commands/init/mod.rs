@@ -366,6 +366,35 @@ mod tests {
 	}
 
 	#[test]
+	fn test_scaffold_gitignore_includes_namespace_runtime_state() {
+		let temp = TempDir::new().unwrap();
+		let options = InitOptions {
+			path: temp.path().to_path_buf(),
+			template: InitTemplate::Minimal,
+			no_config: false,
+			no_example: false,
+			typescript: false,
+			force: false,
+			nix: false,
+		};
+
+		let result = scaffold_project(options).unwrap();
+		let gitignore = fs::read_to_string(
+			result
+				.project_root
+				.join(dirs::PLAYWRIGHT)
+				.join(".gitignore"),
+		)
+		.unwrap();
+
+		assert!(gitignore.contains("/.pw-cli-v3/namespaces/*/cache.json"));
+		assert!(gitignore.contains("/.pw-cli-v3/namespaces/*/config.json"));
+		assert!(gitignore.contains("/.pw-cli-v3/namespaces/*/sessions/"));
+		assert!(gitignore.contains("/.pw-cli-v3/namespaces/*/auth/"));
+		assert!(gitignore.contains("/.pw-cli-v3/namespaces/*/connect-user-data/"));
+	}
+
+	#[test]
 	fn test_scaffold_typescript() {
 		let temp = TempDir::new().unwrap();
 		let options = InitOptions {

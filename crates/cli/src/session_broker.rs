@@ -13,6 +13,7 @@ use crate::error::{PwError, Result};
 use crate::output::SessionSource;
 use crate::target::Target;
 use crate::types::BrowserKind;
+use crate::workspace::ensure_state_gitignore_for;
 
 const DRIVER_HASH: &str = env!("CARGO_PKG_VERSION");
 
@@ -43,6 +44,7 @@ impl SessionDescriptor {
 	}
 
 	pub(crate) fn save(&self, path: &Path) -> Result<()> {
+		ensure_state_gitignore_for(path)?;
 		if let Some(parent) = path.parent() {
 			fs::create_dir_all(parent)?;
 		}
@@ -617,6 +619,41 @@ mod tests {
 			download_config: &DEFAULT_DOWNLOAD_CONFIG,
 		};
 		assert!(loaded.matches(&req, Some(DRIVER_HASH)));
+	}
+
+	#[test]
+	fn descriptor_save_creates_state_gitignore_for_state_paths() {
+		let dir = tempdir().unwrap();
+		let path = dir
+			.path()
+			.join("playwright")
+			.join(crate::workspace::STATE_VERSION_DIR)
+			.join("namespaces")
+			.join("default")
+			.join("sessions")
+			.join("session.json");
+
+		let desc = SessionDescriptor {
+			pid: std::process::id(),
+			browser: BrowserKind::Chromium,
+			headless: true,
+			cdp_endpoint: Some("ws://localhost:1234".into()),
+			ws_endpoint: Some("ws://localhost:1234".into()),
+			workspace_id: Some("ws".into()),
+			namespace: Some("default".into()),
+			session_key: Some("ws:default:chromium:headless".into()),
+			driver_hash: Some(DRIVER_HASH.to_string()),
+			created_at: 123,
+		};
+
+		desc.save(&path).unwrap();
+		let gitignore = dir
+			.path()
+			.join("playwright")
+			.join(crate::workspace::STATE_VERSION_DIR)
+			.join(".gitignore");
+		assert!(gitignore.exists());
+		assert_eq!(std::fs::read_to_string(gitignore).unwrap(), "*\n");
 	}
 
 	#[test]

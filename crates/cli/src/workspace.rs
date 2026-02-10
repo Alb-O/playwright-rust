@@ -14,6 +14,7 @@ use crate::types::BrowserKind;
 
 pub const DEFAULT_NAMESPACE: &str = "default";
 pub const STATE_VERSION_DIR: &str = ".pw-cli-v3";
+pub const STATE_GITIGNORE_CONTENT: &str = "*\n";
 
 /// Canonical identity for a workspace namespace.
 #[derive(Debug, Clone)]
@@ -103,6 +104,40 @@ pub fn normalize_namespace(namespace: &str) -> String {
 	}
 }
 
+/// Ensures the runtime state root has a local .gitignore that hides generated files.
+///
+/// The file uses a single `*` pattern so all transient files under `.pw-cli-v3/`
+/// stay out of git status, even when `pw init` was never run.
+pub fn ensure_state_root_gitignore(state_root: &Path) -> Result<()> {
+	std::fs::create_dir_all(state_root)?;
+	let gitignore_path = state_root.join(".gitignore");
+	if !gitignore_path.exists() {
+		std::fs::write(gitignore_path, STATE_GITIGNORE_CONTENT)?;
+	}
+	Ok(())
+}
+
+/// Best-effort helper: find `.pw-cli-v3` in the path ancestry and ensure its `.gitignore`.
+///
+/// Returns `Ok(())` even when the path is not under `.pw-cli-v3`.
+pub fn ensure_state_gitignore_for(path: &Path) -> Result<()> {
+	if let Some(state_root) = find_state_root(path) {
+		ensure_state_root_gitignore(&state_root)?;
+	}
+	Ok(())
+}
+
+fn find_state_root(path: &Path) -> Option<PathBuf> {
+	let mut current = Some(path);
+	while let Some(candidate) = current {
+		if candidate.file_name().and_then(|name| name.to_str()) == Some(STATE_VERSION_DIR) {
+			return Some(candidate.to_path_buf());
+		}
+		current = candidate.parent();
+	}
+	None
+}
+
 fn resolve_workspace_root(workspace: Option<&str>, no_project: bool) -> Result<PathBuf> {
 	if let Some(value) = workspace {
 		if value == "auto" {
@@ -144,6 +179,8 @@ fn hash_hex(input: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+	use tempfile::TempDir;
+
 	use super::*;
 
 	#[test]
@@ -164,5 +201,36 @@ mod tests {
 		let key1 = scope.session_key(BrowserKind::Chromium, true);
 		let key2 = scope.session_key(BrowserKind::Chromium, true);
 		assert_eq!(key1, key2);
+	}
+
+	#[test]
+	fn ensure_state_root_gitignore_creates_wildcard_ignore() {
+		let temp = TempDir::new().unwrap();
+		let state_root = temp.path().join("playwright").join(STATE_VERSION_DIR);
+		ensure_state_root_gitignore(&state_root).unwrap();
+
+		let ignore = std::fs::read_to_string(state_root.join(".gitignore")).unwrap();
+		assert_eq!(ignore, STATE_GITIGNORE_CONTENT);
+	}
+
+	#[test]
+	fn ensure_state_gitignore_for_uses_ancestor_state_root() {
+		let temp = TempDir::new().unwrap();
+		let target = temp
+			.path()
+			.join("playwright")
+			.join(STATE_VERSION_DIR)
+			.join("namespaces")
+			.join("default")
+			.join("cache.json");
+		ensure_state_gitignore_for(&target).unwrap();
+
+		assert!(
+			temp.path()
+				.join("playwright")
+				.join(STATE_VERSION_DIR)
+				.join(".gitignore")
+				.exists()
+		);
 	}
 }

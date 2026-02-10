@@ -230,8 +230,18 @@ pub const PLAYWRIGHT_GITIGNORE: &str = r#"# Test outputs
 /mcp-output/
 /mcp-user-data/
 
-# CLI context cache
+# CLI context cache (legacy)
 /.pw-cli/
+
+# CLI runtime state (namespace/session/cache/profile)
+/.pw-cli-v3/namespaces/*/cache.json
+/.pw-cli-v3/namespaces/*/config.json
+/.pw-cli-v3/namespaces/*/sessions/
+/.pw-cli-v3/namespaces/*/auth/
+/.pw-cli-v3/namespaces/*/connect-user-data/
+/.pw-cli-v3/namespaces/*/connect-user-data-*/
+
+# Future v3 runtime internals (daemon metadata, lockfiles, logs, etc.)
 /.pw-cli-v3/
 "#;
 
