@@ -17,6 +17,8 @@ use crate::error::{PwError, Result};
 use crate::output::{OutputFormat, ResultBuilder, print_result};
 use crate::workspace::{STATE_VERSION_DIR, compute_cdp_port, ensure_state_root_gitignore};
 
+mod wsl;
+
 /// Options for the connect command.
 pub struct ConnectOptions {
 	pub endpoint: Option<String>,
@@ -198,6 +200,10 @@ async fn discover_chrome(port: u16) -> Result<CdpVersionInfo> {
 
 /// Launch Chrome with remote debugging enabled
 async fn launch_chrome(port: u16, user_data_dir: Option<&std::path::Path>) -> Result<CdpVersionInfo> {
+	if wsl::is_wsl() {
+		return wsl::launch_windows_chrome_from_wsl(port, user_data_dir).await;
+	}
+
 	let chrome_path = find_chrome_executable().ok_or_else(|| {
 		PwError::Context(
 			"Could not find Chrome/Chromium executable. \n\
@@ -264,7 +270,9 @@ async fn launch_chrome(port: u16, user_data_dir: Option<&std::path::Path>) -> Re
 }
 
 fn resolve_user_data_dir(ctx_state: &ContextState, user_data_dir: Option<&std::path::Path>) -> Result<std::path::PathBuf> {
-	let resolved = if let Some(dir) = user_data_dir {
+	let resolved = if wsl::is_wsl() {
+		wsl::resolve_wsl_user_data_dir(ctx_state, user_data_dir)
+	} else if let Some(dir) = user_data_dir {
 		if dir.is_absolute() {
 			dir.to_path_buf()
 		} else {
@@ -548,12 +556,21 @@ mod tests {
 		.unwrap();
 
 		let dir = resolve_user_data_dir(&ctx_state, None).unwrap();
-		assert!(
-			dir.ends_with("playwright/.pw-cli-v3/namespaces/agent-a/connect-user-data"),
-			"resolved path was {}",
-			dir.display()
-		);
-		assert!(temp.path().join("playwright").join(".pw-cli-v3").join(".gitignore").exists());
+		if wsl::is_wsl() {
+			assert_eq!(
+				dir,
+				std::path::PathBuf::from(wsl::WSL_MANAGED_USER_DATA_ROOT).join("agent-a"),
+				"resolved path was {}",
+				dir.display()
+			);
+		} else {
+			assert!(
+				dir.ends_with("playwright/.pw-cli-v3/namespaces/agent-a/connect-user-data"),
+				"resolved path was {}",
+				dir.display()
+			);
+			assert!(temp.path().join("playwright").join(".pw-cli-v3").join(".gitignore").exists());
+		}
 	}
 
 	#[test]
