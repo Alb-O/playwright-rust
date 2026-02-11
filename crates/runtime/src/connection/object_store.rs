@@ -47,9 +47,7 @@ impl ObjectStore {
 
 	/// Synchronous lookup.
 	pub fn try_get(&self, guid: &str) -> Option<Arc<dyn ChannelOwner>> {
-		self.objects
-			.get(&Arc::from(guid) as &Arc<str>)
-			.map(|r| r.value().clone())
+		self.objects.get(&Arc::from(guid) as &Arc<str>).map(|r| r.value().clone())
 	}
 
 	/// Waits for an object to be registered, with timeout.
@@ -60,11 +58,7 @@ impl ObjectStore {
 		let deadline = tokio::time::Instant::now() + timeout;
 
 		loop {
-			let notify = self
-				.waiters
-				.entry(g.clone())
-				.or_insert_with(|| Arc::new(Notify::new()))
-				.clone();
+			let notify = self.waiters.entry(g.clone()).or_insert_with(|| Arc::new(Notify::new())).clone();
 			let notified = notify.notified();
 
 			if let Some(obj) = self.objects.get(&g) {

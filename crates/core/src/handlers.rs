@@ -65,10 +65,8 @@ pub struct RouteMatcher {
 impl RouteMatcher {
 	/// Compiles a glob pattern, falling back to literal matching on invalid patterns.
 	pub fn new(pattern: &str) -> Self {
-		let pattern = glob::Pattern::new(pattern).unwrap_or_else(|_| {
-			glob::Pattern::new(&glob::Pattern::escape(pattern))
-				.expect("escaped pattern is always valid")
-		});
+		let pattern =
+			glob::Pattern::new(pattern).unwrap_or_else(|_| glob::Pattern::new(&glob::Pattern::escape(pattern)).expect("escaped pattern is always valid"));
 		Self { pattern }
 	}
 
@@ -103,10 +101,7 @@ pub struct Subscription {
 impl Subscription {
 	/// Creates a subscription with a custom dropper function.
 	pub fn new(id: HandlerId, dropper: Arc<dyn Fn(HandlerId) + Send + Sync>) -> Self {
-		Self {
-			id,
-			dropper: Some(dropper),
-		}
+		Self { id, dropper: Some(dropper) }
 	}
 
 	/// Creates a subscription from a handler map using a weak reference.

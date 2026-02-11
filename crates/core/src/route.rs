@@ -28,18 +28,8 @@ impl Route {
 	///
 	/// This is called by the object factory when the server sends a `__create__` message
 	/// for a Route object.
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent.clone()),
-			type_name,
-			guid,
-			initializer,
-		);
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent.clone()), type_name, guid, initializer);
 
 		Ok(Self { base })
 	}
@@ -58,33 +48,18 @@ impl Route {
 
 		// Fallback: Create a stub Request from initializer data
 		// This should rarely happen in practice
-		let request_data = self
-			.initializer()
-			.get("request")
-			.cloned()
-			.unwrap_or_else(|| {
-				serde_json::json!({
-					"url": "",
-					"method": "GET"
-				})
-			});
+		let request_data = self.initializer().get("request").cloned().unwrap_or_else(|| {
+			serde_json::json!({
+				"url": "",
+				"method": "GET"
+			})
+		});
 
-		let parent = self
-			.parent()
-			.unwrap_or_else(|| Arc::new(self.clone()) as Arc<dyn ChannelOwner>);
+		let parent = self.parent().unwrap_or_else(|| Arc::new(self.clone()) as Arc<dyn ChannelOwner>);
 
-		let request_guid = request_data
-			.get("guid")
-			.and_then(|v| v.as_str())
-			.unwrap_or("request-stub");
+		let request_guid = request_data.get("guid").and_then(|v| v.as_str()).unwrap_or("request-stub");
 
-		Request::new(
-			parent,
-			"Request".to_string(),
-			Arc::from(request_guid),
-			request_data,
-		)
-		.unwrap()
+		Request::new(parent, "Request".to_string(), Arc::from(request_guid), request_data).unwrap()
 	}
 
 	/// Aborts the route's request.
@@ -110,10 +85,7 @@ impl Route {
 			"errorCode": error_code.unwrap_or("failed")
 		});
 
-		self.channel()
-			.send::<_, serde_json::Value>("abort", params)
-			.await
-			.map(|_| ())
+		self.channel().send::<_, serde_json::Value>("abort", params).await.map(|_| ())
 	}
 
 	/// Continues the route's request with optional modifications.
@@ -132,10 +104,7 @@ impl Route {
 		if let Some(opts) = overrides {
 			// Add headers
 			if let Some(headers) = opts.headers {
-				let headers_array: Vec<serde_json::Value> = headers
-					.into_iter()
-					.map(|(name, value)| json!({"name": name, "value": value}))
-					.collect();
+				let headers_array: Vec<serde_json::Value> = headers.into_iter().map(|(name, value)| json!({"name": name, "value": value})).collect();
 				params["headers"] = json!(headers_array);
 			}
 
@@ -159,10 +128,7 @@ impl Route {
 			}
 		}
 
-		self.channel()
-			.send::<_, serde_json::Value>("continue", params)
-			.await
-			.map(|_| ())
+		self.channel().send::<_, serde_json::Value>("continue", params).await.map(|_| ())
 	}
 
 	/// Fulfills the route's request with a custom response.
@@ -218,10 +184,7 @@ impl Route {
 		}
 
 		// Convert headers to protocol format
-		let headers_array: Vec<Value> = headers_map
-			.into_iter()
-			.map(|(name, value)| json!({"name": name, "value": value}))
-			.collect();
+		let headers_array: Vec<Value> = headers_map.into_iter().map(|(name, value)| json!({"name": name, "value": value})).collect();
 		response["headers"] = json!(headers_array);
 
 		// Set body LAST, after all other fields
@@ -241,10 +204,7 @@ impl Route {
 			"response": response
 		});
 
-		self.channel()
-			.send::<_, serde_json::Value>("fulfill", params)
-			.await
-			.map(|_| ())
+		self.channel().send::<_, serde_json::Value>("fulfill", params).await.map(|_| ())
 	}
 }
 
@@ -387,9 +347,7 @@ impl FulfillOptionsBuilder {
 
 	/// Sets the response body from JSON (automatically sets content-type to application/json)
 	pub fn json(mut self, value: &impl serde::Serialize) -> Result<Self> {
-		let json_str = serde_json::to_string(value).map_err(|e| {
-			pw_runtime::Error::ProtocolError(format!("JSON serialization failed: {}", e))
-		})?;
+		let json_str = serde_json::to_string(value).map_err(|e| pw_runtime::Error::ProtocolError(format!("JSON serialization failed: {}", e)))?;
 		self.body = Some(json_str.into_bytes());
 		self.content_type = Some("application/json".to_string());
 		Ok(self)

@@ -158,15 +158,9 @@ impl Expectation {
 			// Check timeout
 			if start.elapsed() >= self.timeout {
 				let message = if self.negate {
-					format!(
-						"Expected element '{}' NOT to be visible, but it was visible after {:?}",
-						selector, self.timeout
-					)
+					format!("Expected element '{}' NOT to be visible, but it was visible after {:?}", selector, self.timeout)
 				} else {
-					format!(
-						"Expected element '{}' to be visible, but it was not visible after {:?}",
-						selector, self.timeout
-					)
+					format!("Expected element '{}' to be visible, but it was not visible after {:?}", selector, self.timeout)
 				};
 				return Err(pw_runtime::Error::AssertionTimeout(message));
 			}
@@ -208,11 +202,7 @@ impl Expectation {
 			let actual = actual_text.trim();
 
 			// Check if condition matches (with negation support)
-			let matches = if self.negate {
-				actual != expected
-			} else {
-				actual == expected
-			};
+			let matches = if self.negate { actual != expected } else { actual == expected };
 
 			if matches {
 				return Ok(());
@@ -245,19 +235,14 @@ impl Expectation {
 	pub async fn to_have_text_regex(self, pattern: &str) -> Result<()> {
 		let start = std::time::Instant::now();
 		let selector = self.locator.selector().to_string();
-		let re = regex::Regex::new(pattern)
-			.map_err(|e| pw_runtime::Error::InvalidArgument(format!("Invalid regex: {}", e)))?;
+		let re = regex::Regex::new(pattern).map_err(|e| pw_runtime::Error::InvalidArgument(format!("Invalid regex: {}", e)))?;
 
 		loop {
 			let actual_text = self.locator.inner_text().await?;
 			let actual = actual_text.trim();
 
 			// Check if condition matches (with negation support)
-			let matches = if self.negate {
-				!re.is_match(actual)
-			} else {
-				re.is_match(actual)
-			};
+			let matches = if self.negate { !re.is_match(actual) } else { re.is_match(actual) };
 
 			if matches {
 				return Ok(());
@@ -298,11 +283,7 @@ impl Expectation {
 			let actual = actual_text.trim();
 
 			// Check if condition matches (with negation support)
-			let matches = if self.negate {
-				!actual.contains(expected)
-			} else {
-				actual.contains(expected)
-			};
+			let matches = if self.negate { !actual.contains(expected) } else { actual.contains(expected) };
 
 			if matches {
 				return Ok(());
@@ -335,19 +316,14 @@ impl Expectation {
 	pub async fn to_contain_text_regex(self, pattern: &str) -> Result<()> {
 		let start = std::time::Instant::now();
 		let selector = self.locator.selector().to_string();
-		let re = regex::Regex::new(pattern)
-			.map_err(|e| pw_runtime::Error::InvalidArgument(format!("Invalid regex: {}", e)))?;
+		let re = regex::Regex::new(pattern).map_err(|e| pw_runtime::Error::InvalidArgument(format!("Invalid regex: {}", e)))?;
 
 		loop {
 			let actual_text = self.locator.inner_text().await?;
 			let actual = actual_text.trim();
 
 			// Check if condition matches (with negation support)
-			let matches = if self.negate {
-				!re.is_match(actual)
-			} else {
-				re.is_match(actual)
-			};
+			let matches = if self.negate { !re.is_match(actual) } else { re.is_match(actual) };
 
 			if matches {
 				return Ok(());
@@ -387,11 +363,7 @@ impl Expectation {
 			let actual = self.locator.input_value(None).await?;
 
 			// Check if condition matches (with negation support)
-			let matches = if self.negate {
-				actual != expected
-			} else {
-				actual == expected
-			};
+			let matches = if self.negate { actual != expected } else { actual == expected };
 
 			if matches {
 				return Ok(());
@@ -424,18 +396,13 @@ impl Expectation {
 	pub async fn to_have_value_regex(self, pattern: &str) -> Result<()> {
 		let start = std::time::Instant::now();
 		let selector = self.locator.selector().to_string();
-		let re = regex::Regex::new(pattern)
-			.map_err(|e| pw_runtime::Error::InvalidArgument(format!("Invalid regex: {}", e)))?;
+		let re = regex::Regex::new(pattern).map_err(|e| pw_runtime::Error::InvalidArgument(format!("Invalid regex: {}", e)))?;
 
 		loop {
 			let actual = self.locator.input_value(None).await?;
 
 			// Check if condition matches (with negation support)
-			let matches = if self.negate {
-				!re.is_match(&actual)
-			} else {
-				re.is_match(&actual)
-			};
+			let matches = if self.negate { !re.is_match(&actual) } else { re.is_match(&actual) };
 
 			if matches {
 				return Ok(());
@@ -485,15 +452,9 @@ impl Expectation {
 			// Check timeout
 			if start.elapsed() >= self.timeout {
 				let message = if self.negate {
-					format!(
-						"Expected element '{}' NOT to be enabled, but it was enabled after {:?}",
-						selector, self.timeout
-					)
+					format!("Expected element '{}' NOT to be enabled, but it was enabled after {:?}", selector, self.timeout)
 				} else {
-					format!(
-						"Expected element '{}' to be enabled, but it was not enabled after {:?}",
-						selector, self.timeout
-					)
+					format!("Expected element '{}' to be enabled, but it was not enabled after {:?}", selector, self.timeout)
 				};
 				return Err(pw_runtime::Error::AssertionTimeout(message));
 			}
@@ -541,15 +502,9 @@ impl Expectation {
 			// Check timeout
 			if start.elapsed() >= self.timeout {
 				let message = if self.negate {
-					format!(
-						"Expected element '{}' NOT to be checked, but it was checked after {:?}",
-						selector, self.timeout
-					)
+					format!("Expected element '{}' NOT to be checked, but it was checked after {:?}", selector, self.timeout)
 				} else {
-					format!(
-						"Expected element '{}' to be checked, but it was not checked after {:?}",
-						selector, self.timeout
-					)
+					format!("Expected element '{}' to be checked, but it was not checked after {:?}", selector, self.timeout)
 				};
 				return Err(pw_runtime::Error::AssertionTimeout(message));
 			}
@@ -588,11 +543,7 @@ impl Expectation {
 			let is_editable = self.locator.is_editable().await?;
 
 			// Check if condition matches (with negation support)
-			let matches = if self.negate {
-				!is_editable
-			} else {
-				is_editable
-			};
+			let matches = if self.negate { !is_editable } else { is_editable };
 
 			if matches {
 				return Ok(());
@@ -641,15 +592,9 @@ impl Expectation {
 			// Check timeout
 			if start.elapsed() >= self.timeout {
 				let message = if self.negate {
-					format!(
-						"Expected element '{}' NOT to be focused, but it was focused after {:?}",
-						selector, self.timeout
-					)
+					format!("Expected element '{}' NOT to be focused, but it was focused after {:?}", selector, self.timeout)
 				} else {
-					format!(
-						"Expected element '{}' to be focused, but it was not focused after {:?}",
-						selector, self.timeout
-					)
+					format!("Expected element '{}' to be focused, but it was not focused after {:?}", selector, self.timeout)
 				};
 				return Err(pw_runtime::Error::AssertionTimeout(message));
 			}

@@ -24,12 +24,7 @@ pub async fn execute_batch_command<'ctx>(
 	let has_cdp = ctx.cdp_endpoint().is_some();
 
 	let Some(cmd_id) = lookup_command(cmd_str) else {
-		return BatchResponse::error(
-			id,
-			cmd_str,
-			"UNKNOWN_COMMAND",
-			&format!("Unknown command: {}", cmd_str),
-		);
+		return BatchResponse::error(id, cmd_str, "UNKNOWN_COMMAND", &format!("Unknown command: {}", cmd_str));
 	};
 
 	let canonical = command_name(cmd_id);

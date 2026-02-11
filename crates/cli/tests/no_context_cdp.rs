@@ -36,19 +36,10 @@ fn clear_context_store() {
 fn run_pw(args: &[&str]) -> (bool, String, String) {
 	let workspace = workspace_root();
 	let workspace_str = workspace.to_string_lossy().to_string();
-	let mut full_args = vec![
-		"--no-project",
-		"--workspace",
-		&workspace_str,
-		"--namespace",
-		"default",
-	];
+	let mut full_args = vec!["--no-project", "--workspace", &workspace_str, "--namespace", "default"];
 	full_args.extend_from_slice(args);
 
-	let output = Command::new(pw_binary())
-		.args(&full_args)
-		.output()
-		.expect("Failed to execute pw");
+	let output = Command::new(pw_binary()).args(&full_args).output().expect("Failed to execute pw");
 
 	let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 	let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -66,14 +57,10 @@ fn no_context_without_cdp_requires_url() {
 	clear_context_store();
 
 	// Run text command with --no-context but without URL or CDP
-	let (success, stdout, _stderr) =
-		run_pw(&["-f", "json", "--no-context", "page", "text", "-s", "body"]);
+	let (success, stdout, _stderr) = run_pw(&["-f", "json", "--no-context", "page", "text", "-s", "body"]);
 
 	// Should fail because no URL provided and no CDP endpoint
-	assert!(
-		!success,
-		"Expected failure when --no-context without URL or CDP"
-	);
+	assert!(!success, "Expected failure when --no-context without URL or CDP");
 	assert!(
 		stdout.contains("URL is required") || stdout.contains("error"),
 		"Expected error about missing URL: {}",
@@ -97,11 +84,7 @@ fn normal_mode_uses_cached_url() {
 	// Now run text without URL - should use context
 	let (success, stdout, stderr) = run_pw(&["-f", "json", "page", "text", "-s", "h1"]);
 	assert!(success, "Text command failed: {}", stderr);
-	assert!(
-		stdout.contains("Cached Test"),
-		"Expected cached content: {}",
-		stdout
-	);
+	assert!(stdout.contains("Cached Test"), "Expected cached content: {}", stdout);
 }
 
 /// Test: --no-context mode ignores cached URL
@@ -119,8 +102,7 @@ fn no_context_ignores_cached_url() {
 
 	// Now run text with --no-context but without URL
 	// Should fail even though context has a URL
-	let (success, stdout, _stderr) =
-		run_pw(&["-f", "json", "--no-context", "page", "text", "-s", "h1"]);
+	let (success, stdout, _stderr) = run_pw(&["-f", "json", "--no-context", "page", "text", "-s", "h1"]);
 
 	assert!(!success, "Expected failure with --no-context and no URL");
 	assert!(
@@ -139,15 +121,10 @@ fn no_context_with_explicit_url_works() {
 	clear_context_store();
 
 	let url = "data:text/html,<p>Explicit URL Test</p>";
-	let (success, stdout, stderr) =
-		run_pw(&["-f", "json", "--no-context", "page", "text", url, "-s", "p"]);
+	let (success, stdout, stderr) = run_pw(&["-f", "json", "--no-context", "page", "text", url, "-s", "p"]);
 
 	assert!(success, "Text command failed: {}", stderr);
-	assert!(
-		stdout.contains("Explicit URL Test"),
-		"Expected content: {}",
-		stdout
-	);
+	assert!(stdout.contains("Explicit URL Test"), "Expected content: {}", stdout);
 }
 
 // Note: Testing --no-context with an actual CDP connection requires

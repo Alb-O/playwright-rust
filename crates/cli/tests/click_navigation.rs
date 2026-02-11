@@ -28,19 +28,10 @@ fn run_pw(args: &[&str]) -> (bool, String, String) {
 	clear_context_store();
 	let workspace = workspace_root();
 	let workspace_str = workspace.to_string_lossy().to_string();
-	let mut full_args = vec![
-		"--no-project",
-		"--workspace",
-		&workspace_str,
-		"--namespace",
-		"default",
-	];
+	let mut full_args = vec!["--no-project", "--workspace", &workspace_str, "--namespace", "default"];
 	full_args.extend_from_slice(args);
 
-	let output = Command::new(pw_binary())
-		.args(&full_args)
-		.output()
-		.expect("Failed to execute pw");
+	let output = Command::new(pw_binary()).args(&full_args).output().expect("Failed to execute pw");
 
 	let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 	let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -60,22 +51,10 @@ fn click_element_changes_url_reports_navigated() {
 	// pushState allows URL modification without actual navigation
 	let html = "data:text/html,<html><body><button id='change-btn' onclick=\"history.pushState({}, '', location.href + '?changed=1')\">Change URL</button></body></html>";
 
-	let (success, stdout, stderr) = run_pw(&[
-		"-f",
-		"json",
-		"click",
-		html,
-		"#change-btn",
-		"--wait-ms",
-		"100",
-	]);
+	let (success, stdout, stderr) = run_pw(&["-f", "json", "click", html, "#change-btn", "--wait-ms", "100"]);
 
 	assert!(success, "Click command failed: {}", stderr);
-	assert!(
-		stdout.contains("\"ok\": true"),
-		"Expected success in JSON: {}",
-		stdout
-	);
+	assert!(stdout.contains("\"ok\": true"), "Expected success in JSON: {}", stdout);
 	// The key assertion: navigated should be true when URL changes via pushState
 	assert!(
 		stdout.contains("\"navigated\": true"),
@@ -83,11 +62,7 @@ fn click_element_changes_url_reports_navigated() {
 		stdout
 	);
 	// Verify that afterUrl contains the query parameter
-	assert!(
-		stdout.contains("changed=1"),
-		"Expected changed=1 in afterUrl: {}",
-		stdout
-	);
+	assert!(stdout.contains("changed=1"), "Expected changed=1 in afterUrl: {}", stdout);
 }
 
 /// Test: Click a button that doesn't navigate, verify `navigated: false`
@@ -99,22 +74,10 @@ fn click_button_no_navigate_reports_false() {
 	// Page with a button that modifies content but doesn't navigate
 	let html = r#"data:text/html,<html><body><button id="action-btn" onclick="document.body.innerHTML += '<p>Clicked</p>'">Action</button></body></html>"#;
 
-	let (success, stdout, stderr) = run_pw(&[
-		"-f",
-		"json",
-		"click",
-		html,
-		"#action-btn",
-		"--wait-ms",
-		"100",
-	]);
+	let (success, stdout, stderr) = run_pw(&["-f", "json", "click", html, "#action-btn", "--wait-ms", "100"]);
 
 	assert!(success, "Click command failed: {}", stderr);
-	assert!(
-		stdout.contains("\"ok\": true"),
-		"Expected success in JSON: {}",
-		stdout
-	);
+	assert!(stdout.contains("\"ok\": true"), "Expected success in JSON: {}", stdout);
 	// The key assertion: navigated should be false for non-navigation clicks
 	assert!(
 		stdout.contains("\"navigated\": false"),
@@ -136,21 +99,9 @@ fn click_includes_before_and_after_urls() {
 	assert!(success, "Click command failed: {}", stderr);
 
 	// Verify both URL fields are present
-	assert!(
-		stdout.contains("\"beforeUrl\""),
-		"Expected beforeUrl in output: {}",
-		stdout
-	);
-	assert!(
-		stdout.contains("\"afterUrl\""),
-		"Expected afterUrl in output: {}",
-		stdout
-	);
-	assert!(
-		stdout.contains("\"navigated\""),
-		"Expected navigated field in output: {}",
-		stdout
-	);
+	assert!(stdout.contains("\"beforeUrl\""), "Expected beforeUrl in output: {}", stdout);
+	assert!(stdout.contains("\"afterUrl\""), "Expected afterUrl in output: {}", stdout);
+	assert!(stdout.contains("\"navigated\""), "Expected navigated field in output: {}", stdout);
 }
 
 /// Test: Click command uses JavaScript-based URL detection (not page.url())

@@ -79,17 +79,12 @@ impl CommandDef for WaitCommand {
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
 		let url = raw.url_flag.or(raw.url);
 		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
-		let condition = raw
-			.condition
-			.ok_or_else(|| PwError::Context("No condition provided for wait command".into()))?;
+		let condition = raw.condition.ok_or_else(|| PwError::Context("No condition provided for wait command".into()))?;
 
 		Ok(WaitResolved { target, condition })
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -102,43 +97,34 @@ impl CommandDef for WaitCommand {
 			let target = args.target.target.clone();
 			let condition = args.condition.clone();
 
-			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx).with_preferred_url(preferred_url);
 
-			let data = crate::session_helpers::with_session(
-				&mut exec,
-				req,
-				ArtifactsPolicy::Never,
-				move |session| {
-					let condition = condition.clone();
-					Box::pin(async move {
-						session.goto_target(&target, timeout_ms).await?;
+			let data = crate::session_helpers::with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
+				let condition = condition.clone();
+				Box::pin(async move {
+					session.goto_target(&target, timeout_ms).await?;
 
-						if let Ok(ms) = condition.parse::<u64>() {
-							tokio::time::sleep(Duration::from_millis(ms)).await;
+					if let Ok(ms) = condition.parse::<u64>() {
+						tokio::time::sleep(Duration::from_millis(ms)).await;
 
-							return Ok(WaitData {
-								condition: format!("timeout:{ms}ms"),
-								waited_ms: Some(ms),
-								selector_found: None,
-							});
-						}
+						return Ok(WaitData {
+							condition: format!("timeout:{ms}ms"),
+							waited_ms: Some(ms),
+							selector_found: None,
+						});
+					}
 
-						if matches!(
-							condition.as_str(),
-							"load" | "domcontentloaded" | "networkidle"
-						) {
-							return Ok(WaitData {
-								condition: format!("loadstate:{condition}"),
-								waited_ms: None,
-								selector_found: None,
-							});
-						}
+					if matches!(condition.as_str(), "load" | "domcontentloaded" | "networkidle") {
+						return Ok(WaitData {
+							condition: format!("loadstate:{condition}"),
+							waited_ms: None,
+							selector_found: None,
+						});
+					}
 
-						wait_for_selector(session, &condition).await
-					})
-				},
-			)
+					wait_for_selector(session, &condition).await
+				})
+			})
 			.await?;
 
 			let inputs = build_inputs(args.target.url_str(), args.condition.as_str());
@@ -157,9 +143,7 @@ impl CommandDef for WaitCommand {
 }
 
 fn build_inputs(url_str: Option<&str>, condition: &str) -> CommandInputs {
-	if condition.parse::<u64>().is_ok()
-		|| matches!(condition, "load" | "domcontentloaded" | "networkidle")
-	{
+	if condition.parse::<u64>().is_ok() || matches!(condition, "load" | "domcontentloaded" | "networkidle") {
 		CommandInputs {
 			url: url_str.map(String::from),
 			extra: Some(serde_json::json!({ "condition": condition })),

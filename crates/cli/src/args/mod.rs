@@ -213,11 +213,7 @@ pub struct ResolvedArgs {
 /// - Explicit `--url` and `--selector` flags take precedence
 /// - Positional arguments that look like CSS selectors are treated as selectors
 /// - Other positional arguments are treated as URLs
-pub fn resolve_url_and_selector(
-	positional: Option<String>,
-	url_flag: Option<String>,
-	selector_flag: Option<String>,
-) -> ResolvedArgs {
+pub fn resolve_url_and_selector(positional: Option<String>, url_flag: Option<String>, selector_flag: Option<String>) -> ResolvedArgs {
 	if url_flag.is_some() || selector_flag.is_some() {
 		return ResolvedArgs {
 			url: url_flag.or(positional.clone().filter(|p| !looks_like_selector(p))),
@@ -226,10 +222,7 @@ pub fn resolve_url_and_selector(
 	}
 
 	let Some(pos) = positional else {
-		return ResolvedArgs {
-			url: None,
-			selector: None,
-		};
+		return ResolvedArgs { url: None, selector: None };
 	};
 
 	if looks_like_selector(&pos) {
@@ -254,11 +247,7 @@ pub struct ArgConflict {
 
 impl std::fmt::Display for ArgConflict {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(
-			f,
-			"provide {} either positionally or via flag, not both",
-			self.name
-		)
+		write!(f, "provide {} either positionally or via flag, not both", self.name)
 	}
 }
 
@@ -301,11 +290,7 @@ impl std::error::Error for ArgConflict {}
 ///     "url"
 /// ).is_err());
 /// ```
-pub fn choose<T>(
-	positional: Option<T>,
-	flag: Option<T>,
-	name: &'static str,
-) -> Result<Option<T>, ArgConflict> {
+pub fn choose<T>(positional: Option<T>, flag: Option<T>, name: &'static str) -> Result<Option<T>, ArgConflict> {
 	match (positional, flag) {
 		(Some(_), Some(_)) => Err(ArgConflict { name }),
 		(a, b) => Ok(a.or(b)),

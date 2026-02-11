@@ -73,9 +73,7 @@ impl FilePayloadBuilder {
 	pub fn build(self) -> FilePayload {
 		FilePayload {
 			name: self.name.expect("name is required for FilePayload"),
-			mime_type: self
-				.mime_type
-				.expect("mime_type is required for FilePayload"),
+			mime_type: self.mime_type.expect("mime_type is required for FilePayload"),
 			buffer: self.buffer.expect("buffer is required for FilePayload"),
 		}
 	}

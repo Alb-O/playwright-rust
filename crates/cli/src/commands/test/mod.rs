@@ -13,11 +13,8 @@ use crate::error::{PwError, Result};
 
 /// Spawns the Playwright test runner with the given arguments.
 pub fn execute(args: Vec<String>) -> Result<()> {
-	let paths = pw_runtime::get_test_runner_paths().map_err(|_| {
-        PwError::Init(
-            "Playwright test runner not found. The test package may not have been downloaded during build.".to_string(),
-        )
-    })?;
+	let paths = pw_runtime::get_test_runner_paths()
+		.map_err(|_| PwError::Init("Playwright test runner not found. The test package may not have been downloaded during build.".to_string()))?;
 
 	let node_modules = ensure_node_modules(&paths)?;
 	let cli_js = if node_modules.join("playwright/cli.js").exists() {
@@ -27,10 +24,7 @@ pub fn execute(args: Vec<String>) -> Result<()> {
 	};
 
 	let mut cmd = Command::new(&paths.node_exe);
-	cmd.arg(&cli_js)
-		.arg("test")
-		.args(&args)
-		.env("NODE_PATH", &node_modules);
+	cmd.arg(&cli_js).arg("test").args(&args).env("NODE_PATH", &node_modules);
 
 	#[cfg(unix)]
 	{
@@ -100,11 +94,7 @@ fn cache_node_modules() -> Result<PathBuf> {
 ///
 /// For local cargo builds where node_modules is nested inside playwright_dir,
 /// uses symlinks since the playwright package is already accessible as the parent.
-fn setup_node_modules(
-	node_modules: &Path,
-	driver_package_dir: &Path,
-	playwright_dir: &Path,
-) -> Result<()> {
+fn setup_node_modules(node_modules: &Path, driver_package_dir: &Path, playwright_dir: &Path) -> Result<()> {
 	let playwright_dst = node_modules.join("playwright");
 	let core_dst = node_modules.join("playwright-core");
 
@@ -122,12 +112,7 @@ fn setup_node_modules(
 		copy_dir_if_needed(playwright_dir, &playwright_dst)?;
 	}
 
-	let version = read_package_version(if is_nested {
-		playwright_dir
-	} else {
-		&playwright_dst
-	})
-	.unwrap_or_else(|| "0.0.0".into());
+	let version = read_package_version(if is_nested { playwright_dir } else { &playwright_dst }).unwrap_or_else(|| "0.0.0".into());
 	setup_scoped_wrapper(node_modules, &version)
 }
 
@@ -146,10 +131,7 @@ fn setup_scoped_wrapper(node_modules: &Path, version: &str) -> Result<()> {
 		scoped_dir.join("package.json"),
 		format!(r#"{{"name":"@playwright/test","version":"{version}","main":"index.js"}}"#),
 	)?;
-	fs::write(
-		scoped_dir.join("index.js"),
-		"module.exports = require('playwright/test');",
-	)?;
+	fs::write(scoped_dir.join("index.js"), "module.exports = require('playwright/test');")?;
 	Ok(())
 }
 

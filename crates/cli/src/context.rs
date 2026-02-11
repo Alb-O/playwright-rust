@@ -139,14 +139,7 @@ pub struct CommandContext {
 
 impl CommandContext {
 	/// Create a new command context
-	pub fn new(
-		browser: BrowserKind,
-		no_project: bool,
-		auth_file: Option<PathBuf>,
-		cdp_endpoint: Option<String>,
-		launch_server: bool,
-		no_daemon: bool,
-	) -> Self {
+	pub fn new(browser: BrowserKind, no_project: bool, auth_file: Option<PathBuf>, cdp_endpoint: Option<String>, launch_server: bool, no_daemon: bool) -> Self {
 		Self::with_config(CommandContextConfig {
 			browser,
 			no_project,
@@ -199,16 +192,11 @@ impl CommandContext {
 			namespace,
 		} = cfg;
 
-		let resolved_workspace_root = workspace_root
-			.unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+		let resolved_workspace_root = workspace_root.unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 		let resolved_workspace_id = workspace_id.unwrap_or_else(|| "unknown".to_string());
 		let resolved_namespace = namespace.unwrap_or_else(|| "default".to_string());
 
-		let project = if no_project {
-			None
-		} else {
-			Project::detect_from(&resolved_workspace_root)
-		};
+		let project = if no_project { None } else { Project::detect_from(&resolved_workspace_root) };
 
 		// Resolve auth file path based on project
 		let resolved_auth = auth_file.map(|auth| {
@@ -327,12 +315,7 @@ impl CommandContext {
 	}
 
 	pub fn session_key(&self, browser: BrowserKind, headless: bool) -> String {
-		format!(
-			"{}:{}:{}",
-			self.namespace_id(),
-			browser,
-			if headless { "headless" } else { "headful" }
-		)
+		format!("{}:{}:{}", self.namespace_id(), browser, if headless { "headless" } else { "headful" })
 	}
 
 	/// Get the screenshot output path, using project paths if available
@@ -344,8 +327,7 @@ impl CommandContext {
 
 		// If just a filename and we have a project, put it in screenshots dir
 		if let Some(ref proj) = self.project {
-			proj.paths
-				.screenshot_path(output.to_string_lossy().as_ref())
+			proj.paths.screenshot_path(output.to_string_lossy().as_ref())
 		} else {
 			self.workspace_root.join(output)
 		}
@@ -418,14 +400,7 @@ mod tests {
 
 	#[test]
 	fn test_cdp_endpoint_round_trip() {
-		let ctx = CommandContext::new(
-			BrowserKind::Chromium,
-			true,
-			None,
-			Some("ws://localhost:19988/cdp".into()),
-			false,
-			false,
-		);
+		let ctx = CommandContext::new(BrowserKind::Chromium, true, None, Some("ws://localhost:19988/cdp".into()), false, false);
 		assert_eq!(ctx.cdp_endpoint(), Some("ws://localhost:19988/cdp"));
 	}
 
@@ -461,9 +436,7 @@ mod tests {
 			assert!(ctx.project.is_some());
 			let path = ctx.screenshot_path(Path::new("test.png"));
 			// Verify it ends with the expected path components
-			let expected_suffix = PathBuf::from(dirs::PLAYWRIGHT)
-				.join(dirs::SCREENSHOTS)
-				.join("test.png");
+			let expected_suffix = PathBuf::from(dirs::PLAYWRIGHT).join(dirs::SCREENSHOTS).join("test.png");
 			assert!(path.ends_with(&expected_suffix));
 		});
 

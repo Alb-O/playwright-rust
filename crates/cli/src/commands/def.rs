@@ -109,10 +109,7 @@ pub trait CommandDef: 'static {
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved>;
 
 	/// Execute the command. **Must not print**. Wrapper prints.
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec;
 }

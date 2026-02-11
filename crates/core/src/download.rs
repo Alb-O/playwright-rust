@@ -44,11 +44,7 @@ impl Download {
 	/// * `artifact` - The Artifact protocol object (from event params)
 	/// * `url` - Download URL (from event params)
 	/// * `suggested_filename` - Suggested filename (from event params)
-	pub fn from_artifact(
-		artifact: Arc<dyn ChannelOwner>,
-		url: String,
-		suggested_filename: String,
-	) -> Self {
+	pub fn from_artifact(artifact: Arc<dyn ChannelOwner>, url: String, suggested_filename: String) -> Self {
 		Self {
 			artifact,
 			url,
@@ -117,9 +113,7 @@ impl Download {
 			.to_str()
 			.ok_or_else(|| pw_runtime::Error::InvalidArgument("Invalid path".to_string()))?;
 
-		self.channel()
-			.send_no_result("saveAs", json!({ "path": path_str }))
-			.await?;
+		self.channel().send_no_result("saveAs", json!({ "path": path_str })).await?;
 
 		Ok(())
 	}

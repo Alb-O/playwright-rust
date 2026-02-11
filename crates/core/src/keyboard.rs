@@ -44,11 +44,7 @@ impl Keyboard {
 	/// Sends a `keydown`, `keypress`/`input`, and `keyup` event for each character.
 	///
 	/// See: <https://playwright.dev/docs/api/class-keyboard#keyboard-type>
-	pub async fn type_text(
-		&self,
-		text: &str,
-		options: Option<crate::KeyboardOptions>,
-	) -> Result<()> {
+	pub async fn type_text(&self, text: &str, options: Option<crate::KeyboardOptions>) -> Result<()> {
 		self.page.keyboard_type(text, options).await
 	}
 

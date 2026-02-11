@@ -47,9 +47,7 @@ pub struct Daemon {
 
 impl Daemon {
 	pub async fn start() -> Result<Self> {
-		let playwright = Playwright::launch()
-			.await
-			.map_err(|e| anyhow!(e.to_string()))?;
+		let playwright = Playwright::launch().await.map_err(|e| anyhow!(e.to_string()))?;
 		let state = DaemonState {
 			playwright,
 			browsers: HashMap::new(),
@@ -61,24 +59,15 @@ impl Daemon {
 		{
 			let socket_path = daemon_socket_path();
 			if socket_path.exists() {
-				std::fs::remove_file(&socket_path).with_context(|| {
-					format!(
-						"Failed to remove existing socket: {}",
-						socket_path.display()
-					)
-				})?;
+				std::fs::remove_file(&socket_path).with_context(|| format!("Failed to remove existing socket: {}", socket_path.display()))?;
 			}
 			// Ensure parent directory exists (for XDG_RUNTIME_DIR fallback)
 			if let Some(parent) = socket_path.parent() {
 				if !parent.exists() {
-					std::fs::create_dir_all(parent).with_context(|| {
-						format!("Failed to create socket directory: {}", parent.display())
-					})?;
+					std::fs::create_dir_all(parent).with_context(|| format!("Failed to create socket directory: {}", parent.display()))?;
 				}
 			}
-			let listener = UnixListener::bind(&socket_path).with_context(|| {
-				format!("Failed to bind daemon socket: {}", socket_path.display())
-			})?;
+			let listener = UnixListener::bind(&socket_path).with_context(|| format!("Failed to bind daemon socket: {}", socket_path.display()))?;
 			info!(
 				target = "pw.daemon",
 				socket = %socket_path.display(),
@@ -111,24 +100,12 @@ impl Daemon {
 	pub async fn run(mut self) -> Result<()> {
 		#[cfg(unix)]
 		{
-			run_unix(
-				self.listener,
-				self.state,
-				self.shutdown_tx,
-				&mut self.shutdown_rx,
-			)
-			.await
+			run_unix(self.listener, self.state, self.shutdown_tx, &mut self.shutdown_rx).await
 		}
 
 		#[cfg(windows)]
 		{
-			run_tcp(
-				self.listener,
-				self.state,
-				self.shutdown_tx,
-				&mut self.shutdown_rx,
-			)
-			.await
+			run_tcp(self.listener, self.state, self.shutdown_tx, &mut self.shutdown_rx).await
 		}
 	}
 }
@@ -142,8 +119,7 @@ async fn run_unix(
 ) -> Result<()> {
 	use tokio::signal::unix::{SignalKind, signal};
 
-	let mut sigterm =
-		signal(SignalKind::terminate()).context("Failed to install SIGTERM handler")?;
+	let mut sigterm = signal(SignalKind::terminate()).context("Failed to install SIGTERM handler")?;
 	let mut sigint = signal(SignalKind::interrupt()).context("Failed to install SIGINT handler")?;
 
 	loop {
@@ -225,11 +201,7 @@ async fn run_tcp(
 	Ok(())
 }
 
-async fn handle_client<S>(
-	stream: S,
-	state: Arc<Mutex<DaemonState>>,
-	shutdown_tx: watch::Sender<bool>,
-) -> Result<()>
+async fn handle_client<S>(stream: S, state: Arc<Mutex<DaemonState>>, shutdown_tx: watch::Sender<bool>) -> Result<()>
 where
 	S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
@@ -239,10 +211,7 @@ where
 
 	loop {
 		line.clear();
-		let bytes = reader
-			.read_line(&mut line)
-			.await
-			.context("Failed reading daemon request")?;
+		let bytes = reader.read_line(&mut line).await.context("Failed reading daemon request")?;
 		if bytes == 0 {
 			break;
 		}
@@ -275,18 +244,11 @@ where
 		.write_all(format!("{}\n", payload).as_bytes())
 		.await
 		.context("Failed writing daemon response")?;
-	writer
-		.flush()
-		.await
-		.context("Failed flushing daemon response")?;
+	writer.flush().await.context("Failed flushing daemon response")?;
 	Ok(())
 }
 
-async fn handle_request(
-	state: &Arc<Mutex<DaemonState>>,
-	shutdown_tx: watch::Sender<bool>,
-	request: DaemonRequest,
-) -> DaemonResponse {
+async fn handle_request(state: &Arc<Mutex<DaemonState>>, shutdown_tx: watch::Sender<bool>, request: DaemonRequest) -> DaemonResponse {
 	match request {
 		DaemonRequest::Ping => DaemonResponse::Pong,
 		DaemonRequest::AcquireBrowser {
@@ -300,17 +262,10 @@ async fn handle_request(
 				Err(err) => daemon_error("acquire_failed", err),
 			}
 		}
-		DaemonRequest::SpawnBrowser {
-			browser,
-			headless,
-			port,
-		} => {
+		DaemonRequest::SpawnBrowser { browser, headless, port } => {
 			let mut daemon = state.lock().await;
 			let session_key = format!("spawn:{}:{}:{}", browser, headless, now_ts());
-			match daemon
-				.spawn_browser(browser, headless, port, session_key)
-				.await
-			{
+			match daemon.spawn_browser(browser, headless, port, session_key).await {
 				Ok((port, cdp_endpoint)) => DaemonResponse::Browser { cdp_endpoint, port },
 				Err(err) => daemon_error("spawn_failed", err),
 			}
@@ -340,11 +295,7 @@ async fn handle_request(
 		}
 		DaemonRequest::ListBrowsers => {
 			let daemon = state.lock().await;
-			let list = daemon
-				.browsers
-				.values()
-				.map(|instance| instance.info.clone())
-				.collect();
+			let list = daemon.browsers.values().map(|instance| instance.info.clone()).collect();
 			DaemonResponse::Browsers { list }
 		}
 		DaemonRequest::Shutdown => {
@@ -360,12 +311,7 @@ async fn handle_request(
 
 impl DaemonState {
 	/// Acquire a browser, reusing an existing one if session_key matches.
-	async fn acquire_browser(
-		&mut self,
-		browser_kind: BrowserKind,
-		headless: bool,
-		session_key: String,
-	) -> Result<(u16, String)> {
+	async fn acquire_browser(&mut self, browser_kind: BrowserKind, headless: bool, session_key: String) -> Result<(u16, String)> {
 		// Check for existing browser with matching session_key.
 		if let Some(&port) = self.session_index.get(&session_key) {
 			if let Some(instance) = self.browsers.get_mut(&port) {
@@ -385,22 +331,13 @@ impl DaemonState {
 		}
 
 		// No existing browser found, spawn a new one
-		self.spawn_browser(browser_kind, headless, None, session_key)
-			.await
+		self.spawn_browser(browser_kind, headless, None, session_key).await
 	}
 
 	/// Spawn a new browser bound to `session_key`.
-	async fn spawn_browser(
-		&mut self,
-		browser_kind: BrowserKind,
-		headless: bool,
-		requested_port: Option<u16>,
-		session_key: String,
-	) -> Result<(u16, String)> {
+	async fn spawn_browser(&mut self, browser_kind: BrowserKind, headless: bool, requested_port: Option<u16>, session_key: String) -> Result<(u16, String)> {
 		if browser_kind != BrowserKind::Chromium {
-			return Err(anyhow!(
-				"Daemon-managed browsers currently require chromium"
-			));
+			return Err(anyhow!("Daemon-managed browsers currently require chromium"));
 		}
 
 		let port = if let Some(port) = requested_port {
@@ -415,8 +352,7 @@ impl DaemonState {
 			}
 			port
 		} else {
-			self.find_available_port()
-				.ok_or_else(|| anyhow!("No available ports"))?
+			self.find_available_port().ok_or_else(|| anyhow!("No available ports"))?
 		};
 
 		let launch_options = LaunchOptions {
@@ -446,13 +382,7 @@ impl DaemonState {
 			last_used_at: now,
 		};
 
-		self.browsers.insert(
-			port,
-			BrowserInstance {
-				info: info.clone(),
-				browser,
-			},
-		);
+		self.browsers.insert(port, BrowserInstance { info: info.clone(), browser });
 
 		self.session_index.insert(session_key, port);
 
@@ -479,11 +409,7 @@ impl DaemonState {
 			self.session_index.remove(&instance.info.session_key);
 		}
 
-		instance
-			.browser
-			.close()
-			.await
-			.map_err(|e| anyhow!(e.to_string()))?;
+		instance.browser.close().await.map_err(|e| anyhow!(e.to_string()))?;
 		self.browsers.remove(&port);
 		Ok(())
 	}
@@ -494,16 +420,12 @@ impl DaemonState {
 			let _ = self.kill_browser(port).await;
 		}
 		self.session_index.clear();
-		self.playwright
-			.shutdown()
-			.await
-			.map_err(|e| anyhow!(e.to_string()))?;
+		self.playwright.shutdown().await.map_err(|e| anyhow!(e.to_string()))?;
 		Ok(())
 	}
 
 	fn find_available_port(&self) -> Option<u16> {
-		(PORT_RANGE_START..=PORT_RANGE_END)
-			.find(|port| !self.browsers.contains_key(port) && port_available(*port))
+		(PORT_RANGE_START..=PORT_RANGE_END).find(|port| !self.browsers.contains_key(port) && port_available(*port))
 	}
 }
 
@@ -519,8 +441,5 @@ fn port_available(port: u16) -> bool {
 }
 
 fn now_ts() -> u64 {
-	std::time::SystemTime::now()
-		.duration_since(std::time::UNIX_EPOCH)
-		.unwrap_or_default()
-		.as_secs()
+	std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
 }

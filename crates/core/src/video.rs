@@ -67,18 +67,8 @@ pub struct Video {
 
 impl Video {
 	/// Creates a new Video from protocol initialization.
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent),
-			type_name,
-			guid,
-			initializer,
-		);
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent), type_name, guid, initializer);
 		Ok(Self { base })
 	}
 
@@ -151,9 +141,7 @@ impl Video {
 	///
 	/// See: <https://playwright.dev/docs/api/class-video#video-delete>
 	pub async fn delete(&self) -> Result<()> {
-		self.channel()
-			.send_no_result("delete", serde_json::json!({}))
-			.await
+		self.channel().send_no_result("delete", serde_json::json!({})).await
 	}
 }
 

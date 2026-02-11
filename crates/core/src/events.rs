@@ -52,9 +52,7 @@ pub struct ConsoleSubscription {
 
 impl ConsoleSubscription {
 	pub(crate) fn new(cancel_tx: oneshot::Sender<()>) -> Self {
-		Self {
-			cancel_tx: Some(cancel_tx),
-		}
+		Self { cancel_tx: Some(cancel_tx) }
 	}
 
 	/// Explicitly cancels the subscription, equivalent to dropping it.
@@ -75,16 +73,11 @@ impl Drop for ConsoleSubscription {
 
 impl std::fmt::Debug for ConsoleSubscription {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("ConsoleSubscription")
-			.field("active", &self.cancel_tx.is_some())
-			.finish()
+		f.debug_struct("ConsoleSubscription").field("active", &self.cancel_tx.is_some()).finish()
 	}
 }
 
-#[allow(
-	dead_code,
-	reason = "infrastructure for future event handling integration"
-)]
+#[allow(dead_code, reason = "infrastructure for future event handling integration")]
 struct WaiterEntry<E> {
 	predicate: Box<dyn Fn(&E) -> bool + Send + Sync>,
 	complete_tx: oneshot::Sender<E>,
@@ -120,10 +113,7 @@ impl<E: Clone + Send + 'static> EventBus<E> {
 	/// and are removed from the registry. The event is then broadcast to all stream
 	/// subscribers. This ordering ensures `wait_for_*` calls have guaranteed delivery
 	/// even if broadcast receivers are lagging.
-	#[allow(
-		dead_code,
-		reason = "infrastructure for future event handling integration"
-	)]
+	#[allow(dead_code, reason = "infrastructure for future event handling integration")]
 	pub fn emit(&self, event: E) {
 		{
 			let mut waiters = self.waiters.lock();
@@ -146,10 +136,7 @@ impl<E: Clone + Send + 'static> EventBus<E> {
 	/// Events emitted before subscription are not received.
 	///
 	/// [`broadcast::Receiver`]: tokio::sync::broadcast::Receiver
-	#[allow(
-		dead_code,
-		reason = "infrastructure for future event handling integration"
-	)]
+	#[allow(dead_code, reason = "infrastructure for future event handling integration")]
 	pub fn subscribe(&self) -> broadcast::Receiver<E> {
 		self.tx.subscribe()
 	}
@@ -160,10 +147,7 @@ impl<E: Clone + Send + 'static> EventBus<E> {
 	/// the `predicate` is emitted. The waiter is automatically removed after matching.
 	///
 	/// [`oneshot::Receiver`]: tokio::sync::oneshot::Receiver
-	#[allow(
-		dead_code,
-		reason = "infrastructure for future event handling integration"
-	)]
+	#[allow(dead_code, reason = "infrastructure for future event handling integration")]
 	pub fn register_waiter<F>(&self, predicate: F) -> oneshot::Receiver<E>
 	where
 		F: Fn(&E) -> bool + Send + Sync + 'static,
@@ -219,10 +203,7 @@ pub struct EventStream<E: Clone + Send + 'static> {
 
 impl<E: Clone + Send + 'static> EventStream<E> {
 	/// Creates a new [`EventStream`] wrapping the given broadcast receiver.
-	#[allow(
-		dead_code,
-		reason = "infrastructure for future event handling integration"
-	)]
+	#[allow(dead_code, reason = "infrastructure for future event handling integration")]
 	pub(crate) fn new(rx: broadcast::Receiver<E>) -> Self {
 		Self { rx }
 	}
@@ -257,9 +238,7 @@ impl<E: Clone + Send + 'static> EventStream<E> {
 				Err(broadcast::error::TryRecvError::Lagged(n)) => {
 					tracing::warn!(dropped = n, "Event stream lagged, dropped events");
 				}
-				Err(
-					broadcast::error::TryRecvError::Empty | broadcast::error::TryRecvError::Closed,
-				) => return None,
+				Err(broadcast::error::TryRecvError::Empty | broadcast::error::TryRecvError::Closed) => return None,
 			}
 		}
 	}
@@ -286,10 +265,7 @@ pub struct EventWaiter<E> {
 
 impl<E: Send + 'static> EventWaiter<E> {
 	/// Creates a new [`EventWaiter`] with the given receiver and timeout.
-	#[allow(
-		dead_code,
-		reason = "infrastructure for future event handling integration"
-	)]
+	#[allow(dead_code, reason = "infrastructure for future event handling integration")]
 	pub(crate) fn new(rx: oneshot::Receiver<E>, timeout: Duration) -> Self {
 		Self { rx, timeout }
 	}

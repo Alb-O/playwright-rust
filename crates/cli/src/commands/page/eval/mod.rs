@@ -68,20 +68,12 @@ impl CommandDef for EvalCommand {
 			.and_then(|p| std::fs::read_to_string(p).ok())
 			.or(raw.expression_flag)
 			.or(raw.expression)
-			.ok_or_else(|| {
-				PwError::Context(
-					"expression is required (provide positionally, via --expr, or via --file)"
-						.into(),
-				)
-			})?;
+			.ok_or_else(|| PwError::Context("expression is required (provide positionally, via --expr, or via --file)".into()))?;
 
 		Ok(EvalResolved { target, expression })
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -96,8 +88,7 @@ impl CommandDef for EvalCommand {
 			let expression = args.expression.clone();
 			let expression_for_inputs = truncate_expression(&expression);
 
-			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx).with_preferred_url(preferred_url);
 
 			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
 				let expression = expression.clone();
@@ -108,13 +99,9 @@ impl CommandDef for EvalCommand {
 					let raw_result = session.page().evaluate_value(&wrapped_expr).await;
 
 					let json_str = raw_result.map_err(|e| PwError::JsEval(e.to_string()))?;
-					let value: serde_json::Value =
-						serde_json::from_str(&json_str).unwrap_or(serde_json::Value::Null);
+					let value: serde_json::Value = serde_json::from_str(&json_str).unwrap_or(serde_json::Value::Null);
 
-					Ok(EvalData {
-						result: value,
-						expression,
-					})
+					Ok(EvalData { result: value, expression })
 				})
 			})
 			.await?;

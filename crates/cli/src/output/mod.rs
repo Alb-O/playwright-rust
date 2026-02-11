@@ -436,12 +436,7 @@ impl<T: Serialize> ResultBuilder<T> {
 	}
 
 	/// Set an error with details
-	pub fn error_with_details(
-		mut self,
-		code: ErrorCode,
-		message: impl Into<String>,
-		details: serde_json::Value,
-	) -> Self {
+	pub fn error_with_details(mut self, code: ErrorCode, message: impl Into<String>, details: serde_json::Value) -> Self {
 		self.error = Some(CommandError {
 			code,
 			message: message.into(),
@@ -467,12 +462,7 @@ impl<T: Serialize> ResultBuilder<T> {
 	}
 
 	/// Add a diagnostic with source
-	pub fn diagnostic_with_source(
-		mut self,
-		level: DiagnosticLevel,
-		message: impl Into<String>,
-		source: impl Into<String>,
-	) -> Self {
+	pub fn diagnostic_with_source(mut self, level: DiagnosticLevel, message: impl Into<String>, source: impl Into<String>) -> Self {
 		self.diagnostics.push(Diagnostic {
 			level,
 			message: message.into(),
@@ -497,9 +487,7 @@ impl<T: Serialize> ResultBuilder<T> {
 	pub fn build(self) -> CommandResult<T> {
 		let ok = self.error.is_none() && self.data.is_some();
 
-		let timings = self
-			.timings
-			.or_else(|| self.start_time.map(|start| Timings::from(start.elapsed())));
+		let timings = self.timings.or_else(|| self.start_time.map(|start| Timings::from(start.elapsed())));
 
 		CommandResult {
 			schema_version: self.schema_version,
@@ -576,12 +564,7 @@ fn print_result_text<T: Serialize>(result: &CommandResult<T>) {
 
 	// Print artifacts
 	for artifact in &result.artifacts {
-		let _ = writeln!(
-			stdout,
-			"Saved {:?}: {}",
-			artifact.artifact_type,
-			artifact.path.display()
-		);
+		let _ = writeln!(stdout, "Saved {:?}: {}", artifact.artifact_type, artifact.path.display());
 	}
 
 	// Print timing in verbose/debug scenarios
@@ -613,10 +596,7 @@ pub struct FailureWithArtifacts {
 
 impl FailureWithArtifacts {
 	pub fn new(error: CommandError) -> Self {
-		Self {
-			error,
-			artifacts: Vec::new(),
-		}
+		Self { error, artifacts: Vec::new() }
 	}
 
 	pub fn with_artifacts(mut self, artifacts: Vec<Artifact>) -> Self {
@@ -626,14 +606,8 @@ impl FailureWithArtifacts {
 }
 
 /// Print a failure result with artifacts to stdout
-pub fn print_failure_with_artifacts(
-	command: &str,
-	failure: &FailureWithArtifacts,
-	format: OutputFormat,
-) {
-	let result: CommandResult<()> = ResultBuilder::new(command)
-		.error(failure.error.code, &failure.error.message)
-		.build();
+pub fn print_failure_with_artifacts(command: &str, failure: &FailureWithArtifacts, format: OutputFormat) {
+	let result: CommandResult<()> = ResultBuilder::new(command).error(failure.error.code, &failure.error.message).build();
 
 	// We need to manually add artifacts since ResultBuilder doesn't support
 	// adding artifacts to error results. Create a modified result.

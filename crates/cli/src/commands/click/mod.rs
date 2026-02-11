@@ -61,27 +61,16 @@ impl CommandDef for ClickCommand {
 	type Data = ClickData;
 
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let resolved = args::resolve_url_and_selector(
-			raw.url.clone(),
-			raw.url_flag,
-			raw.selector_flag.or(raw.selector),
-		);
+		let resolved = args::resolve_url_and_selector(raw.url.clone(), raw.url_flag, raw.selector_flag.or(raw.selector));
 
 		let target = env.resolve_target(resolved.url, TargetPolicy::AllowCurrentPage)?;
 		let selector = env.resolve_selector(resolved.selector, Some("css=button"))?;
 		let wait_ms = raw.wait_ms.unwrap_or(0);
 
-		Ok(ClickResolved {
-			target,
-			selector,
-			wait_ms,
-		})
+		Ok(ClickResolved { target, selector, wait_ms })
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -96,45 +85,36 @@ impl CommandDef for ClickCommand {
 			let selector_for_outcome = selector.clone();
 			let wait_ms = args.wait_ms;
 
-			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx).with_preferred_url(preferred_url);
 
-			let (after_url, data) = with_session(
-				&mut exec,
-				req,
-				ArtifactsPolicy::OnError { command: "click" },
-				move |session| {
-					let selector = selector.clone();
-					Box::pin(async move {
-						session.goto_target(&target, timeout_ms).await?;
+			let (after_url, data) = with_session(&mut exec, req, ArtifactsPolicy::OnError { command: "click" }, move |session| {
+				let selector = selector.clone();
+				Box::pin(async move {
+					session.goto_target(&target, timeout_ms).await?;
 
-						let before_url = session
-							.page()
-							.evaluate_value("window.location.href")
-							.await
-							.unwrap_or_else(|_| session.page().url());
+					let before_url = session
+						.page()
+						.evaluate_value("window.location.href")
+						.await
+						.unwrap_or_else(|_| session.page().url());
 
-							let locator = session.page().locator(&selector).await;
-							let click_opts = ClickOptions::builder()
-								// We compute navigation ourselves via before/after URL checks.
-								// Disabling auto-wait avoids false 30s timeouts on non-navigating clicks.
-								.no_wait_after(true)
-								.timeout(
-									timeout_ms
-										.unwrap_or(pw_protocol::options::DEFAULT_TIMEOUT_MS as u64)
-										as f64,
-								)
-								.build();
-							match locator.click(Some(click_opts)).await {
-								Ok(()) => {}
-								Err(err) => {
-									let msg = err.to_string();
-									if msg.to_lowercase().contains("timeout") {
-										// Playwright 1.57+ can intermittently hang on locator click
-										// for simple static elements. Fallback to a DOM click.
-										let selector_json = serde_json::to_string(&selector)?;
-										let expr = format!(
-											r#"(() => {{
+					let locator = session.page().locator(&selector).await;
+					let click_opts = ClickOptions::builder()
+						// We compute navigation ourselves via before/after URL checks.
+						// Disabling auto-wait avoids false 30s timeouts on non-navigating clicks.
+						.no_wait_after(true)
+						.timeout(timeout_ms.unwrap_or(pw_protocol::options::DEFAULT_TIMEOUT_MS as u64) as f64)
+						.build();
+					match locator.click(Some(click_opts)).await {
+						Ok(()) => {}
+						Err(err) => {
+							let msg = err.to_string();
+							if msg.to_lowercase().contains("timeout") {
+								// Playwright 1.57+ can intermittently hang on locator click
+								// for simple static elements. Fallback to a DOM click.
+								let selector_json = serde_json::to_string(&selector)?;
+								let expr = format!(
+									r#"(() => {{
                                                 const el = document.querySelector({selector});
                                                 if (!el) {{
                                                     throw new Error("selector not found for click fallback");
@@ -142,49 +122,48 @@ impl CommandDef for ClickCommand {
                                                 el.click();
                                                 return true;
                                             }})()"#,
-											selector = selector_json
-										);
-										session.page().evaluate_value(&expr).await?;
-									} else {
-										return Err(err.into());
-									}
-								}
+									selector = selector_json
+								);
+								session.page().evaluate_value(&expr).await?;
+							} else {
+								return Err(err.into());
 							}
+						}
+					}
 
-							if wait_ms > 0 {
-								tokio::time::sleep(Duration::from_millis(wait_ms)).await;
-							}
+					if wait_ms > 0 {
+						tokio::time::sleep(Duration::from_millis(wait_ms)).await;
+					}
 
-						let after_url = session
-							.page()
-							.evaluate_value("window.location.href")
-							.await
-							.unwrap_or_else(|_| session.page().url());
+					let after_url = session
+						.page()
+						.evaluate_value("window.location.href")
+						.await
+						.unwrap_or_else(|_| session.page().url());
 
-						let navigated = before_url != after_url;
+					let navigated = before_url != after_url;
 
-						let downloads: Vec<DownloadedFile> = session
-							.downloads()
-							.into_iter()
-							.map(|d| DownloadedFile {
-								url: d.url,
-								suggested_filename: d.suggested_filename,
-								path: d.path,
-							})
-							.collect();
+					let downloads: Vec<DownloadedFile> = session
+						.downloads()
+						.into_iter()
+						.map(|d| DownloadedFile {
+							url: d.url,
+							suggested_filename: d.suggested_filename,
+							path: d.path,
+						})
+						.collect();
 
-						let data = ClickData {
-							before_url,
-							after_url: after_url.clone(),
-							navigated,
-							selector: selector.clone(),
-							downloads,
-						};
+					let data = ClickData {
+						before_url,
+						after_url: after_url.clone(),
+						navigated,
+						selector: selector.clone(),
+						downloads,
+					};
 
-						Ok((after_url, data))
-					})
-				},
-			)
+					Ok((after_url, data))
+				})
+			})
 			.await?;
 
 			let inputs = CommandInputs {

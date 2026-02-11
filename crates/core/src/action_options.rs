@@ -627,12 +627,7 @@ mod tests {
 
 	#[test]
 	fn test_mouse_options_builder() {
-		let options = MouseOptions::builder()
-			.button(MouseButton::Right)
-			.click_count(2)
-			.delay(100.0)
-			.steps(10)
-			.build();
+		let options = MouseOptions::builder().button(MouseButton::Right).click_count(2).delay(100.0).steps(10).build();
 
 		let json = options.to_json();
 		assert_eq!(json["button"], "right");

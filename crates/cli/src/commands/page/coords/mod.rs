@@ -105,10 +105,7 @@ impl CommandDef for CoordsCommand {
 		Ok(CoordsResolved { target, selector })
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -121,23 +118,17 @@ impl CommandDef for CoordsCommand {
 			let target = args.target.target.clone();
 			let selector = args.selector.clone();
 
-			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx).with_preferred_url(preferred_url);
 
 			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
 				let selector = selector.clone();
 				Box::pin(async move {
 					session.goto_target(&target, timeout_ms).await?;
 
-					let result_json = session
-						.page()
-						.evaluate_value(&js::get_element_coords_js(&selector))
-						.await?;
+					let result_json = session.page().evaluate_value(&js::get_element_coords_js(&selector)).await?;
 
 					if result_json == "null" {
-						return Err(PwError::ElementNotFound {
-							selector: selector.clone(),
-						});
+						return Err(PwError::ElementNotFound { selector: selector.clone() });
 					}
 
 					let coords: ElementCoords = serde_json::from_str(&result_json)?;
@@ -183,10 +174,7 @@ impl CommandDef for CoordsAllCommand {
 		Ok(CoordsAllResolved { target, selector })
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -199,27 +187,19 @@ impl CommandDef for CoordsAllCommand {
 			let target = args.target.target.clone();
 			let selector = args.selector.clone();
 
-			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx).with_preferred_url(preferred_url);
 
 			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
 				let selector = selector.clone();
 				Box::pin(async move {
 					session.goto_target(&target, timeout_ms).await?;
 
-					let results_json = session
-						.page()
-						.evaluate_value(&js::get_all_element_coords_js(&selector))
-						.await?;
+					let results_json = session.page().evaluate_value(&js::get_all_element_coords_js(&selector)).await?;
 
 					let coords: Vec<IndexedElementCoords> = serde_json::from_str(&results_json)?;
 					let count = coords.len();
 
-					Ok(CoordsAllData {
-						coords,
-						selector,
-						count,
-					})
+					Ok(CoordsAllData { coords, selector, count })
 				})
 			})
 			.await?;

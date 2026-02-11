@@ -11,9 +11,7 @@ pub fn kill_browser_processes() {
 	let browsers = vec!["chromium", "chrome", "firefox", "msedge", "webkit", "pw_"];
 
 	for browser in browsers {
-		let _ = Command::new("taskkill")
-			.args(&["/F", "/IM", &format!("{}*.exe", browser), "/T"])
-			.output();
+		let _ = Command::new("taskkill").args(&["/F", "/IM", &format!("{}*.exe", browser), "/T"]).output();
 	}
 
 	// Small delay to ensure processes are fully terminated

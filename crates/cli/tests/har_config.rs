@@ -27,31 +27,17 @@ fn clear_context_store() {
 fn run_pw_json(args: &[&str]) -> (bool, String, String) {
 	let workspace = workspace_root();
 	let workspace_str = workspace.to_string_lossy().to_string();
-	let mut all_args = vec![
-		"--no-project",
-		"--workspace",
-		&workspace_str,
-		"--namespace",
-		"default",
-		"-f",
-		"json",
-	];
+	let mut all_args = vec!["--no-project", "--workspace", &workspace_str, "--namespace", "default", "-f", "json"];
 	all_args.extend_from_slice(args);
 
-	let output = Command::new(pw_binary())
-		.args(&all_args)
-		.output()
-		.expect("Failed to execute pw");
+	let output = Command::new(pw_binary()).args(&all_args).output().expect("Failed to execute pw");
 	let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 	let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 	(output.status.success(), stdout, stderr)
 }
 
 fn run_pw_raw(args: &[&str]) -> (bool, String, String) {
-	let output = Command::new(pw_binary())
-		.args(args)
-		.output()
-		.expect("Failed to execute pw");
+	let output = Command::new(pw_binary()).args(args).output().expect("Failed to execute pw");
 	let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 	let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 	(output.status.success(), stdout, stderr)
@@ -132,10 +118,8 @@ fn har_set_persists_namespace_config_file() {
 		.join("namespaces")
 		.join("default")
 		.join("config.json");
-	let config = std::fs::read_to_string(&config_path)
-		.unwrap_or_else(|e| panic!("Failed to read {}: {}", config_path.display(), e));
-	let value: serde_json::Value =
-		serde_json::from_str(&config).expect("Expected valid config JSON");
+	let config = std::fs::read_to_string(&config_path).unwrap_or_else(|e| panic!("Failed to read {}: {}", config_path.display(), e));
+	let value: serde_json::Value = serde_json::from_str(&config).expect("Expected valid config JSON");
 	assert_eq!(value["har"]["path"], "captures/network.har");
 	assert_eq!(value["har"]["contentPolicy"], "embed");
 	assert_eq!(value["har"]["mode"], "minimal");
@@ -167,16 +151,7 @@ fn root_help_lists_har_subcommand_and_not_legacy_flags() {
 	let _lock = lock_har();
 	let (success, stdout, _stderr) = run_pw_raw(&["--help"]);
 	assert!(success, "Help should succeed");
-	assert!(
-		stdout.contains("har"),
-		"Expected har command in help output"
-	);
-	assert!(
-		!stdout.contains("--har"),
-		"Legacy --har flag should not appear"
-	);
-	assert!(
-		!stdout.contains("--har-content"),
-		"Legacy --har-content flag should not appear"
-	);
+	assert!(stdout.contains("har"), "Expected har command in help output");
+	assert!(!stdout.contains("--har"), "Legacy --har flag should not appear");
+	assert!(!stdout.contains("--har-content"), "Legacy --har-content flag should not appear");
 }

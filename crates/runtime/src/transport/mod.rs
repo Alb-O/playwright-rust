@@ -34,8 +34,7 @@ where
 	W: AsyncWriteExt + Unpin,
 {
 	// Serialize to JSON
-	let json_bytes = serde_json::to_vec(&message)
-		.map_err(|e| Error::TransportError(format!("Failed to serialize JSON: {}", e)))?;
+	let json_bytes = serde_json::to_vec(&message).map_err(|e| Error::TransportError(format!("Failed to serialize JSON: {}", e)))?;
 
 	let length = json_bytes.len() as u32;
 
@@ -52,10 +51,7 @@ where
 		.map_err(|e| Error::TransportError(format!("Failed to write message: {}", e)))?;
 
 	// Flush to ensure message is sent
-	stdin
-		.flush()
-		.await
-		.map_err(|e| Error::TransportError(format!("Failed to flush: {}", e)))?;
+	stdin.flush().await.map_err(|e| Error::TransportError(format!("Failed to flush: {}", e)))?;
 
 	Ok(())
 }
@@ -66,8 +62,7 @@ where
 /// length-prefixed JSON messages.
 pub trait Transport: Send + Sync {
 	/// Send a JSON message to the server
-	fn send(&mut self, message: JsonValue)
-	-> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+	fn send(&mut self, message: JsonValue) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
 }
 
 pub trait TransportReceiver: Send {
@@ -168,9 +163,10 @@ where
 		loop {
 			// Read 4-byte little-endian length prefix
 			let mut len_buf = [0u8; 4];
-			self.stdout.read_exact(&mut len_buf).await.map_err(|e| {
-				Error::TransportError(format!("Failed to read length prefix: {}", e))
-			})?;
+			self.stdout
+				.read_exact(&mut len_buf)
+				.await
+				.map_err(|e| Error::TransportError(format!("Failed to read length prefix: {}", e)))?;
 
 			let length = u32::from_le_bytes(len_buf) as usize;
 
@@ -193,9 +189,10 @@ where
 					let to_read = std::cmp::min(remaining, CHUNK_SIZE);
 					let mut chunk = vec![0u8; to_read];
 
-					self.stdout.read_exact(&mut chunk).await.map_err(|e| {
-						Error::TransportError(format!("Failed to read message chunk: {}", e))
-					})?;
+					self.stdout
+						.read_exact(&mut chunk)
+						.await
+						.map_err(|e| Error::TransportError(format!("Failed to read message chunk: {}", e)))?;
 
 					buf.extend_from_slice(&chunk);
 					remaining -= to_read;
@@ -205,8 +202,7 @@ where
 			};
 
 			// Parse JSON
-			let message: JsonValue = serde_json::from_slice(&message_buf)
-				.map_err(|e| Error::ProtocolError(format!("Failed to parse JSON: {}", e)))?;
+			let message: JsonValue = serde_json::from_slice(&message_buf).map_err(|e| Error::ProtocolError(format!("Failed to parse JSON: {}", e)))?;
 
 			// Dispatch message
 			if self.message_tx.send(message).is_err() {
@@ -266,11 +262,7 @@ where
 	pub fn new(stdin: W, stdout: R) -> (Self, mpsc::UnboundedReceiver<JsonValue>) {
 		let (message_tx, message_rx) = mpsc::unbounded_channel();
 
-		let transport = Self {
-			stdin,
-			stdout,
-			message_tx,
-		};
+		let transport = Self { stdin, stdout, message_tx };
 
 		(transport, message_rx)
 	}
@@ -294,10 +286,7 @@ where
 		)
 	}
 
-	pub fn into_transport_parts(
-		self,
-		message_rx: mpsc::UnboundedReceiver<JsonValue>,
-	) -> TransportParts {
+	pub fn into_transport_parts(self, message_rx: mpsc::UnboundedReceiver<JsonValue>) -> TransportParts {
 		let (sender, receiver) = self.into_parts();
 		TransportParts {
 			sender: Box::new(sender),
@@ -329,9 +318,10 @@ where
 			// Read 4-byte little-endian length prefix
 			// Matches: buffer = await self._proc.stdout.readexactly(4)
 			let mut len_buf = [0u8; 4];
-			self.stdout.read_exact(&mut len_buf).await.map_err(|e| {
-				Error::TransportError(format!("Failed to read length prefix: {}", e))
-			})?;
+			self.stdout
+				.read_exact(&mut len_buf)
+				.await
+				.map_err(|e| Error::TransportError(format!("Failed to read length prefix: {}", e)))?;
 
 			let length = u32::from_le_bytes(len_buf) as usize;
 
@@ -356,9 +346,10 @@ where
 					let to_read = std::cmp::min(remaining, CHUNK_SIZE);
 					let mut chunk = vec![0u8; to_read];
 
-					self.stdout.read_exact(&mut chunk).await.map_err(|e| {
-						Error::TransportError(format!("Failed to read message chunk: {}", e))
-					})?;
+					self.stdout
+						.read_exact(&mut chunk)
+						.await
+						.map_err(|e| Error::TransportError(format!("Failed to read message chunk: {}", e)))?;
 
 					buf.extend_from_slice(&chunk);
 					remaining -= to_read;
@@ -369,8 +360,7 @@ where
 
 			// Parse JSON
 			// Matches: obj = json.loads(data.decode("utf-8"))
-			let message: JsonValue = serde_json::from_slice(&message_buf)
-				.map_err(|e| Error::ProtocolError(format!("Failed to parse JSON: {}", e)))?;
+			let message: JsonValue = serde_json::from_slice(&message_buf).map_err(|e| Error::ProtocolError(format!("Failed to parse JSON: {}", e)))?;
 
 			// Dispatch message
 			// Matches: self.on_message(obj)
@@ -390,8 +380,7 @@ where
 {
 	/// Send a message to the server using length-prefixed framing
 	async fn send_internal(&mut self, message: JsonValue) -> Result<()> {
-		let json_bytes = serde_json::to_vec(&message)
-			.map_err(|e| Error::TransportError(format!("Failed to serialize JSON: {}", e)))?;
+		let json_bytes = serde_json::to_vec(&message).map_err(|e| Error::TransportError(format!("Failed to serialize JSON: {}", e)))?;
 
 		let length = json_bytes.len() as u32;
 
@@ -405,10 +394,7 @@ where
 			.await
 			.map_err(|e| Error::TransportError(format!("Failed to write message: {}", e)))?;
 
-		self.stdin
-			.flush()
-			.await
-			.map_err(|e| Error::TransportError(format!("Failed to flush: {}", e)))?;
+		self.stdin.flush().await.map_err(|e| Error::TransportError(format!("Failed to flush: {}", e)))?;
 
 		Ok(())
 	}
@@ -418,10 +404,7 @@ impl<W> Transport for PipeTransportSender<W>
 where
 	W: AsyncWrite + Unpin + Send + Sync + 'static,
 {
-	fn send(
-		&mut self,
-		message: JsonValue,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>> {
+	fn send(&mut self, message: JsonValue) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>> {
 		Box::pin(self.send_internal(message))
 	}
 }
@@ -473,10 +456,7 @@ impl WebSocketTransport {
 		(self.sender, self.receiver)
 	}
 
-	pub fn into_transport_parts(
-		self,
-		message_rx: mpsc::UnboundedReceiver<JsonValue>,
-	) -> TransportParts {
+	pub fn into_transport_parts(self, message_rx: mpsc::UnboundedReceiver<JsonValue>) -> TransportParts {
 		let (sender, receiver) = self.into_parts();
 		TransportParts {
 			sender: Box::new(sender),
@@ -487,21 +467,19 @@ impl WebSocketTransport {
 }
 
 impl Transport for WebSocketTransportSender {
-	fn send(
-		&mut self,
-		message: JsonValue,
-	) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>> {
+	fn send(&mut self, message: JsonValue) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>> {
 		Box::pin(async move {
-			let payload = serde_json::to_string(&message)
-				.map_err(|e| Error::TransportError(format!("Failed to serialize JSON: {}", e)))?;
+			let payload = serde_json::to_string(&message).map_err(|e| Error::TransportError(format!("Failed to serialize JSON: {}", e)))?;
 
-			self.sink.send(Message::Text(payload)).await.map_err(|e| {
-				Error::TransportError(format!("Failed to send websocket message: {}", e))
-			})?;
+			self.sink
+				.send(Message::Text(payload))
+				.await
+				.map_err(|e| Error::TransportError(format!("Failed to send websocket message: {}", e)))?;
 
-			self.sink.flush().await.map_err(|e| {
-				Error::TransportError(format!("Failed to flush websocket sink: {}", e))
-			})?;
+			self.sink
+				.flush()
+				.await
+				.map_err(|e| Error::TransportError(format!("Failed to flush websocket sink: {}", e)))?;
 
 			Ok(())
 		})
@@ -511,43 +489,30 @@ impl Transport for WebSocketTransportSender {
 impl TransportReceiver for WebSocketTransportReceiver {
 	fn run(self: Box<Self>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> {
 		Box::pin(async move {
-			let Self {
-				mut stream,
-				message_tx,
-			} = *self;
+			let Self { mut stream, message_tx } = *self;
 
 			while let Some(frame) = stream.next().await {
 				let frame = match frame {
 					Ok(frame) => frame,
 					Err(WsError::ConnectionClosed) | Err(WsError::AlreadyClosed) => break,
 					Err(e) => {
-						return Err(Error::TransportError(format!(
-							"WebSocket read error: {}",
-							e
-						)));
+						return Err(Error::TransportError(format!("WebSocket read error: {}", e)));
 					}
 				};
 
 				let value = match frame {
 					Message::Text(text) => {
-						serde_json::from_str::<JsonValue>(&text).map_err(|e| {
-							Error::ProtocolError(format!("Failed to parse websocket text: {}", e))
-						})?
+						serde_json::from_str::<JsonValue>(&text).map_err(|e| Error::ProtocolError(format!("Failed to parse websocket text: {}", e)))?
 					}
 					Message::Binary(bin) => {
-						serde_json::from_slice::<JsonValue>(&bin).map_err(|e| {
-							Error::ProtocolError(format!("Failed to parse websocket binary: {}", e))
-						})?
+						serde_json::from_slice::<JsonValue>(&bin).map_err(|e| Error::ProtocolError(format!("Failed to parse websocket binary: {}", e)))?
 					}
 					Message::Close(_) => break,
 					Message::Ping(_) | Message::Pong(_) => {
 						continue;
 					}
 					other => {
-						return Err(Error::TransportError(format!(
-							"Unexpected websocket message: {:?}",
-							other
-						)));
+						return Err(Error::TransportError(format!("Unexpected websocket message: {:?}", other)));
 					}
 				};
 

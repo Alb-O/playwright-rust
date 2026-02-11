@@ -66,17 +66,10 @@ impl CommandDef for FillCommand {
 		let selector = env.resolve_selector(raw.selector, None)?;
 		let text = raw.text.unwrap_or_default();
 
-		Ok(FillResolved {
-			target,
-			selector,
-			text,
-		})
+		Ok(FillResolved { target, selector, text })
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -90,26 +83,20 @@ impl CommandDef for FillCommand {
 			let selector = args.selector.clone();
 			let text = args.text.clone();
 
-			let req = SessionRequest::from_context(WaitUntil::Load, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::Load, exec.ctx).with_preferred_url(preferred_url);
 
-			let data = with_session(
-				&mut exec,
-				req,
-				ArtifactsPolicy::OnError { command: "fill" },
-				move |session| {
-					let selector = selector.clone();
-					let text = text.clone();
-					Box::pin(async move {
-						session.goto_target(&target, timeout_ms).await?;
+			let data = with_session(&mut exec, req, ArtifactsPolicy::OnError { command: "fill" }, move |session| {
+				let selector = selector.clone();
+				let text = text.clone();
+				Box::pin(async move {
+					session.goto_target(&target, timeout_ms).await?;
 
-						let locator = session.page().locator(&selector).await;
-						locator.fill(&text, None).await?;
+					let locator = session.page().locator(&selector).await;
+					locator.fill(&text, None).await?;
 
-						Ok(FillData { selector, text })
-					})
-				},
-			)
+					Ok(FillData { selector, text })
+				})
+			})
 			.await?;
 
 			let inputs = CommandInputs {

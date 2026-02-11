@@ -89,12 +89,8 @@ impl CliCache {
 
 	/// Returns true if `last_used_at` exceeds `timeout_secs`.
 	pub fn is_stale(&self, timeout_secs: u64) -> bool {
-		let now = std::time::SystemTime::now()
-			.duration_since(std::time::UNIX_EPOCH)
-			.unwrap_or_default()
-			.as_secs();
-		self.last_used_at
-			.is_some_and(|last| now.saturating_sub(last) > timeout_secs)
+		let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+		self.last_used_at.is_some_and(|last| now.saturating_sub(last) > timeout_secs)
 	}
 
 	/// Clears session data (last_url, last_selector, last_output).
@@ -112,12 +108,7 @@ mod tests {
 	#[test]
 	fn test_cache_staleness() {
 		let fresh = CliCache {
-			last_used_at: Some(
-				std::time::SystemTime::now()
-					.duration_since(std::time::UNIX_EPOCH)
-					.unwrap()
-					.as_secs(),
-			),
+			last_used_at: Some(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()),
 			..Default::default()
 		};
 		assert!(!fresh.is_stale(3600));

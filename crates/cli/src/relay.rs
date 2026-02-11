@@ -59,28 +59,18 @@ pub async fn run_relay_server(host: &str, port: u16) -> Result<()> {
 		.route("/", get(|| async { "OK" }))
 		.route(
 			"/extension",
-			get(
-				|ws: WebSocketUpgrade, State(state): State<SharedState>| async move {
-					ws.on_upgrade(|socket| handle_extension_socket(socket, state))
-				},
-			),
+			get(|ws: WebSocketUpgrade, State(state): State<SharedState>| async move { ws.on_upgrade(|socket| handle_extension_socket(socket, state)) }),
 		)
 		.route(
 			"/cdp",
-			get(
-				|ws: WebSocketUpgrade, State(state): State<SharedState>| async move {
-					ws.on_upgrade(|socket| {
-						handle_client_socket(socket, state, "default".to_string())
-					})
-				},
-			),
+			get(|ws: WebSocketUpgrade, State(state): State<SharedState>| async move {
+				ws.on_upgrade(|socket| handle_client_socket(socket, state, "default".to_string()))
+			}),
 		)
 		.route(
 			"/cdp/{client_id}",
 			get(
-				|Path(client_id): Path<String>,
-				 ws: WebSocketUpgrade,
-				 State(state): State<SharedState>| async move {
+				|Path(client_id): Path<String>, ws: WebSocketUpgrade, State(state): State<SharedState>| async move {
 					ws.on_upgrade(|socket| handle_client_socket(socket, state, client_id))
 				},
 			),
@@ -97,9 +87,7 @@ pub async fn run_relay_server(host: &str, port: u16) -> Result<()> {
 		.await
 		.with_context(|| format!("Failed to bind relay server to {addr}"))?;
 
-	axum::serve(listener, app.into_make_service())
-		.await
-		.context("Relay server error")
+	axum::serve(listener, app.into_make_service()).await.context("Relay server error")
 }
 
 async fn handle_extension_socket(socket: WebSocket, state: SharedState) {
@@ -176,10 +164,7 @@ async fn handle_extension_message(state: &SharedState, raw: &str) -> Result<()> 
 		if let Some(sender) = pending {
 			let _ = sender.send(result);
 		} else {
-			warn!(
-				target = "pw",
-				id, "Received response with unknown id from extension"
-			);
+			warn!(target = "pw", id, "Received response with unknown id from extension");
 		}
 		return Ok(());
 	}
@@ -190,11 +175,7 @@ async fn handle_extension_message(state: &SharedState, raw: &str) -> Result<()> 
 		.ok_or_else(|| anyhow!("Extension event missing method"))?;
 
 	if method == "log" {
-		let level = value
-			.get("params")
-			.and_then(|p| p.get("level"))
-			.and_then(|l| l.as_str())
-			.unwrap_or("info");
+		let level = value.get("params").and_then(|p| p.get("level")).and_then(|l| l.as_str()).unwrap_or("info");
 		let args = value
 			.get("params")
 			.and_then(|p| p.get("args"))
@@ -210,24 +191,15 @@ async fn handle_extension_message(state: &SharedState, raw: &str) -> Result<()> 
 		return Ok(());
 	}
 
-	let params = value
-		.get("params")
-		.cloned()
-		.ok_or_else(|| anyhow!("forwardCDPEvent missing params"))?;
+	let params = value.get("params").cloned().ok_or_else(|| anyhow!("forwardCDPEvent missing params"))?;
 	let event_method = params
 		.get("method")
 		.and_then(|v| v.as_str())
 		.ok_or_else(|| anyhow!("forwardCDPEvent missing method"))?;
-	let session_id = params
-		.get("sessionId")
-		.and_then(|v| v.as_str())
-		.map(str::to_owned);
+	let session_id = params.get("sessionId").and_then(|v| v.as_str()).map(str::to_owned);
 
 	if event_method == "Target.attachedToTarget" {
-		if let (Some(sid), Some(target_info)) = (
-			params.get("sessionId").and_then(|v| v.as_str()),
-			params.get("targetInfo"),
-		) {
+		if let (Some(sid), Some(target_info)) = (params.get("sessionId").and_then(|v| v.as_str()), params.get("targetInfo")) {
 			if let Some(target_id) = target_info.get("targetId").and_then(|v| v.as_str()) {
 				let mut st = state.lock().await;
 				st.connected_targets.insert(
@@ -248,9 +220,7 @@ async fn handle_extension_message(state: &SharedState, raw: &str) -> Result<()> 
 	} else if event_method == "Target.targetInfoChanged" {
 		if let (Some(target_info), Some(target_id)) = (
 			params.get("targetInfo"),
-			params
-				.get("targetInfo")
-				.and_then(|t| t.get("targetId").and_then(|v| v.as_str())),
+			params.get("targetInfo").and_then(|t| t.get("targetId").and_then(|v| v.as_str())),
 		) {
 			let mut st = state.lock().await;
 			for target in st.connected_targets.values_mut() {
@@ -325,10 +295,7 @@ async fn handle_client_socket(socket: WebSocket, state: SharedState, client_id: 
 
 async fn handle_client_message(state: &SharedState, client_id: &str, raw: &str) -> Result<()> {
 	let cmd: Value = serde_json::from_str(raw).context("Parsing client message")?;
-	let id = cmd
-		.get("id")
-		.and_then(|v| v.as_u64())
-		.ok_or_else(|| anyhow!("Client command missing id"))?;
+	let id = cmd.get("id").and_then(|v| v.as_u64()).ok_or_else(|| anyhow!("Client command missing id"))?;
 	let method = cmd
 		.get("method")
 		.and_then(|v| v.as_str())
@@ -354,12 +321,7 @@ async fn handle_client_message(state: &SharedState, client_id: &str, raw: &str) 
 				}
 			}
 
-			if method == "Target.setDiscoverTargets"
-				&& params
-					.get("discover")
-					.and_then(|v| v.as_bool())
-					.unwrap_or(false)
-			{
+			if method == "Target.setDiscoverTargets" && params.get("discover").and_then(|v| v.as_bool()).unwrap_or(false) {
 				let targets = snapshot_targets(state).await;
 				for target in targets {
 					extra_events.push(json!({
@@ -387,12 +349,7 @@ async fn handle_client_message(state: &SharedState, client_id: &str, raw: &str) 
 	Ok(())
 }
 
-async fn route_cdp_command(
-	state: &SharedState,
-	method: &str,
-	params: Value,
-	session_id: Option<&str>,
-) -> Result<Value> {
+async fn route_cdp_command(state: &SharedState, method: &str, params: Value, session_id: Option<&str>) -> Result<Value> {
 	match method {
 		"Browser.getVersion" => {
 			return Ok(json!({
@@ -422,10 +379,7 @@ async fn route_cdp_command(
 
 			let session = {
 				let st = state.lock().await;
-				st.connected_targets
-					.values()
-					.find(|t| t.target_id == target_id)
-					.map(|t| t.session_id.clone())
+				st.connected_targets.values().find(|t| t.target_id == target_id).map(|t| t.session_id.clone())
 			};
 
 			if let Some(session) = session {
@@ -438,10 +392,7 @@ async fn route_cdp_command(
 			if let Some(target_id) = params.get("targetId").and_then(|v| v.as_str()) {
 				let info = {
 					let st = state.lock().await;
-					st.connected_targets
-						.values()
-						.find(|t| t.target_id == target_id)
-						.map(|t| t.target_info.clone())
+					st.connected_targets.values().find(|t| t.target_id == target_id).map(|t| t.target_info.clone())
 				};
 				if let Some(target_info) = info {
 					return Ok(json!({"targetInfo": target_info}));
@@ -451,9 +402,7 @@ async fn route_cdp_command(
 			if let Some(session) = session_id {
 				let info = {
 					let st = state.lock().await;
-					st.connected_targets
-						.get(session)
-						.map(|t| t.target_info.clone())
+					st.connected_targets.get(session).map(|t| t.target_info.clone())
 				};
 
 				if let Some(target_info) = info {
@@ -463,10 +412,7 @@ async fn route_cdp_command(
 
 			let first = {
 				let st = state.lock().await;
-				st.connected_targets
-					.values()
-					.next()
-					.map(|t| t.target_info.clone())
+				st.connected_targets.values().next().map(|t| t.target_info.clone())
 			};
 			return Ok(json!({"targetInfo": first}));
 		}
@@ -496,18 +442,10 @@ async fn route_cdp_command(
 	send_to_extension(state, method, params, session_id).await
 }
 
-async fn send_to_extension(
-	state: &SharedState,
-	method: &str,
-	params: Value,
-	session_id: Option<&str>,
-) -> Result<Value> {
+async fn send_to_extension(state: &SharedState, method: &str, params: Value, session_id: Option<&str>) -> Result<Value> {
 	let (tx, id) = {
 		let mut st = state.lock().await;
-		let tx = st
-			.extension_tx
-			.clone()
-			.ok_or_else(|| anyhow!("Extension not connected"))?;
+		let tx = st.extension_tx.clone().ok_or_else(|| anyhow!("Extension not connected"))?;
 		st.next_extension_id += 1;
 		let id = st.next_extension_id;
 		(tx, id)

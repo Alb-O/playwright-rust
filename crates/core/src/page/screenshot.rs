@@ -33,11 +33,7 @@ impl Page {
 	/// Captures a screenshot, writes to `path`, and returns the bytes.
 	///
 	/// See <https://playwright.dev/docs/api/class-page#page-screenshot>
-	pub async fn screenshot_to_file(
-		&self,
-		path: &std::path::Path,
-		options: Option<crate::ScreenshotOptions>,
-	) -> Result<Vec<u8>> {
+	pub async fn screenshot_to_file(&self, path: &std::path::Path, options: Option<crate::ScreenshotOptions>) -> Result<Vec<u8>> {
 		let bytes = self.screenshot(options).await?;
 		tokio::fs::write(path, &bytes)
 			.await

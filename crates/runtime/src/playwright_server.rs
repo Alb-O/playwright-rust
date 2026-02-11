@@ -57,28 +57,20 @@ impl PlaywrightServer {
 			cmd.env("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", skip_download);
 		}
 
-		let mut child = cmd
-			.spawn()
-			.map_err(|e| Error::LaunchFailed(format!("Failed to spawn process: {}", e)))?;
+		let mut child = cmd.spawn().map_err(|e| Error::LaunchFailed(format!("Failed to spawn process: {}", e)))?;
 
 		// Check if process started successfully
 		tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
 		match child.try_wait() {
 			Ok(Some(status)) => {
-				return Err(Error::LaunchFailed(format!(
-					"Server process exited immediately with status: {}",
-					status
-				)));
+				return Err(Error::LaunchFailed(format!("Server process exited immediately with status: {}", status)));
 			}
 			Ok(None) => {
 				// Process is still running, good!
 			}
 			Err(e) => {
-				return Err(Error::LaunchFailed(format!(
-					"Failed to check process status: {}",
-					e
-				)));
+				return Err(Error::LaunchFailed(format!("Failed to check process status: {}", e)));
 			}
 		}
 
@@ -109,18 +101,12 @@ impl PlaywrightServer {
 				.await
 				.map_err(|e| Error::LaunchFailed(format!("Failed to kill process: {}", e)))?;
 
-			match tokio::time::timeout(std::time::Duration::from_secs(5), self.process.wait()).await
-			{
+			match tokio::time::timeout(std::time::Duration::from_secs(5), self.process.wait()).await {
 				Ok(Ok(_)) => Ok(()),
-				Ok(Err(e)) => Err(Error::LaunchFailed(format!(
-					"Failed to wait for process: {}",
-					e
-				))),
+				Ok(Err(e)) => Err(Error::LaunchFailed(format!("Failed to wait for process: {}", e))),
 				Err(_) => {
 					let _ = self.process.start_kill();
-					Err(Error::LaunchFailed(
-						"Process shutdown timeout after 5 seconds".to_string(),
-					))
+					Err(Error::LaunchFailed("Process shutdown timeout after 5 seconds".to_string()))
 				}
 			}
 		}
@@ -156,15 +142,12 @@ impl PlaywrightServer {
 
 		#[cfg(windows)]
 		{
-			let _ =
-				tokio::time::timeout(std::time::Duration::from_secs(2), self.process.wait()).await;
+			let _ = tokio::time::timeout(std::time::Duration::from_secs(2), self.process.wait()).await;
 		}
 
 		#[cfg(not(windows))]
 		{
-			let _ =
-				tokio::time::timeout(std::time::Duration::from_millis(500), self.process.wait())
-					.await;
+			let _ = tokio::time::timeout(std::time::Duration::from_millis(500), self.process.wait()).await;
 		}
 
 		Ok(())
@@ -183,16 +166,10 @@ mod tests {
 			Ok(server) => {
 				println!("Server launched successfully!");
 				let shutdown_result = server.shutdown().await;
-				assert!(
-					shutdown_result.is_ok(),
-					"Shutdown failed: {:?}",
-					shutdown_result
-				);
+				assert!(shutdown_result.is_ok(), "Shutdown failed: {:?}", shutdown_result);
 			}
 			Err(Error::ServerNotFound) => {
-				eprintln!(
-					"Could not launch server: Playwright not found and download may have failed"
-				);
+				eprintln!("Could not launch server: Playwright not found and download may have failed");
 			}
 			Err(Error::LaunchFailed(msg)) => {
 				eprintln!("Launch failed: {}", msg);

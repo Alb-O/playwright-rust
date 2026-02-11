@@ -33,10 +33,7 @@ fn cdp_endpoint_writes_to_config_defaults() {
 	ctx_state.set_cdp_endpoint(Some("ws://new-endpoint".to_string()));
 
 	assert_eq!(ctx_state.cdp_endpoint(), Some("ws://new-endpoint"));
-	assert_eq!(
-		ctx_state.state().config.defaults.cdp_endpoint,
-		Some("ws://new-endpoint".to_string())
-	);
+	assert_eq!(ctx_state.state().config.defaults.cdp_endpoint, Some("ws://new-endpoint".to_string()));
 }
 
 #[test]
@@ -179,14 +176,8 @@ fn apply_delta_updates_cache() {
 	});
 
 	assert_eq!(ctx_state.last_url(), Some("https://new-url.com"));
-	assert_eq!(
-		ctx_state.state().cache.last_selector,
-		Some("#button".to_string())
-	);
-	assert_eq!(
-		ctx_state.state().cache.last_output,
-		Some("screenshot.png".to_string())
-	);
+	assert_eq!(ctx_state.state().cache.last_selector, Some("#button".to_string()));
+	assert_eq!(ctx_state.state().cache.last_output, Some("screenshot.png".to_string()));
 	assert!(ctx_state.state().cache.last_used_at.is_some());
 }
 
@@ -249,12 +240,7 @@ fn resolve_selector_prefers_provided() {
 
 	let ctx_state = ContextState::test_new(state, "ws1".to_string(), "default".to_string());
 
-	assert_eq!(
-		ctx_state
-			.resolve_selector(Some("#provided".to_string()), None)
-			.unwrap(),
-		"#provided"
-	);
+	assert_eq!(ctx_state.resolve_selector(Some("#provided".to_string()), None).unwrap(), "#provided");
 }
 
 #[test]

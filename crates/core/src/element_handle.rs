@@ -27,18 +27,8 @@ impl ElementHandle {
 	///
 	/// This is called by the object factory when the server sends a `__create__` message
 	/// for an ElementHandle object.
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent),
-			type_name,
-			guid,
-			initializer,
-		);
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent), type_name, guid, initializer);
 
 		Ok(Self { base })
 	}
@@ -86,12 +76,7 @@ impl ElementHandle {
 		// Decode base64 to bytes
 		let bytes = base64::prelude::BASE64_STANDARD
 			.decode(&response.binary)
-			.map_err(|e| {
-				pw_runtime::Error::ProtocolError(format!(
-					"Failed to decode element screenshot: {}",
-					e
-				))
-			})?;
+			.map_err(|e| pw_runtime::Error::ProtocolError(format!("Failed to decode element screenshot: {}", e)))?;
 
 		Ok(bytes)
 	}
@@ -151,8 +136,6 @@ impl ChannelOwner for ElementHandle {
 
 impl std::fmt::Debug for ElementHandle {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("ElementHandle")
-			.field("guid", &self.guid())
-			.finish()
+		f.debug_struct("ElementHandle").field("guid", &self.guid()).finish()
 	}
 }

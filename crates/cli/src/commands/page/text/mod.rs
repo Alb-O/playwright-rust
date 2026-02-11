@@ -53,11 +53,7 @@ impl CommandDef for TextCommand {
 	type Data = TextData;
 
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let resolved = args::resolve_url_and_selector(
-			raw.url.clone(),
-			raw.url_flag,
-			raw.selector_flag.or(raw.selector),
-		);
+		let resolved = args::resolve_url_and_selector(raw.url.clone(), raw.url_flag, raw.selector_flag.or(raw.selector));
 
 		let target = env.resolve_target(resolved.url, TargetPolicy::AllowCurrentPage)?;
 		let selector = env.resolve_selector(resolved.selector, None)?;
@@ -65,10 +61,7 @@ impl CommandDef for TextCommand {
 		Ok(TextResolved { target, selector })
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -81,8 +74,7 @@ impl CommandDef for TextCommand {
 			let target = args.target.target.clone();
 			let selector = args.selector.clone();
 
-			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx).with_preferred_url(preferred_url);
 
 			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
 				let selector = selector.clone();
@@ -141,8 +133,7 @@ fn is_garbage_line(line: &str) -> bool {
 	}
 
 	if trimmed.len() > 200 {
-		let space_ratio =
-			trimmed.chars().filter(|c| c.is_whitespace()).count() as f32 / trimmed.len() as f32;
+		let space_ratio = trimmed.chars().filter(|c| c.is_whitespace()).count() as f32 / trimmed.len() as f32;
 		if space_ratio < 0.05 {
 			return true;
 		}
@@ -172,8 +163,7 @@ fn is_garbage_line(line: &str) -> bool {
 	}
 
 	if trimmed.len() > 100 && !trimmed.contains(' ') {
-		let alnum_ratio =
-			trimmed.chars().filter(|c| c.is_alphanumeric()).count() as f32 / trimmed.len() as f32;
+		let alnum_ratio = trimmed.chars().filter(|c| c.is_alphanumeric()).count() as f32 / trimmed.len() as f32;
 		if alnum_ratio > 0.9 {
 			return true;
 		}
@@ -231,9 +221,7 @@ mod tests {
 	#[test]
 	fn preserves_normal_text() {
 		assert!(!is_garbage_line("Welcome to our website"));
-		assert!(!is_garbage_line(
-			"Click here to learn more about our products."
-		));
+		assert!(!is_garbage_line("Click here to learn more about our products."));
 		assert!(!is_garbage_line("Copyright 2024 Company Inc."));
 		assert!(!is_garbage_line(""));
 	}

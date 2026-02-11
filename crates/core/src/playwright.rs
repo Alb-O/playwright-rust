@@ -102,13 +102,17 @@ impl Playwright {
 		let mut server = PlaywrightServer::launch().await?;
 
 		// 2. Take stdio streams from server process
-		let stdin = server.process.stdin.take().ok_or_else(|| {
-			pw_runtime::Error::ServerError("Failed to get server stdin".to_string())
-		})?;
+		let stdin = server
+			.process
+			.stdin
+			.take()
+			.ok_or_else(|| pw_runtime::Error::ServerError("Failed to get server stdin".to_string()))?;
 
-		let stdout = server.process.stdout.take().ok_or_else(|| {
-			pw_runtime::Error::ServerError("Failed to get server stdout".to_string())
-		})?;
+		let stdout = server
+			.process
+			.stdout
+			.take()
+			.ok_or_else(|| pw_runtime::Error::ServerError("Failed to get server stdout".to_string()))?;
 
 		// 3. Create transport and connection
 		tracing::debug!("Creating transport and connection");
@@ -127,11 +131,9 @@ impl Playwright {
 		let playwright_obj = crate::initialize_playwright(&connection).await?;
 
 		// 6. Downcast to Playwright type
-		let playwright = playwright_obj.downcast_ref::<Playwright>().ok_or_else(|| {
-			pw_runtime::Error::ProtocolError(
-				"Initialized object is not Playwright type".to_string(),
-			)
-		})?;
+		let playwright = playwright_obj
+			.downcast_ref::<Playwright>()
+			.ok_or_else(|| pw_runtime::Error::ProtocolError("Initialized object is not Playwright type".to_string()))?;
 
 		// Clone the Playwright object to return it
 		// Note: We need to own the Playwright, not just borrow it
@@ -164,11 +166,9 @@ impl Playwright {
 
 		let playwright_obj = crate::initialize_playwright(&connection).await?;
 
-		let playwright = playwright_obj.downcast_ref::<Playwright>().ok_or_else(|| {
-			pw_runtime::Error::ProtocolError(
-				"Initialized object is not Playwright type".to_string(),
-			)
-		})?;
+		let playwright = playwright_obj
+			.downcast_ref::<Playwright>()
+			.ok_or_else(|| pw_runtime::Error::ProtocolError("Initialized object is not Playwright type".to_string()))?;
 
 		Ok(Self {
 			base: playwright.base.clone(),
@@ -206,37 +206,21 @@ impl Playwright {
 	///   "webkit": { "guid": "browserType@webkit" }
 	/// }
 	/// ```
-	pub async fn new(
-		connection: Arc<dyn ConnectionLike>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Connection(connection.clone()),
-			type_name,
-			guid,
-			initializer.clone(),
-		);
+	pub async fn new(connection: Arc<dyn ConnectionLike>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Connection(connection.clone()), type_name, guid, initializer.clone());
 
 		// Extract BrowserType GUIDs from initializer
-		let chromium_guid = initializer["chromium"]["guid"].as_str().ok_or_else(|| {
-			pw_runtime::Error::ProtocolError(
-				"Playwright initializer missing 'chromium.guid'".to_string(),
-			)
-		})?;
+		let chromium_guid = initializer["chromium"]["guid"]
+			.as_str()
+			.ok_or_else(|| pw_runtime::Error::ProtocolError("Playwright initializer missing 'chromium.guid'".to_string()))?;
 
-		let firefox_guid = initializer["firefox"]["guid"].as_str().ok_or_else(|| {
-			pw_runtime::Error::ProtocolError(
-				"Playwright initializer missing 'firefox.guid'".to_string(),
-			)
-		})?;
+		let firefox_guid = initializer["firefox"]["guid"]
+			.as_str()
+			.ok_or_else(|| pw_runtime::Error::ProtocolError("Playwright initializer missing 'firefox.guid'".to_string()))?;
 
-		let webkit_guid = initializer["webkit"]["guid"].as_str().ok_or_else(|| {
-			pw_runtime::Error::ProtocolError(
-				"Playwright initializer missing 'webkit.guid'".to_string(),
-			)
-		})?;
+		let webkit_guid = initializer["webkit"]["guid"]
+			.as_str()
+			.ok_or_else(|| pw_runtime::Error::ProtocolError("Playwright initializer missing 'webkit.guid'".to_string()))?;
 
 		// Get BrowserType objects from connection registry
 		// Note: These objects should already exist (created by earlier __create__ messages)
@@ -259,23 +243,17 @@ impl Playwright {
 	/// Returns the Chromium browser type.
 	pub fn chromium(&self) -> &BrowserType {
 		// Downcast from Arc<dyn ChannelOwner> to &BrowserType
-		self.chromium
-			.downcast_ref::<BrowserType>()
-			.expect("chromium should be BrowserType")
+		self.chromium.downcast_ref::<BrowserType>().expect("chromium should be BrowserType")
 	}
 
 	/// Returns the Firefox browser type.
 	pub fn firefox(&self) -> &BrowserType {
-		self.firefox
-			.downcast_ref::<BrowserType>()
-			.expect("firefox should be BrowserType")
+		self.firefox.downcast_ref::<BrowserType>().expect("firefox should be BrowserType")
 	}
 
 	/// Returns the WebKit browser type.
 	pub fn webkit(&self) -> &BrowserType {
-		self.webkit
-			.downcast_ref::<BrowserType>()
-			.expect("webkit should be BrowserType")
+		self.webkit.downcast_ref::<BrowserType>().expect("webkit should be BrowserType")
 	}
 
 	/// Allow the launched Playwright server to keep running after this handle is dropped.

@@ -3,16 +3,8 @@
 use crate::output::{CommandInputs, OutputFormat, ResultBuilder, print_result};
 
 /// Print success result in the given format.
-pub fn emit_success(
-	command: &'static str,
-	inputs: CommandInputs,
-	data: serde_json::Value,
-	format: OutputFormat,
-) {
-	let result = ResultBuilder::new(command)
-		.inputs(inputs)
-		.data(data)
-		.build();
+pub fn emit_success(command: &'static str, inputs: CommandInputs, data: serde_json::Value, format: OutputFormat) {
+	let result = ResultBuilder::new(command).inputs(inputs).data(data).build();
 	print_result(&result, format);
 }
 

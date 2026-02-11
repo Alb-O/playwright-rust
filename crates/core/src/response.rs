@@ -26,18 +26,8 @@ impl ResponseObject {
 	///
 	/// This is called by the object factory when the server sends a `__create__` message
 	/// for a Response object.
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent),
-			type_name,
-			guid,
-			initializer,
-		);
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent), type_name, guid, initializer);
 
 		Ok(Self { base })
 	}
@@ -97,8 +87,6 @@ impl ChannelOwner for ResponseObject {
 
 impl std::fmt::Debug for ResponseObject {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("ResponseObject")
-			.field("guid", &self.guid())
-			.finish()
+		f.debug_struct("ResponseObject").field("guid", &self.guid()).finish()
 	}
 }

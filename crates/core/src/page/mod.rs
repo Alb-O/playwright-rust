@@ -167,25 +167,14 @@ pub struct ConsoleLocation {
 
 impl Page {
 	/// Creates a new Page from protocol initialization.
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let main_frame_guid: Arc<str> =
-			Arc::from(initializer["mainFrame"]["guid"].as_str().ok_or_else(|| {
-				pw_runtime::Error::ProtocolError(
-					"Page initializer missing 'mainFrame.guid' field".to_string(),
-				)
-			})?);
-
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent),
-			type_name,
-			guid,
-			initializer,
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let main_frame_guid: Arc<str> = Arc::from(
+			initializer["mainFrame"]["guid"]
+				.as_str()
+				.ok_or_else(|| pw_runtime::Error::ProtocolError("Page initializer missing 'mainFrame.guid' field".to_string()))?,
 		);
+
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent), type_name, guid, initializer);
 
 		let url = Arc::new(RwLock::new("about:blank".to_string()));
 		let route_handlers = Arc::new(Mutex::new(IndexMap::new()));
@@ -211,12 +200,9 @@ impl Page {
 	pub(crate) async fn main_frame(&self) -> Result<crate::Frame> {
 		let frame_arc = self.connection().get_object(&self.main_frame_guid).await?;
 
-		let frame = frame_arc.downcast_ref::<crate::Frame>().ok_or_else(|| {
-			pw_runtime::Error::ProtocolError(format!(
-				"Expected Frame object, got {}",
-				frame_arc.type_name()
-			))
-		})?;
+		let frame = frame_arc
+			.downcast_ref::<crate::Frame>()
+			.ok_or_else(|| pw_runtime::Error::ProtocolError(format!("Expected Frame object, got {}", frame_arc.type_name())))?;
 
 		Ok(frame.clone())
 	}
@@ -232,18 +218,14 @@ impl Page {
 	///
 	/// See <https://playwright.dev/docs/api/class-page#page-close>
 	pub async fn close(&self) -> Result<()> {
-		self.channel()
-			.send_no_result("close", serde_json::json!({}))
-			.await
+		self.channel().send_no_result("close", serde_json::json!({})).await
 	}
 
 	/// Brings the page to the front (activates the tab).
 	///
 	/// See <https://playwright.dev/docs/api/class-page#page-bring-to-front>
 	pub async fn bring_to_front(&self) -> Result<()> {
-		self.channel()
-			.send_no_result("bringToFront", serde_json::json!({}))
-			.await
+		self.channel().send_no_result("bringToFront", serde_json::json!({})).await
 	}
 
 	/// Navigates to the specified URL.
@@ -319,12 +301,7 @@ impl Page {
 	///
 	/// See <https://playwright.dev/docs/api/class-page#page-video>
 	pub fn video(&self) -> Option<crate::Video> {
-		let video_guid = self
-			.base
-			.initializer()
-			.get("video")
-			.and_then(|v| v.get("guid"))
-			.and_then(|v| v.as_str())?;
+		let video_guid = self.base.initializer().get("video").and_then(|v| v.get("guid")).and_then(|v| v.as_str())?;
 
 		self.base
 			.children()
@@ -370,22 +347,17 @@ impl Page {
 
 		if let Some(response_ref) = reload_result.response {
 			// Wait for Response object - __create__ may arrive after the response
-			let response_arc = self
-				.connection()
-				.wait_for_object(&response_ref.guid, std::time::Duration::from_secs(1))
-				.await?;
+			let response_arc = self.connection().wait_for_object(&response_ref.guid, std::time::Duration::from_secs(1)).await?;
 
 			let initializer = response_arc.initializer();
 
-			let status = initializer["status"].as_u64().ok_or_else(|| {
-				pw_runtime::Error::ProtocolError("Response missing status".to_string())
-			})? as u16;
+			let status = initializer["status"]
+				.as_u64()
+				.ok_or_else(|| pw_runtime::Error::ProtocolError("Response missing status".to_string()))? as u16;
 
 			let headers = initializer["headers"]
 				.as_array()
-				.ok_or_else(|| {
-					pw_runtime::Error::ProtocolError("Response missing headers".to_string())
-				})?
+				.ok_or_else(|| pw_runtime::Error::ProtocolError("Response missing headers".to_string()))?
 				.iter()
 				.filter_map(|h| {
 					let name = h["name"].as_str()?;
@@ -397,9 +369,7 @@ impl Page {
 			let response = Response {
 				url: initializer["url"]
 					.as_str()
-					.ok_or_else(|| {
-						pw_runtime::Error::ProtocolError("Response missing url".to_string())
-					})?
+					.ok_or_else(|| pw_runtime::Error::ProtocolError("Response missing url".to_string()))?
 					.to_string(),
 				status,
 				status_text: initializer["statusText"].as_str().unwrap_or("").to_string(),
@@ -423,10 +393,7 @@ impl Page {
 	/// Returns the first element matching the selector, or `None`.
 	///
 	/// See <https://playwright.dev/docs/api/class-page#page-query-selector>
-	pub async fn query_selector(
-		&self,
-		selector: &str,
-	) -> Result<Option<Arc<crate::ElementHandle>>> {
+	pub async fn query_selector(&self, selector: &str) -> Result<Option<Arc<crate::ElementHandle>>> {
 		let frame = self.main_frame().await?;
 		frame.query_selector(selector).await
 	}
@@ -434,10 +401,7 @@ impl Page {
 	/// Returns all elements matching the selector.
 	///
 	/// See <https://playwright.dev/docs/api/class-page#page-query-selector-all>
-	pub async fn query_selector_all(
-		&self,
-		selector: &str,
-	) -> Result<Vec<Arc<crate::ElementHandle>>> {
+	pub async fn query_selector_all(&self, selector: &str) -> Result<Vec<Arc<crate::ElementHandle>>> {
 		let frame = self.main_frame().await?;
 		frame.query_selector_all(selector).await
 	}
@@ -496,11 +460,7 @@ impl ChannelOwner for Page {
 				}
 			}
 			"route" => {
-				let Some(route_guid) = params
-					.get("route")
-					.and_then(|v| v.get("guid"))
-					.and_then(|v| v.as_str())
-				else {
+				let Some(route_guid) = params.get("route").and_then(|v| v.get("guid")).and_then(|v| v.as_str()) else {
 					return;
 				};
 
@@ -523,23 +483,11 @@ impl ChannelOwner for Page {
 				});
 			}
 			"download" => {
-				let url = params
-					.get("url")
-					.and_then(|v| v.as_str())
-					.unwrap_or("")
-					.to_string();
+				let url = params.get("url").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
-				let suggested_filename = params
-					.get("suggestedFilename")
-					.and_then(|v| v.as_str())
-					.unwrap_or("")
-					.to_string();
+				let suggested_filename = params.get("suggestedFilename").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
-				let Some(artifact_guid) = params
-					.get("artifact")
-					.and_then(|v| v.get("guid"))
-					.and_then(|v| v.as_str())
-				else {
+				let Some(artifact_guid) = params.get("artifact").and_then(|v| v.get("guid")).and_then(|v| v.as_str()) else {
 					return;
 				};
 
@@ -569,11 +517,7 @@ impl ChannelOwner for Page {
 					.map(ConsoleMessageKind::from_str)
 					.unwrap_or(ConsoleMessageKind::Log);
 
-				let text = message_obj
-					.get("text")
-					.and_then(|v| v.as_str())
-					.unwrap_or("")
-					.to_string();
+				let text = message_obj.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
 				let location = message_obj.get("location").and_then(|loc| {
 					Some(ConsoleLocation {
@@ -583,11 +527,7 @@ impl ChannelOwner for Page {
 					})
 				});
 
-				let _ = self.console_tx.send(ConsoleMessage {
-					kind,
-					text,
-					location,
-				});
+				let _ = self.console_tx.send(ConsoleMessage { kind, text, location });
 			}
 			_ => {}
 		}
@@ -600,10 +540,7 @@ impl ChannelOwner for Page {
 
 impl std::fmt::Debug for Page {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("Page")
-			.field("guid", &self.guid())
-			.field("url", &self.url())
-			.finish()
+		f.debug_struct("Page").field("guid", &self.guid()).field("url", &self.url()).finish()
 	}
 }
 
@@ -708,26 +645,11 @@ mod tests {
 	#[test]
 	fn test_console_message_kind_from_str() {
 		assert_eq!(ConsoleMessageKind::from_str("log"), ConsoleMessageKind::Log);
-		assert_eq!(
-			ConsoleMessageKind::from_str("error"),
-			ConsoleMessageKind::Error
-		);
-		assert_eq!(
-			ConsoleMessageKind::from_str("warning"),
-			ConsoleMessageKind::Warning
-		);
-		assert_eq!(
-			ConsoleMessageKind::from_str("info"),
-			ConsoleMessageKind::Info
-		);
-		assert_eq!(
-			ConsoleMessageKind::from_str("debug"),
-			ConsoleMessageKind::Debug
-		);
-		assert_eq!(
-			ConsoleMessageKind::from_str("unknown"),
-			ConsoleMessageKind::Other
-		);
+		assert_eq!(ConsoleMessageKind::from_str("error"), ConsoleMessageKind::Error);
+		assert_eq!(ConsoleMessageKind::from_str("warning"), ConsoleMessageKind::Warning);
+		assert_eq!(ConsoleMessageKind::from_str("info"), ConsoleMessageKind::Info);
+		assert_eq!(ConsoleMessageKind::from_str("debug"), ConsoleMessageKind::Debug);
+		assert_eq!(ConsoleMessageKind::from_str("unknown"), ConsoleMessageKind::Other);
 	}
 
 	#[test]

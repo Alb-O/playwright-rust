@@ -6,9 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
-use crate::commands::page::snapshot::{
-	EXTRACT_ELEMENTS_JS, EXTRACT_META_JS, EXTRACT_TEXT_JS, PageMeta, RawElement,
-};
+use crate::commands::page::snapshot::{EXTRACT_ELEMENTS_JS, EXTRACT_META_JS, EXTRACT_TEXT_JS, PageMeta, RawElement};
 use crate::error::Result;
 use crate::output::{CommandInputs, InteractiveElement, SnapshotData};
 use crate::session_broker::SessionRequest;
@@ -51,10 +49,7 @@ impl CommandDef for NavigateCommand {
 		Ok(NavigateResolved { target })
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -64,16 +59,13 @@ impl CommandDef for NavigateCommand {
 
 			let preferred_url = args.target.preferred_url(exec.last_url);
 
-			let req = SessionRequest::from_context(WaitUntil::Load, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::Load, exec.ctx).with_preferred_url(preferred_url);
 
 			let session = exec.broker.session(req).await?;
 
 			match &args.target.target {
 				Target::Navigate(url) => {
-					session
-						.goto_if_needed(url.as_str(), exec.ctx.timeout_ms())
-						.await?;
+					session.goto_if_needed(url.as_str(), exec.ctx.timeout_ms()).await?;
 				}
 				Target::CurrentPage => {}
 			}
@@ -81,22 +73,15 @@ impl CommandDef for NavigateCommand {
 			session.page().bring_to_front().await?;
 
 			let meta_js = format!("JSON.stringify({})", EXTRACT_META_JS);
-			let meta: PageMeta =
-				serde_json::from_str(&session.page().evaluate_value(&meta_js).await?)?;
+			let meta: PageMeta = serde_json::from_str(&session.page().evaluate_value(&meta_js).await?)?;
 
-			let text_js = format!(
-				"JSON.stringify({}({}, {}))",
-				EXTRACT_TEXT_JS, DEFAULT_MAX_TEXT_LENGTH, false
-			);
-			let text: String =
-				serde_json::from_str(&session.page().evaluate_value(&text_js).await?)?;
+			let text_js = format!("JSON.stringify({}({}, {}))", EXTRACT_TEXT_JS, DEFAULT_MAX_TEXT_LENGTH, false);
+			let text: String = serde_json::from_str(&session.page().evaluate_value(&text_js).await?)?;
 
 			let elements_js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
-			let raw_elements: Vec<RawElement> =
-				serde_json::from_str(&session.page().evaluate_value(&elements_js).await?)?;
+			let raw_elements: Vec<RawElement> = serde_json::from_str(&session.page().evaluate_value(&elements_js).await?)?;
 
-			let elements: Vec<InteractiveElement> =
-				raw_elements.into_iter().map(Into::into).collect();
+			let elements: Vec<InteractiveElement> = raw_elements.into_iter().map(Into::into).collect();
 			let element_count = elements.len();
 
 			let data = SnapshotData {

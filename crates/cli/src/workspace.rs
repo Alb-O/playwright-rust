@@ -32,11 +32,7 @@ impl WorkspaceScope {
 	/// - `workspace`: explicit workspace path, or `"auto"` for detection.
 	/// - `namespace`: optional namespace; defaults to [`DEFAULT_NAMESPACE`].
 	/// - `no_project`: when true, skip playwright project-root detection.
-	pub fn resolve(
-		workspace: Option<&str>,
-		namespace: Option<&str>,
-		no_project: bool,
-	) -> Result<Self> {
+	pub fn resolve(workspace: Option<&str>, namespace: Option<&str>, no_project: bool) -> Result<Self> {
 		let namespace = normalize_namespace(namespace.unwrap_or(DEFAULT_NAMESPACE));
 		let root = resolve_workspace_root(workspace, no_project)?;
 		Ok(Self::from_parts(root, namespace))
@@ -70,12 +66,7 @@ impl WorkspaceScope {
 
 	/// Deterministic browser-session key for daemon/browser reuse.
 	pub fn session_key(&self, browser: BrowserKind, headless: bool) -> String {
-		format!(
-			"{}:{}:{}",
-			self.namespace_id(),
-			browser,
-			if headless { "headless" } else { "headful" }
-		)
+		format!("{}:{}:{}", self.namespace_id(), browser, if headless { "headless" } else { "headful" })
 	}
 
 	/// Root directory for all v3 state.
@@ -156,9 +147,7 @@ fn resolve_workspace_root(workspace: Option<&str>, no_project: bool) -> Result<P
 
 	// Default to current directory for strict per-folder session isolation.
 	// Use `--workspace auto` to opt into project-root detection.
-	std::env::current_dir()
-		.map(canonicalize_or_self)
-		.map_err(PwError::Io)
+	std::env::current_dir().map(canonicalize_or_self).map_err(PwError::Io)
 }
 
 fn auto_workspace_root(no_project: bool) -> Result<PathBuf> {
@@ -168,9 +157,7 @@ fn auto_workspace_root(no_project: bool) -> Result<PathBuf> {
 		}
 	}
 
-	std::env::current_dir()
-		.map(canonicalize_or_self)
-		.map_err(PwError::Io)
+	std::env::current_dir().map(canonicalize_or_self).map_err(PwError::Io)
 }
 
 fn canonicalize_or_self(path: PathBuf) -> PathBuf {
@@ -227,11 +214,7 @@ mod tests {
 		let project_root = temp.path().join("project");
 		let nested = project_root.join("agents").join("agent-a");
 		std::fs::create_dir_all(&nested).unwrap();
-		std::fs::write(
-			project_root.join(pw_rs::dirs::CONFIG_JS),
-			"export default {}",
-		)
-		.unwrap();
+		std::fs::write(project_root.join(pw_rs::dirs::CONFIG_JS), "export default {}").unwrap();
 
 		let original_dir = std::env::current_dir().unwrap();
 		struct CwdGuard(PathBuf);
@@ -254,11 +237,7 @@ mod tests {
 		let project_root = temp.path().join("project");
 		let nested = project_root.join("agents").join("agent-a");
 		std::fs::create_dir_all(&nested).unwrap();
-		std::fs::write(
-			project_root.join(pw_rs::dirs::CONFIG_JS),
-			"export default {}",
-		)
-		.unwrap();
+		std::fs::write(project_root.join(pw_rs::dirs::CONFIG_JS), "export default {}").unwrap();
 
 		let original_dir = std::env::current_dir().unwrap();
 		struct CwdGuard(PathBuf);
@@ -296,13 +275,7 @@ mod tests {
 			.join("cache.json");
 		ensure_state_gitignore_for(&target).unwrap();
 
-		assert!(
-			temp.path()
-				.join("playwright")
-				.join(STATE_VERSION_DIR)
-				.join(".gitignore")
-				.exists()
-		);
+		assert!(temp.path().join("playwright").join(STATE_VERSION_DIR).join(".gitignore").exists());
 	}
 
 	#[test]

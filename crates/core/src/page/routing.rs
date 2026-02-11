@@ -7,9 +7,7 @@ use pw_runtime::Result;
 
 use super::Page;
 use crate::Route;
-use crate::handlers::{
-	HandlerEntry, HandlerFn, HandlerFuture, RouteMatcher, RouteMeta, Subscription, next_handler_id,
-};
+use crate::handlers::{HandlerEntry, HandlerFn, HandlerFuture, RouteMatcher, RouteMeta, Subscription, next_handler_id};
 
 impl Page {
 	/// Registers a route handler for network interception.
@@ -33,8 +31,7 @@ impl Page {
 		Fut: Future<Output = Result<()>> + Send + 'static,
 	{
 		let id = next_handler_id();
-		let handler: HandlerFn<Route> =
-			Arc::new(move |route: Route| -> HandlerFuture { Box::pin(handler(route)) });
+		let handler: HandlerFn<Route> = Arc::new(move |route: Route| -> HandlerFuture { Box::pin(handler(route)) });
 		let matcher = RouteMatcher::new(pattern);
 
 		self.route_handlers.lock().insert(
@@ -60,10 +57,7 @@ impl Page {
 			.collect();
 
 		self.channel()
-			.send_no_result(
-				"setNetworkInterceptionPatterns",
-				serde_json::json!({ "patterns": patterns }),
-			)
+			.send_no_result("setNetworkInterceptionPatterns", serde_json::json!({ "patterns": patterns }))
 			.await
 	}
 

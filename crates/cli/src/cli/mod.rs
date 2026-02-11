@@ -314,9 +314,7 @@ pub enum InitTemplate {
 }
 
 /// Output format for the read command
-#[derive(
-	Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ReadOutputFormat {
 	/// Plain text
@@ -500,9 +498,7 @@ impl Commands {
 	/// Returns registry [`CommandId`] and JSON args for registry-backed commands.
 	///
 	/// [`CommandId`]: crate::commands::registry::CommandId
-	pub fn into_registry_args(
-		&self,
-	) -> Option<(crate::commands::registry::CommandId, serde_json::Value)> {
+	pub fn into_registry_args(&self) -> Option<(crate::commands::registry::CommandId, serde_json::Value)> {
 		use crate::commands::registry::CommandId as Id;
 
 		Some(match self {
@@ -521,9 +517,7 @@ impl PageAction {
 	/// Returns registry [`CommandId`] and JSON args.
 	///
 	/// [`CommandId`]: crate::commands::registry::CommandId
-	pub fn into_registry_args(
-		&self,
-	) -> Option<(crate::commands::registry::CommandId, serde_json::Value)> {
+	pub fn into_registry_args(&self) -> Option<(crate::commands::registry::CommandId, serde_json::Value)> {
 		use crate::commands::registry::CommandId as Id;
 
 		Some(match self {

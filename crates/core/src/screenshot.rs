@@ -213,22 +213,13 @@ mod tests {
 
 	#[test]
 	fn test_screenshot_type_serialization() {
-		assert_eq!(
-			serde_json::to_string(&ScreenshotType::Png).unwrap(),
-			"\"png\""
-		);
-		assert_eq!(
-			serde_json::to_string(&ScreenshotType::Jpeg).unwrap(),
-			"\"jpeg\""
-		);
+		assert_eq!(serde_json::to_string(&ScreenshotType::Png).unwrap(), "\"png\"");
+		assert_eq!(serde_json::to_string(&ScreenshotType::Jpeg).unwrap(), "\"jpeg\"");
 	}
 
 	#[test]
 	fn test_builder_jpeg_with_quality() {
-		let options = ScreenshotOptions::builder()
-			.screenshot_type(ScreenshotType::Jpeg)
-			.quality(80)
-			.build();
+		let options = ScreenshotOptions::builder().screenshot_type(ScreenshotType::Jpeg).quality(80).build();
 
 		let json = options.to_json();
 		assert_eq!(json["type"], "jpeg");

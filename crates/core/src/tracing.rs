@@ -57,18 +57,8 @@ pub struct Tracing {
 
 impl Tracing {
 	/// Creates a new Tracing from protocol initialization.
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent),
-			type_name,
-			guid,
-			initializer,
-		);
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent), type_name, guid, initializer);
 		Ok(Self { base })
 	}
 
@@ -129,9 +119,7 @@ impl Tracing {
 		let params = options
 			.map(|o| serde_json::to_value(&o).unwrap_or_default())
 			.unwrap_or_else(|| serde_json::json!({}));
-		self.channel()
-			.send_no_result("tracingStartChunk", params)
-			.await
+		self.channel().send_no_result("tracingStartChunk", params).await
 	}
 
 	/// Stops recording the trace and optionally saves it.
@@ -183,9 +171,7 @@ impl Tracing {
 	/// See: <https://playwright.dev/docs/api/class-tracing#tracing-stop-chunk>
 	pub async fn stop_chunk(&self, options: TracingStopOptions) -> Result<()> {
 		let params = serde_json::to_value(&options).unwrap_or_default();
-		self.channel()
-			.send_no_result("tracingStopChunk", params)
-			.await
+		self.channel().send_no_result("tracingStopChunk", params).await
 	}
 }
 
@@ -241,9 +227,7 @@ impl ChannelOwner for Tracing {
 
 impl std::fmt::Debug for Tracing {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("Tracing")
-			.field("guid", &self.guid())
-			.finish()
+		f.debug_struct("Tracing").field("guid", &self.guid()).finish()
 	}
 }
 
@@ -359,8 +343,6 @@ pub struct TracingStopOptions {
 impl TracingStopOptions {
 	/// Creates stop options that save to the given path.
 	pub fn with_path(path: impl Into<PathBuf>) -> Self {
-		Self {
-			path: Some(path.into()),
-		}
+		Self { path: Some(path.into()) }
 	}
 }

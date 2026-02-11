@@ -87,11 +87,7 @@ impl DomainCookies {
 	/// for loading into a browser context via Playwright's storage state API.
 	pub fn to_storage_state(&self) -> StorageState {
 		StorageState {
-			cookies: self
-				.cookies
-				.iter()
-				.map(ExtensionCookie::to_playwright_cookie)
-				.collect(),
+			cookies: self.cookies.iter().map(ExtensionCookie::to_playwright_cookie).collect(),
 			origins: vec![],
 		}
 	}
@@ -172,9 +168,7 @@ mod tests {
 
 	#[test]
 	fn extension_message_hello_serializes_with_type_tag() {
-		let msg = ExtensionMessage::Hello {
-			token: "abc123".into(),
-		};
+		let msg = ExtensionMessage::Hello { token: "abc123".into() };
 		let json = serde_json::to_string(&msg).unwrap();
 		assert!(json.contains(r#""type":"hello""#));
 		assert!(json.contains(r#""token":"abc123""#));
@@ -182,9 +176,7 @@ mod tests {
 
 	#[test]
 	fn server_message_welcome_serializes_with_type_tag() {
-		let msg = ServerMessage::Welcome {
-			version: "0.12.0".into(),
-		};
+		let msg = ServerMessage::Welcome { version: "0.12.0".into() };
 		let json = serde_json::to_string(&msg).unwrap();
 		assert!(json.contains(r#""type":"welcome""#));
 	}

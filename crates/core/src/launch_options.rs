@@ -261,10 +261,7 @@ impl LaunchOptions {
 		// Convert env HashMap to array of {name, value} objects
 		if let Some(env_map) = value.get_mut("env") {
 			if let Some(map) = env_map.as_object() {
-				let env_array: Vec<_> = map
-					.iter()
-					.map(|(k, v)| json!({"name": k, "value": v}))
-					.collect();
+				let env_array: Vec<_> = map.iter().map(|(k, v)| json!({"name": k, "value": v})).collect();
 				*env_map = json!(env_array);
 			}
 		}
@@ -309,10 +306,7 @@ mod tests {
 
 	#[test]
 	fn test_launch_options_builder() {
-		let opts = LaunchOptions::default()
-			.headless(false)
-			.slow_mo(100.0)
-			.args(vec!["--no-sandbox".to_string()]);
+		let opts = LaunchOptions::default().headless(false).slow_mo(100.0).args(vec!["--no-sandbox".to_string()]);
 
 		assert_eq!(opts.headless, Some(false));
 		assert_eq!(opts.slow_mo, Some(100.0));
@@ -321,10 +315,7 @@ mod tests {
 
 	#[test]
 	fn test_launch_options_normalize_env() {
-		let opts = LaunchOptions::default().env(HashMap::from([
-			("FOO".to_string(), "bar".to_string()),
-			("BAZ".to_string(), "qux".to_string()),
-		]));
+		let opts = LaunchOptions::default().env(HashMap::from([("FOO".to_string(), "bar".to_string()), ("BAZ".to_string(), "qux".to_string())]));
 
 		let normalized = opts.normalize();
 
@@ -334,10 +325,7 @@ mod tests {
 		assert_eq!(env_array.len(), 2);
 
 		// Check that both env vars are present (order may vary)
-		let names: Vec<_> = env_array
-			.iter()
-			.map(|v| v["name"].as_str().unwrap())
-			.collect();
+		let names: Vec<_> = env_array.iter().map(|v| v["name"].as_str().unwrap()).collect();
 		assert!(names.contains(&"FOO"));
 		assert!(names.contains(&"BAZ"));
 	}
@@ -355,17 +343,13 @@ mod tests {
 
 	#[test]
 	fn test_launch_options_normalize_ignore_default_args_array() {
-		let opts = LaunchOptions::default()
-			.ignore_default_args(IgnoreDefaultArgs::Array(vec!["--foo".to_string()]));
+		let opts = LaunchOptions::default().ignore_default_args(IgnoreDefaultArgs::Array(vec!["--foo".to_string()]));
 
 		let normalized = opts.normalize();
 
 		// Verify array is preserved
 		assert!(normalized["ignoreDefaultArgs"].is_array());
-		assert_eq!(
-			normalized["ignoreDefaultArgs"][0].as_str().unwrap(),
-			"--foo"
-		);
+		assert_eq!(normalized["ignoreDefaultArgs"][0].as_str().unwrap(), "--foo");
 	}
 
 	#[test]
@@ -387,10 +371,7 @@ mod tests {
 			.headless(true)
 			.slow_mo(50.0)
 			.timeout(60000.0)
-			.args(vec![
-				"--no-sandbox".to_string(),
-				"--disable-gpu".to_string(),
-			])
+			.args(vec!["--no-sandbox".to_string(), "--disable-gpu".to_string()])
 			.channel("chrome".to_string());
 
 		assert_eq!(opts.headless, Some(true));
@@ -412,18 +393,13 @@ mod tests {
 
 	#[test]
 	fn test_remote_debugging_port_appended_to_existing_args() {
-		let opts = LaunchOptions::default()
-			.args(vec!["--no-sandbox".to_string()])
-			.remote_debugging_port(9333);
+		let opts = LaunchOptions::default().args(vec!["--no-sandbox".to_string()]).remote_debugging_port(9333);
 		let normalized = opts.normalize();
 
 		let args = normalized["args"].as_array().unwrap();
 		assert_eq!(args.len(), 2);
 		assert!(args.iter().any(|a| a.as_str() == Some("--no-sandbox")));
-		assert!(
-			args.iter()
-				.any(|a| a.as_str() == Some("--remote-debugging-port=9333"))
-		);
+		assert!(args.iter().any(|a| a.as_str() == Some("--remote-debugging-port=9333")));
 	}
 
 	#[test]

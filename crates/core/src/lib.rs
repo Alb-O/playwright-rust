@@ -185,26 +185,19 @@ pub mod tracing;
 pub mod video;
 
 pub use accessibility::{
-	Accessibility, AccessibilityNode, AccessibilitySnapshotOptions,
-	AccessibilitySnapshotOptionsBuilder, AccessibilityValue, CheckedState, PressedState,
+	Accessibility, AccessibilityNode, AccessibilitySnapshotOptions, AccessibilitySnapshotOptionsBuilder, AccessibilityValue, CheckedState, PressedState,
 };
-pub use action_options::{
-	CheckOptions, FillOptions, HoverOptions, KeyboardOptions, MouseOptions, PressOptions,
-	SelectOptions,
-};
+pub use action_options::{CheckOptions, FillOptions, HoverOptions, KeyboardOptions, MouseOptions, PressOptions, SelectOptions};
 // Re-export assertions
 pub use assertions::{Expectation, expect};
 pub use browser::Browser;
 pub use browser_context::{
-	BrowserContext, BrowserContextOptions, BrowserContextOptionsBuilder, Geolocation,
-	HarContentPolicy, HarMode, HarNotFound, HarStartOptions, RouteFromHarOptions, Viewport,
+	BrowserContext, BrowserContextOptions, BrowserContextOptionsBuilder, Geolocation, HarContentPolicy, HarMode, HarNotFound, HarStartOptions,
+	RouteFromHarOptions, Viewport,
 };
 pub use browser_type::{BrowserType, ConnectOverCDPResult, LaunchedServer};
 pub use click::{ClickOptions, KeyboardModifier, MouseButton, Position};
-pub use cookie::{
-	ClearCookiesOptions, Cookie, LocalStorageEntry, OriginState, SameSite, StorageState,
-	StorageStateOptions,
-};
+pub use cookie::{ClearCookiesOptions, Cookie, LocalStorageEntry, OriginState, SameSite, StorageState, StorageStateOptions};
 pub use dialog::Dialog;
 pub use download::Download;
 pub use element_handle::ElementHandle;
@@ -217,23 +210,15 @@ pub use keyboard::Keyboard;
 pub use launch_options::{IgnoreDefaultArgs, LaunchOptions, ProxySettings};
 pub use locator::Locator;
 pub use mouse::Mouse;
-pub use page::{
-	ConsoleLocation, ConsoleMessage, ConsoleMessageKind, GotoOptions, Page, Response, Subscription,
-	WaitUntil,
-};
+pub use page::{ConsoleLocation, ConsoleMessage, ConsoleMessageKind, GotoOptions, Page, Response, Subscription, WaitUntil};
 pub use playwright::Playwright;
 pub use request::Request;
 pub use response::ResponseObject;
 pub use root::Root;
-pub use route::{
-	ContinueOptions, ContinueOptionsBuilder, FulfillOptions, FulfillOptionsBuilder, Route,
-};
+pub use route::{ContinueOptions, ContinueOptionsBuilder, FulfillOptions, FulfillOptionsBuilder, Route};
 pub use screenshot::{ScreenshotClip, ScreenshotOptions, ScreenshotType};
 pub use select_option::SelectOption;
-pub use tracing::{
-	Tracing, TracingStartChunkOptions, TracingStartOptions, TracingStartOptionsBuilder,
-	TracingStopOptions,
-};
+pub use tracing::{Tracing, TracingStartChunkOptions, TracingStartOptions, TracingStartOptionsBuilder, TracingStopOptions};
 pub use video::Video;
 
 /// Default timeout in milliseconds for Playwright operations.

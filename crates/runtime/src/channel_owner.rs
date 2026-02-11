@@ -113,12 +113,7 @@ impl Clone for ChannelOwnerImpl {
 
 impl ChannelOwnerImpl {
 	/// Creates a new ChannelOwner base implementation.
-	pub fn new(
-		parent: ParentOrConnection,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Self {
+	pub fn new(parent: ParentOrConnection, type_name: String, guid: Arc<str>, initializer: Value) -> Self {
 		let (connection, parent_opt) = match parent {
 			ParentOrConnection::Parent(p) => {
 				let conn = p.connection();
@@ -221,13 +216,7 @@ impl ChannelOwnerImpl {
 
 	/// Handles a protocol event (default implementation logs it).
 	pub fn on_event(&self, method: &str, params: Value) {
-		tracing::debug!(
-			"Event on {} ({}): {} -> {:?}",
-			self.guid,
-			self.type_name,
-			method,
-			params
-		);
+		tracing::debug!("Event on {} ({}): {} -> {:?}", self.guid, self.type_name, method, params);
 	}
 
 	/// Returns true if object was garbage collected.

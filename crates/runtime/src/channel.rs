@@ -29,16 +29,9 @@ impl Channel {
 	}
 
 	/// Sends a method call to the Playwright server and awaits the response.
-	pub async fn send<P: Serialize, R: DeserializeOwned>(
-		&self,
-		method: &str,
-		params: P,
-	) -> Result<R> {
+	pub async fn send<P: Serialize, R: DeserializeOwned>(&self, method: &str, params: P) -> Result<R> {
 		let params_value = serde_json::to_value(params)?;
-		let response = self
-			.connection
-			.send_message(&self.guid, method, params_value)
-			.await?;
+		let response = self.connection.send_message(&self.guid, method, params_value).await?;
 		serde_json::from_value(response).map_err(Into::into)
 	}
 

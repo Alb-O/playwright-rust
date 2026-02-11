@@ -20,9 +20,7 @@ pub(crate) mod wait;
 
 use std::path::Path;
 
-use crate::cli::{
-	AuthAction, Cli, Commands, DaemonAction, HarAction, ProtectAction, SessionAction, TabsAction,
-};
+use crate::cli::{AuthAction, Cli, Commands, DaemonAction, HarAction, ProtectAction, SessionAction, TabsAction};
 use crate::commands::def::ExecMode;
 use crate::context::CommandContext;
 use crate::context_store::ContextState;
@@ -35,9 +33,7 @@ use crate::target::{Resolve, ResolveEnv};
 
 pub async fn dispatch(cli: Cli, format: OutputFormat) -> Result<()> {
 	if let Commands::Relay { ref host, port } = cli.command {
-		return relay::run_relay_server(host, port)
-			.await
-			.map_err(PwError::Anyhow);
+		return relay::run_relay_server(host, port).await.map_err(PwError::Anyhow);
 	}
 
 	if let Commands::Test { ref args } = cli.command {
@@ -56,17 +52,7 @@ pub async fn dispatch(cli: Cli, format: OutputFormat) -> Result<()> {
 	let result = match cli.command {
 		Commands::Run => run::execute(&ctx, &mut ctx_state, &mut broker).await,
 		Commands::Relay { .. } => unreachable!(),
-		command => {
-			dispatch_command(
-				command,
-				&ctx,
-				&mut ctx_state,
-				&mut broker,
-				format,
-				cli.artifacts_dir.as_deref(),
-			)
-			.await
-		}
+		command => dispatch_command(command, &ctx, &mut ctx_state, &mut broker, format, cli.artifacts_dir.as_deref()).await,
 	};
 
 	if result.is_ok() {
@@ -94,17 +80,7 @@ async fn dispatch_command<'ctx>(
 	};
 
 	if let Some((id, args)) = command.into_registry_args() {
-		return dispatch::dispatch_registry_command(
-			id,
-			args,
-			ExecMode::Cli,
-			ctx,
-			ctx_state,
-			broker,
-			format,
-			artifacts_dir,
-		)
-		.await;
+		return dispatch::dispatch_registry_command(id, args, ExecMode::Cli, ctx, ctx_state, broker, format, artifacts_dir).await;
 	}
 
 	dispatch_ad_hoc(command, ctx, ctx_state, broker, format, has_cdp).await
@@ -120,11 +96,7 @@ async fn dispatch_ad_hoc<'ctx>(
 ) -> Result<()> {
 	match command {
 		Commands::Auth { action } => match action {
-			AuthAction::Login {
-				url,
-				output,
-				timeout,
-			} => {
+			AuthAction::Login { url, output, timeout } => {
 				let resolved_output = resolve_auth_output(ctx, &output);
 				let raw = auth::LoginRaw::from_cli(url, resolved_output.clone(), timeout);
 				let env = ResolveEnv::new(ctx_state, has_cdp, "auth-login");
@@ -140,10 +112,7 @@ async fn dispatch_ad_hoc<'ctx>(
 				}
 				outcome
 			}
-			AuthAction::Cookies {
-				url,
-				format: cookie_format,
-			} => {
+			AuthAction::Cookies { url, format: cookie_format } => {
 				let raw = auth::CookiesRaw::from_cli(url, cookie_format);
 				let env = ResolveEnv::new(ctx_state, has_cdp, "auth-cookies");
 				let resolved = raw.resolve(&env)?;
@@ -160,9 +129,7 @@ async fn dispatch_ad_hoc<'ctx>(
 		Commands::Session { action } => match action {
 			SessionAction::Status => session::status(ctx_state, format).await,
 			SessionAction::Clear => session::clear(ctx_state, format).await,
-			SessionAction::Start { headful } => {
-				session::start(ctx_state, broker, headful, format).await
-			}
+			SessionAction::Start { headful } => session::start(ctx_state, broker, headful, format).await,
 			SessionAction::Stop => session::stop(ctx_state, broker, format).await,
 		},
 		Commands::Daemon { action } => match action {
@@ -218,12 +185,8 @@ async fn dispatch_ad_hoc<'ctx>(
 			let protected = ctx_state.protected_urls();
 			match action {
 				TabsAction::List => tabs::list(ctx, broker, format, protected).await,
-				TabsAction::Switch { target } => {
-					tabs::switch(&target, ctx, broker, format, protected).await
-				}
-				TabsAction::Close { target } => {
-					tabs::close_tab(&target, ctx, broker, format, protected).await
-				}
+				TabsAction::Switch { target } => tabs::switch(&target, ctx, broker, format, protected).await,
+				TabsAction::Close { target } => tabs::close_tab(&target, ctx, broker, format, protected).await,
 				TabsAction::New { url } => tabs::new_tab(url.as_deref(), ctx, broker, format).await,
 			}
 		}
@@ -239,26 +202,13 @@ async fn dispatch_ad_hoc<'ctx>(
 				mode,
 				omit_content,
 				url_filter,
-			} => har::set(
-				ctx_state,
-				format,
-				file,
-				content,
-				mode,
-				omit_content,
-				url_filter,
-			),
+			} => har::set(ctx_state, format, file, content, mode, omit_content, url_filter),
 			HarAction::Show => har::show(ctx_state, format),
 			HarAction::Clear => har::clear(ctx_state, format),
 		},
 		Commands::Test { .. } => unreachable!("handled earlier"),
 		// Registry-backed commands should have been handled above
-		Commands::Navigate(_)
-		| Commands::Screenshot(_)
-		| Commands::Click(_)
-		| Commands::Fill(_)
-		| Commands::Wait(_)
-		| Commands::Page(_) => {
+		Commands::Navigate(_) | Commands::Screenshot(_) | Commands::Click(_) | Commands::Fill(_) | Commands::Wait(_) | Commands::Page(_) => {
 			unreachable!("registry command reached ad-hoc dispatch")
 		}
 	}

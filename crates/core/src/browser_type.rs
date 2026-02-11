@@ -79,43 +79,21 @@ impl BrowserType {
 	/// * `type_name` - Protocol type name ("BrowserType")
 	/// * `guid` - Unique GUID from server (e.g., "browserType@chromium")
 	/// * `initializer` - Initial state with name and executablePath
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent),
-			type_name,
-			guid,
-			initializer.clone(),
-		);
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent), type_name, guid, initializer.clone());
 
 		// Extract fields from initializer
 		let name = initializer["name"]
 			.as_str()
-			.ok_or_else(|| {
-				pw_runtime::Error::ProtocolError(
-					"BrowserType initializer missing 'name'".to_string(),
-				)
-			})?
+			.ok_or_else(|| pw_runtime::Error::ProtocolError("BrowserType initializer missing 'name'".to_string()))?
 			.to_string();
 
 		let executable_path = initializer["executablePath"]
 			.as_str()
-			.ok_or_else(|| {
-				pw_runtime::Error::ProtocolError(
-					"BrowserType initializer missing 'executablePath'".to_string(),
-				)
-			})?
+			.ok_or_else(|| pw_runtime::Error::ProtocolError("BrowserType initializer missing 'executablePath'".to_string()))?
 			.to_string();
 
-		Ok(Self {
-			base,
-			name,
-			executable_path,
-		})
+		Ok(Self { base, name, executable_path })
 	}
 
 	/// Returns the browser name ("chromium", "firefox", or "webkit").
@@ -176,10 +154,10 @@ impl BrowserType {
 
 					// Add Windows CI stability flags if not already present
 					let ci_flags = vec![
-						"--no-sandbox",            // Disable sandboxing (often problematic in CI)
-						"--disable-dev-shm-usage", // Overcome limited /dev/shm resources
-						"--disable-gpu",           // Disable GPU hardware acceleration
-						"--disable-web-security",  // Avoid CORS issues in CI
+						"--no-sandbox",                                       // Disable sandboxing (often problematic in CI)
+						"--disable-dev-shm-usage",                            // Overcome limited /dev/shm resources
+						"--disable-gpu",                                      // Disable GPU hardware acceleration
+						"--disable-web-security",                             // Avoid CORS issues in CI
 						"--disable-features=IsolateOrigins,site-per-process", // Reduce process overhead
 					];
 
@@ -216,27 +194,20 @@ impl BrowserType {
 		let browser_arc = self.connection().get_object(&response.browser.guid).await?;
 
 		// Downcast to Browser
-		let browser = browser_arc.downcast_ref::<Browser>().ok_or_else(|| {
-			pw_runtime::Error::ProtocolError(format!(
-				"Expected Browser object, got {}",
-				browser_arc.type_name()
-			))
-		})?;
+		let browser = browser_arc
+			.downcast_ref::<Browser>()
+			.ok_or_else(|| pw_runtime::Error::ProtocolError(format!("Expected Browser object, got {}", browser_arc.type_name())))?;
 
 		Ok(browser.clone())
 	}
 
 	/// Launches a browser server and returns its websocket endpoint.
 	pub async fn launch_server(&self) -> Result<LaunchedServer> {
-		self.launch_server_with_options(LaunchOptions::default())
-			.await
+		self.launch_server_with_options(LaunchOptions::default()).await
 	}
 
 	/// Launches a browser server with custom options and returns a handle.
-	pub async fn launch_server_with_options(
-		&self,
-		options: LaunchOptions,
-	) -> Result<LaunchedServer> {
+	pub async fn launch_server_with_options(&self, options: LaunchOptions) -> Result<LaunchedServer> {
 		#[derive(Deserialize)]
 		struct LaunchServerResponse {
 			#[serde(rename = "wsEndpoint")]
@@ -248,12 +219,9 @@ impl BrowserType {
 		let response: LaunchServerResponse = self.channel().send("launchServer", params).await?;
 
 		let browser_arc = self.connection().get_object(&response.browser.guid).await?;
-		let browser = browser_arc.downcast_ref::<Browser>().ok_or_else(|| {
-			pw_runtime::Error::ProtocolError(format!(
-				"Expected Browser object, got {}",
-				browser_arc.type_name()
-			))
-		})?;
+		let browser = browser_arc
+			.downcast_ref::<Browser>()
+			.ok_or_else(|| pw_runtime::Error::ProtocolError(format!("Expected Browser object, got {}", browser_arc.type_name())))?;
 
 		Ok(LaunchedServer {
 			ws_endpoint: response.ws_endpoint,
@@ -266,10 +234,7 @@ impl BrowserType {
 	/// This keeps the standard Playwright driver in the loop while reusing a
 	/// running GUI browser (for example, the extension relay). The returned
 	/// default context, when present, represents the persistent browser profile.
-	pub async fn connect_over_cdp(
-		&self,
-		endpoint_url: impl Into<String>,
-	) -> Result<ConnectOverCDPResult> {
+	pub async fn connect_over_cdp(&self, endpoint_url: impl Into<String>) -> Result<ConnectOverCDPResult> {
 		#[derive(Serialize)]
 		struct ConnectParams {
 			#[serde(rename = "endpointURL")]
@@ -290,31 +255,21 @@ impl BrowserType {
 			timeout: Some(30000),
 		};
 
-		let params_json = serde_json::to_value(params).map_err(|e| {
-			pw_runtime::Error::ProtocolError(format!(
-				"Failed to serialize connectOverCDP params: {}",
-				e
-			))
-		})?;
+		let params_json =
+			serde_json::to_value(params).map_err(|e| pw_runtime::Error::ProtocolError(format!("Failed to serialize connectOverCDP params: {}", e)))?;
 
 		let response: ConnectResponse = self.channel().send("connectOverCDP", params_json).await?;
 
 		let browser_arc = self.connection().get_object(&response.browser.guid).await?;
-		let browser = browser_arc.downcast_ref::<Browser>().ok_or_else(|| {
-			pw_runtime::Error::ProtocolError(format!(
-				"Expected Browser object, got {}",
-				browser_arc.type_name()
-			))
-		})?;
+		let browser = browser_arc
+			.downcast_ref::<Browser>()
+			.ok_or_else(|| pw_runtime::Error::ProtocolError(format!("Expected Browser object, got {}", browser_arc.type_name())))?;
 
 		let default_context = if let Some(ctx_ref) = response.default_context {
 			let ctx_arc = self.connection().get_object(&ctx_ref.guid).await?;
-			let ctx = ctx_arc.downcast_ref::<BrowserContext>().ok_or_else(|| {
-				pw_runtime::Error::ProtocolError(format!(
-					"Expected BrowserContext object, got {}",
-					ctx_arc.type_name()
-				))
-			})?;
+			let ctx = ctx_arc
+				.downcast_ref::<BrowserContext>()
+				.ok_or_else(|| pw_runtime::Error::ProtocolError(format!("Expected BrowserContext object, got {}", ctx_arc.type_name())))?;
 			Some(ctx.clone())
 		} else {
 			None

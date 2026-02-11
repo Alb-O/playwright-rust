@@ -56,8 +56,7 @@ impl SessionDescriptor {
 	pub(crate) fn matches(&self, request: &SessionRequest<'_>, driver_hash: Option<&str>) -> bool {
 		let endpoint_match = if let Some(req_endpoint) = request.cdp_endpoint {
 			// Specific endpoint requested - must match
-			self.cdp_endpoint.as_deref() == Some(req_endpoint)
-				|| self.ws_endpoint.as_deref() == Some(req_endpoint)
+			self.cdp_endpoint.as_deref() == Some(req_endpoint) || self.ws_endpoint.as_deref() == Some(req_endpoint)
 		} else {
 			// No specific endpoint requested - match if we have any endpoint
 			self.ws_endpoint.is_some() || self.cdp_endpoint.is_some()
@@ -69,10 +68,7 @@ impl SessionDescriptor {
 			(_, None) => true,
 		};
 
-		self.browser == request.browser
-			&& self.headless == request.headless
-			&& endpoint_match
-			&& driver_match
+		self.browser == request.browser && self.headless == request.headless && endpoint_match && driver_match
 	}
 
 	pub(crate) fn is_alive(&self) -> bool {
@@ -95,10 +91,7 @@ impl SessionDescriptor {
 }
 
 fn now_ts() -> u64 {
-	std::time::SystemTime::now()
-		.duration_since(std::time::UNIX_EPOCH)
-		.unwrap_or_default()
-		.as_secs()
+	std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
 }
 
 /// Request for a browser session; future reuse/daemon logic will live here.
@@ -195,12 +188,7 @@ pub struct SessionBroker<'a> {
 }
 
 impl<'a> SessionBroker<'a> {
-	pub fn new(
-		ctx: &'a CommandContext,
-		descriptor_path: Option<PathBuf>,
-		namespace_id: Option<String>,
-		refresh: bool,
-	) -> Self {
+	pub fn new(ctx: &'a CommandContext, descriptor_path: Option<PathBuf>, namespace_id: Option<String>, refresh: bool) -> Self {
 		Self {
 			ctx,
 			descriptor_path,
@@ -219,16 +207,9 @@ impl<'a> SessionBroker<'a> {
 			if self.refresh {
 				let _ = fs::remove_file(path);
 			} else if let Some(descriptor) = SessionDescriptor::load(path)? {
-				if descriptor.belongs_to(self.ctx)
-					&& descriptor.matches(&request, Some(DRIVER_HASH))
-					&& descriptor.is_alive()
-				{
+				if descriptor.belongs_to(self.ctx) && descriptor.matches(&request, Some(DRIVER_HASH)) && descriptor.is_alive() {
 					// Prefer CDP endpoint (for persistent sessions) over ws_endpoint
-					if let Some(endpoint) = descriptor
-						.cdp_endpoint
-						.as_deref()
-						.or(descriptor.ws_endpoint.as_deref())
-					{
+					if let Some(endpoint) = descriptor.cdp_endpoint.as_deref().or(descriptor.ws_endpoint.as_deref()) {
 						debug!(
 							target = "pw.session",
 							%endpoint,
@@ -271,24 +252,8 @@ impl<'a> SessionBroker<'a> {
 		{
 			if let Some(client) = daemon::try_connect().await {
 				if let Some(namespace_id) = &self.namespace_id {
-					let session_key = format!(
-						"{}:{}:{}",
-						namespace_id,
-						request.browser,
-						if request.headless {
-							"headless"
-						} else {
-							"headful"
-						}
-					);
-					match daemon::request_browser(
-						&client,
-						request.browser,
-						request.headless,
-						&session_key,
-					)
-					.await
-					{
+					let session_key = format!("{}:{}:{}", namespace_id, request.browser, if request.headless { "headless" } else { "headful" });
+					match daemon::request_browser(&client, request.browser, request.headless, &session_key).await {
 						Ok(endpoint) => {
 							debug!(
 								target = "pw.session",
@@ -336,23 +301,10 @@ impl<'a> SessionBroker<'a> {
 					"Persistent sessions with remote_debugging_port require Chromium".to_string(),
 				));
 			}
-			let s = BrowserSession::launch_persistent(
-				request.wait_until,
-				storage_state,
-				request.headless,
-				port,
-				request.keep_browser_running,
-			)
-			.await?;
+			let s = BrowserSession::launch_persistent(request.wait_until, storage_state, request.headless, port, request.keep_browser_running).await?;
 			(s, SessionSource::PersistentDebug)
 		} else if request.launch_server {
-			let s = BrowserSession::launch_server_session(
-				request.wait_until,
-				storage_state,
-				request.headless,
-				request.browser,
-			)
-			.await?;
+			let s = BrowserSession::launch_server_session(request.wait_until, storage_state, request.headless, request.browser).await?;
 			(s, SessionSource::BrowserServer)
 		} else {
 			let mut s = BrowserSession::with_options(SessionOptions {
@@ -406,13 +358,7 @@ impl<'a> SessionBroker<'a> {
 					ws_endpoint: ws,
 					workspace_id: Some(self.ctx.workspace_id().to_string()),
 					namespace: Some(self.ctx.namespace().to_string()),
-					session_key: daemon_session_key.or_else(|| {
-						Some(
-							self.ctx
-								.session_key(request.browser, request.headless)
-								.to_string(),
-						)
-					}),
+					session_key: daemon_session_key.or_else(|| Some(self.ctx.session_key(request.browser, request.headless).to_string())),
 					driver_hash: Some(DRIVER_HASH.to_string()),
 					created_at: now_ts(),
 				};
@@ -424,10 +370,7 @@ impl<'a> SessionBroker<'a> {
 					"saved session descriptor"
 				);
 			} else {
-				debug!(
-					target = "pw.session",
-					"no endpoint available; skipping descriptor save"
-				);
+				debug!(target = "pw.session", "no endpoint available; skipping descriptor save");
 			}
 		}
 
@@ -460,11 +403,7 @@ impl SessionHandle {
 	///
 	/// Returns `true` if navigation was performed, `false` if already on the page.
 	pub async fn goto_if_needed(&self, url: &str, timeout_ms: Option<u64>) -> Result<bool> {
-		let current_url = self
-			.page()
-			.evaluate_value("window.location.href")
-			.await
-			.unwrap_or_else(|_| self.page().url());
+		let current_url = self.page().evaluate_value("window.location.href").await.unwrap_or_else(|_| self.page().url());
 		let current = current_url.trim_matches('"');
 
 		if urls_match(current, url) {
@@ -525,11 +464,7 @@ impl SessionHandle {
 	///
 	/// This should be called when a command fails after navigation to capture
 	/// diagnostic information. Returns empty if artifacts_dir is None.
-	pub async fn collect_failure_artifacts(
-		&self,
-		artifacts_dir: Option<&Path>,
-		command_name: &str,
-	) -> CollectedArtifacts {
+	pub async fn collect_failure_artifacts(&self, artifacts_dir: Option<&Path>, command_name: &str) -> CollectedArtifacts {
 		match artifacts_dir {
 			Some(dir) => collect_failure_artifacts(self.page(), dir, command_name).await,
 			None => CollectedArtifacts::default(),
@@ -538,8 +473,7 @@ impl SessionHandle {
 }
 
 fn load_storage_state(path: &Path) -> Result<StorageState> {
-	StorageState::from_file(path)
-		.map_err(|e| PwError::BrowserLaunch(format!("Failed to load auth file: {}", e)))
+	StorageState::from_file(path).map_err(|e| PwError::BrowserLaunch(format!("Failed to load auth file: {}", e)))
 }
 
 /// Check if two URLs match for navigation purposes.
@@ -574,9 +508,7 @@ mod tests {
 	};
 
 	// Default block config for tests
-	static DEFAULT_BLOCK_CONFIG: BlockConfig = BlockConfig {
-		patterns: Vec::new(),
-	};
+	static DEFAULT_BLOCK_CONFIG: BlockConfig = BlockConfig { patterns: Vec::new() };
 
 	// Default download config for tests
 	static DEFAULT_DOWNLOAD_CONFIG: DownloadConfig = DownloadConfig { dir: None };
@@ -647,11 +579,7 @@ mod tests {
 		};
 
 		desc.save(&path).unwrap();
-		let gitignore = dir
-			.path()
-			.join("playwright")
-			.join(crate::workspace::STATE_VERSION_DIR)
-			.join(".gitignore");
+		let gitignore = dir.path().join("playwright").join(crate::workspace::STATE_VERSION_DIR).join(".gitignore");
 		assert!(gitignore.exists());
 		assert_eq!(std::fs::read_to_string(gitignore).unwrap(), "*\n");
 	}
@@ -732,17 +660,11 @@ mod tests {
 		// Trailing slash normalization
 		assert!(urls_match("https://example.com/", "https://example.com"));
 		assert!(urls_match("https://example.com", "https://example.com/"));
-		assert!(urls_match(
-			"https://example.com/path/",
-			"https://example.com/path"
-		));
+		assert!(urls_match("https://example.com/path/", "https://example.com/path"));
 
 		// Different URLs should not match
 		assert!(!urls_match("https://example.com", "https://other.com"));
-		assert!(!urls_match(
-			"https://example.com/a",
-			"https://example.com/b"
-		));
+		assert!(!urls_match("https://example.com/a", "https://example.com/b"));
 		assert!(!urls_match("https://example.com", "http://example.com"));
 	}
 }

@@ -263,42 +263,18 @@ mod tests {
 
 	#[test]
 	fn test_mouse_button_serialization() {
-		assert_eq!(
-			serde_json::to_string(&MouseButton::Left).unwrap(),
-			"\"left\""
-		);
-		assert_eq!(
-			serde_json::to_string(&MouseButton::Right).unwrap(),
-			"\"right\""
-		);
-		assert_eq!(
-			serde_json::to_string(&MouseButton::Middle).unwrap(),
-			"\"middle\""
-		);
+		assert_eq!(serde_json::to_string(&MouseButton::Left).unwrap(), "\"left\"");
+		assert_eq!(serde_json::to_string(&MouseButton::Right).unwrap(), "\"right\"");
+		assert_eq!(serde_json::to_string(&MouseButton::Middle).unwrap(), "\"middle\"");
 	}
 
 	#[test]
 	fn test_keyboard_modifier_serialization() {
-		assert_eq!(
-			serde_json::to_string(&KeyboardModifier::Alt).unwrap(),
-			"\"Alt\""
-		);
-		assert_eq!(
-			serde_json::to_string(&KeyboardModifier::Control).unwrap(),
-			"\"Control\""
-		);
-		assert_eq!(
-			serde_json::to_string(&KeyboardModifier::Meta).unwrap(),
-			"\"Meta\""
-		);
-		assert_eq!(
-			serde_json::to_string(&KeyboardModifier::Shift).unwrap(),
-			"\"Shift\""
-		);
-		assert_eq!(
-			serde_json::to_string(&KeyboardModifier::ControlOrMeta).unwrap(),
-			"\"ControlOrMeta\""
-		);
+		assert_eq!(serde_json::to_string(&KeyboardModifier::Alt).unwrap(), "\"Alt\"");
+		assert_eq!(serde_json::to_string(&KeyboardModifier::Control).unwrap(), "\"Control\"");
+		assert_eq!(serde_json::to_string(&KeyboardModifier::Meta).unwrap(), "\"Meta\"");
+		assert_eq!(serde_json::to_string(&KeyboardModifier::Shift).unwrap(), "\"Shift\"");
+		assert_eq!(serde_json::to_string(&KeyboardModifier::ControlOrMeta).unwrap(), "\"ControlOrMeta\"");
 	}
 
 	#[test]

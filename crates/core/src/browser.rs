@@ -74,35 +74,17 @@ impl Browser {
 	/// # Errors
 	///
 	/// Returns error if initializer is missing required fields (version, name)
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent),
-			type_name,
-			guid,
-			initializer.clone(),
-		);
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent), type_name, guid, initializer.clone());
 
 		let version = initializer["version"]
 			.as_str()
-			.ok_or_else(|| {
-				pw_runtime::Error::ProtocolError(
-					"Browser initializer missing 'version' field".to_string(),
-				)
-			})?
+			.ok_or_else(|| pw_runtime::Error::ProtocolError("Browser initializer missing 'version' field".to_string()))?
 			.to_string();
 
 		let name = initializer["name"]
 			.as_str()
-			.ok_or_else(|| {
-				pw_runtime::Error::ProtocolError(
-					"Browser initializer missing 'name' field".to_string(),
-				)
-			})?
+			.ok_or_else(|| pw_runtime::Error::ProtocolError("Browser initializer missing 'name' field".to_string()))?
 			.to_string();
 
 		Ok(Self {
@@ -173,10 +155,7 @@ impl Browser {
 		}
 
 		// Send newContext RPC to server with empty options for now
-		let response: NewContextResponse = self
-			.channel()
-			.send("newContext", serde_json::json!({}))
-			.await?;
+		let response: NewContextResponse = self.channel().send("newContext", serde_json::json!({})).await?;
 
 		// Retrieve the BrowserContext object from the connection registry
 		let context_arc = self.connection().get_object(&response.context.guid).await?;
@@ -184,12 +163,7 @@ impl Browser {
 		// Downcast to BrowserContext
 		let context = context_arc
 			.downcast_ref::<BrowserContext>()
-			.ok_or_else(|| {
-				pw_runtime::Error::ProtocolError(format!(
-					"Expected BrowserContext object, got {}",
-					context_arc.type_name()
-				))
-			})?;
+			.ok_or_else(|| pw_runtime::Error::ProtocolError(format!("Expected BrowserContext object, got {}", context_arc.type_name())))?;
 
 		Ok(context.clone())
 	}
@@ -211,10 +185,7 @@ impl Browser {
 	/// - Invalid options provided
 	///
 	/// See: <https://playwright.dev/docs/api/class-browser#browser-new-context>
-	pub async fn new_context_with_options(
-		&self,
-		options: crate::BrowserContextOptions,
-	) -> Result<BrowserContext> {
+	pub async fn new_context_with_options(&self, options: crate::BrowserContextOptions) -> Result<BrowserContext> {
 		// Response contains the GUID of the created BrowserContext
 		#[derive(Deserialize)]
 		struct NewContextResponse {
@@ -228,9 +199,8 @@ impl Browser {
 		}
 
 		// Convert options to JSON
-		let options_json = serde_json::to_value(options).map_err(|e| {
-			pw_runtime::Error::ProtocolError(format!("Failed to serialize context options: {}", e))
-		})?;
+		let options_json =
+			serde_json::to_value(options).map_err(|e| pw_runtime::Error::ProtocolError(format!("Failed to serialize context options: {}", e)))?;
 
 		// Send newContext RPC to server with options
 		let response: NewContextResponse = self.channel().send("newContext", options_json).await?;
@@ -241,12 +211,7 @@ impl Browser {
 		// Downcast to BrowserContext
 		let context = context_arc
 			.downcast_ref::<BrowserContext>()
-			.ok_or_else(|| {
-				pw_runtime::Error::ProtocolError(format!(
-					"Expected BrowserContext object, got {}",
-					context_arc.type_name()
-				))
-			})?;
+			.ok_or_else(|| pw_runtime::Error::ProtocolError(format!("Expected BrowserContext object, got {}", context_arc.type_name())))?;
 
 		Ok(context.clone())
 	}
@@ -287,10 +252,7 @@ impl Browser {
 	pub async fn close(&self) -> Result<()> {
 		// Send close RPC to server
 		// The protocol expects an empty object as params
-		let result = self
-			.channel()
-			.send_no_result("close", serde_json::json!({}))
-			.await;
+		let result = self.channel().send_no_result("close", serde_json::json!({})).await;
 
 		// Add delay on Windows CI to ensure browser process fully terminates
 		// This prevents subsequent browser launches from hanging

@@ -119,40 +119,28 @@ impl Locator {
 	///
 	/// See: <https://playwright.dev/docs/api/class-locator#locator-first>
 	pub fn first(&self) -> Locator {
-		Locator::new(
-			Arc::clone(&self.frame),
-			format!("{} >> nth=0", self.selector),
-		)
+		Locator::new(Arc::clone(&self.frame), format!("{} >> nth=0", self.selector))
 	}
 
 	/// Creates a locator for the last matching element.
 	///
 	/// See: <https://playwright.dev/docs/api/class-locator#locator-last>
 	pub fn last(&self) -> Locator {
-		Locator::new(
-			Arc::clone(&self.frame),
-			format!("{} >> nth=-1", self.selector),
-		)
+		Locator::new(Arc::clone(&self.frame), format!("{} >> nth=-1", self.selector))
 	}
 
 	/// Creates a locator for the nth matching element (0-indexed).
 	///
 	/// See: <https://playwright.dev/docs/api/class-locator#locator-nth>
 	pub fn nth(&self, index: i32) -> Locator {
-		Locator::new(
-			Arc::clone(&self.frame),
-			format!("{} >> nth={}", self.selector, index),
-		)
+		Locator::new(Arc::clone(&self.frame), format!("{} >> nth={}", self.selector, index))
 	}
 
 	/// Creates a sub-locator within this locator's subtree.
 	///
 	/// See: <https://playwright.dev/docs/api/class-locator#locator-locator>
 	pub fn locator(&self, selector: &str) -> Locator {
-		Locator::new(
-			Arc::clone(&self.frame),
-			format!("{} >> {}", self.selector, selector),
-		)
+		Locator::new(Arc::clone(&self.frame), format!("{} >> {}", self.selector, selector))
 	}
 
 	/// Returns the number of elements matching this locator.
@@ -286,16 +274,8 @@ impl Locator {
 	/// or `uncheck()` if `checked` is false.
 	///
 	/// See: <https://playwright.dev/docs/api/class-locator#locator-set-checked>
-	pub async fn set_checked(
-		&self,
-		checked: bool,
-		options: Option<crate::CheckOptions>,
-	) -> Result<()> {
-		if checked {
-			self.check(options).await
-		} else {
-			self.uncheck(options).await
-		}
+	pub async fn set_checked(&self, checked: bool, options: Option<crate::CheckOptions>) -> Result<()> {
+		if checked { self.check(options).await } else { self.uncheck(options).await }
 	}
 
 	/// Hovers the mouse over the element.
@@ -317,14 +297,8 @@ impl Locator {
 	/// Returns an array of option values that have been successfully selected.
 	///
 	/// See: <https://playwright.dev/docs/api/class-locator#locator-select-option>
-	pub async fn select_option(
-		&self,
-		value: impl Into<crate::SelectOption>,
-		options: Option<crate::SelectOptions>,
-	) -> Result<Vec<String>> {
-		self.frame
-			.locator_select_option(&self.selector, value.into(), options)
-			.await
+	pub async fn select_option(&self, value: impl Into<crate::SelectOption>, options: Option<crate::SelectOptions>) -> Result<Vec<String>> {
+		self.frame.locator_select_option(&self.selector, value.into(), options).await
 	}
 
 	/// Selects multiple options in a select element.
@@ -337,63 +311,36 @@ impl Locator {
 		values: &[impl Into<crate::SelectOption> + Clone],
 		options: Option<crate::SelectOptions>,
 	) -> Result<Vec<String>> {
-		let select_options: Vec<crate::SelectOption> =
-			values.iter().map(|v| v.clone().into()).collect();
-		self.frame
-			.locator_select_option_multiple(&self.selector, select_options, options)
-			.await
+		let select_options: Vec<crate::SelectOption> = values.iter().map(|v| v.clone().into()).collect();
+		self.frame.locator_select_option_multiple(&self.selector, select_options, options).await
 	}
 
 	/// Sets the file path(s) to upload to a file input element.
 	///
 	/// See: <https://playwright.dev/docs/api/class-locator#locator-set-input-files>
-	pub async fn set_input_files(
-		&self,
-		file: &std::path::PathBuf,
-		_options: Option<()>,
-	) -> Result<()> {
-		self.frame
-			.locator_set_input_files(&self.selector, file)
-			.await
+	pub async fn set_input_files(&self, file: &std::path::PathBuf, _options: Option<()>) -> Result<()> {
+		self.frame.locator_set_input_files(&self.selector, file).await
 	}
 
 	/// Sets multiple file paths to upload to a file input element.
 	///
 	/// See: <https://playwright.dev/docs/api/class-locator#locator-set-input-files>
-	pub async fn set_input_files_multiple(
-		&self,
-		files: &[&std::path::PathBuf],
-		_options: Option<()>,
-	) -> Result<()> {
-		self.frame
-			.locator_set_input_files_multiple(&self.selector, files)
-			.await
+	pub async fn set_input_files_multiple(&self, files: &[&std::path::PathBuf], _options: Option<()>) -> Result<()> {
+		self.frame.locator_set_input_files_multiple(&self.selector, files).await
 	}
 
 	/// Sets a file to upload using FilePayload (explicit name, mimeType, buffer).
 	///
 	/// See: <https://playwright.dev/docs/api/class-locator#locator-set-input-files>
-	pub async fn set_input_files_payload(
-		&self,
-		file: crate::FilePayload,
-		_options: Option<()>,
-	) -> Result<()> {
-		self.frame
-			.locator_set_input_files_payload(&self.selector, file)
-			.await
+	pub async fn set_input_files_payload(&self, file: crate::FilePayload, _options: Option<()>) -> Result<()> {
+		self.frame.locator_set_input_files_payload(&self.selector, file).await
 	}
 
 	/// Sets multiple files to upload using FilePayload.
 	///
 	/// See: <https://playwright.dev/docs/api/class-locator#locator-set-input-files>
-	pub async fn set_input_files_payload_multiple(
-		&self,
-		files: &[crate::FilePayload],
-		_options: Option<()>,
-	) -> Result<()> {
-		self.frame
-			.locator_set_input_files_payload_multiple(&self.selector, files)
-			.await
+	pub async fn set_input_files_payload_multiple(&self, files: &[crate::FilePayload], _options: Option<()>) -> Result<()> {
+		self.frame.locator_set_input_files_payload_multiple(&self.selector, files).await
 	}
 
 	/// Takes a screenshot of the element and returns the image bytes.
@@ -408,9 +355,7 @@ impl Locator {
 			.frame
 			.query_selector(&self.selector)
 			.await?
-			.ok_or_else(|| {
-				pw_runtime::Error::ElementNotFound(format!("Element not found: {}", self.selector))
-			})?;
+			.ok_or_else(|| pw_runtime::Error::ElementNotFound(format!("Element not found: {}", self.selector)))?;
 
 		// Delegate to ElementHandle.screenshot()
 		element.screenshot(options).await
@@ -419,8 +364,6 @@ impl Locator {
 
 impl std::fmt::Debug for Locator {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("Locator")
-			.field("selector", &self.selector)
-			.finish()
+		f.debug_struct("Locator").field("selector", &self.selector).finish()
 	}
 }

@@ -40,18 +40,11 @@ impl CollectedArtifacts {
 /// A `CollectedArtifacts` containing paths to saved artifacts.
 /// Failures during collection are logged but don't propagate - we want the original
 /// error to be the one reported.
-pub async fn collect_failure_artifacts(
-	page: &Page,
-	artifacts_dir: &Path,
-	command_name: &str,
-) -> CollectedArtifacts {
+pub async fn collect_failure_artifacts(page: &Page, artifacts_dir: &Path, command_name: &str) -> CollectedArtifacts {
 	let mut collected = CollectedArtifacts::default();
 
 	// Generate timestamp for unique filenames
-	let timestamp = SystemTime::now()
-		.duration_since(UNIX_EPOCH)
-		.map(|d| d.as_millis())
-		.unwrap_or(0);
+	let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
 
 	// Ensure artifacts directory exists
 	if let Err(e) = std::fs::create_dir_all(artifacts_dir) {
@@ -71,11 +64,7 @@ pub async fn collect_failure_artifacts(
 		collected.artifacts.push(artifact);
 	}
 
-	debug!(
-		"Collected {} failure artifacts in {}",
-		collected.artifacts.len(),
-		artifacts_dir.display()
-	);
+	debug!("Collected {} failure artifacts in {}", collected.artifacts.len(), artifacts_dir.display());
 
 	collected
 }

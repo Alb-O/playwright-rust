@@ -40,8 +40,7 @@ pub async fn listen(host: &str, port: u16, ctx: &CommandContext) -> Result<()> {
 	let auth_dir = match ctx.project {
 		Some(ref proj) => proj.paths.auth_dir(),
 		None => {
-			let home = dirs::home_dir()
-				.ok_or_else(|| PwError::Context("Could not determine home directory".into()))?;
+			let home = dirs::home_dir().ok_or_else(|| PwError::Context("Could not determine home directory".into()))?;
 			home.join(".config").join("pw").join("auth")
 		}
 	};
@@ -69,9 +68,7 @@ pub async fn listen(host: &str, port: u16, ctx: &CommandContext) -> Result<()> {
 	println!();
 	println!("Press Ctrl+C to stop.");
 
-	axum::serve(listener, app)
-		.await
-		.map_err(|e| PwError::Context(format!("Server error: {e}")))?;
+	axum::serve(listener, app).await.map_err(|e| PwError::Context(format!("Server error: {e}")))?;
 
 	Ok(())
 }
@@ -174,10 +171,7 @@ async fn handle_socket(socket: WebSocket, state: ListenState) {
 	}
 }
 
-fn save_domain_cookies(
-	domains: &[pw_protocol::DomainCookies],
-	auth_dir: &Path,
-) -> (Vec<String>, Vec<String>) {
+fn save_domain_cookies(domains: &[pw_protocol::DomainCookies], auth_dir: &Path) -> (Vec<String>, Vec<String>) {
 	let mut saved_paths = Vec::new();
 	let mut errors = Vec::new();
 
@@ -188,12 +182,7 @@ fn save_domain_cookies(
 
 		match storage_state.to_file(&path) {
 			Ok(()) => {
-				println!(
-					"Saved {} cookies for {} -> {}",
-					dc.cookies.len(),
-					dc.domain,
-					path.display()
-				);
+				println!("Saved {} cookies for {} -> {}", dc.cookies.len(), dc.domain, path.display());
 				saved_paths.push(path.display().to_string());
 			}
 			Err(e) => {
@@ -206,20 +195,14 @@ fn save_domain_cookies(
 	(saved_paths, errors)
 }
 
-async fn send_response(
-	sender: &mut futures::stream::SplitSink<WebSocket, Message>,
-	msg: ServerMessage,
-) -> std::result::Result<(), axum::Error> {
+async fn send_response(sender: &mut futures::stream::SplitSink<WebSocket, Message>, msg: ServerMessage) -> std::result::Result<(), axum::Error> {
 	let json = serde_json::to_string(&msg).expect("ServerMessage is always serializable");
 	sender.send(Message::Text(json.into())).await
 }
 
 fn generate_token() -> String {
 	use std::time::{SystemTime, UNIX_EPOCH};
-	let seed = SystemTime::now()
-		.duration_since(UNIX_EPOCH)
-		.expect("system time is after epoch")
-		.as_nanos();
+	let seed = SystemTime::now().duration_since(UNIX_EPOCH).expect("system time is after epoch").as_nanos();
 	format!("{:x}", seed ^ 0xDEAD_BEEF_CAFE_BABE)
 }
 

@@ -98,12 +98,7 @@ pub async fn clear(ctx_state: &ContextState, format: OutputFormat) -> Result<()>
 	Ok(())
 }
 
-pub async fn start(
-	ctx_state: &ContextState,
-	broker: &mut SessionBroker<'_>,
-	headful: bool,
-	format: OutputFormat,
-) -> Result<()> {
+pub async fn start(ctx_state: &ContextState, broker: &mut SessionBroker<'_>, headful: bool, format: OutputFormat) -> Result<()> {
 	let ctx = broker.context();
 
 	// Persistent sessions only support Chromium (CDP)
@@ -147,11 +142,7 @@ pub async fn start(
 	session.close().await
 }
 
-pub async fn stop(
-	ctx_state: &ContextState,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-) -> Result<()> {
+pub async fn stop(ctx_state: &ContextState, broker: &mut SessionBroker<'_>, format: OutputFormat) -> Result<()> {
 	let Some(path) = ctx_state.session_descriptor_path() else {
 		let result = ResultBuilder::<serde_json::Value>::new("session stop")
 			.data(json!({
@@ -175,10 +166,7 @@ pub async fn stop(
 	};
 
 	// Prefer CDP endpoint for persistent sessions
-	let endpoint = descriptor
-		.cdp_endpoint
-		.as_deref()
-		.or(descriptor.ws_endpoint.as_deref());
+	let endpoint = descriptor.cdp_endpoint.as_deref().or(descriptor.ws_endpoint.as_deref());
 
 	let Some(endpoint) = endpoint else {
 		fs::remove_file(&path)?;

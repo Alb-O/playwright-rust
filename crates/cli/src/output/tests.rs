@@ -35,19 +35,13 @@ fn result_builder_error() {
 	assert!(!result.ok);
 	assert!(result.data.is_none());
 	assert!(result.error.is_some());
-	assert_eq!(
-		result.error.as_ref().unwrap().code,
-		ErrorCode::NavigationFailed
-	);
+	assert_eq!(result.error.as_ref().unwrap().code, ErrorCode::NavigationFailed);
 }
 
 #[test]
 fn error_code_display() {
 	assert_eq!(ErrorCode::NavigationFailed.to_string(), "NAVIGATION_FAILED");
-	assert_eq!(
-		ErrorCode::SelectorNotFound.to_string(),
-		"SELECTOR_NOT_FOUND"
-	);
+	assert_eq!(ErrorCode::SelectorNotFound.to_string(), "SELECTOR_NOT_FOUND");
 }
 
 #[test]

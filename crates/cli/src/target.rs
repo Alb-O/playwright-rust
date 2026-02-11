@@ -126,13 +126,7 @@ pub enum TargetPolicy {
 /// * `last_url` - Last URL from context (for fallback).
 /// * `has_cdp` - Whether a CDP endpoint is active.
 /// * `policy` - How to handle missing URLs.
-pub fn resolve_target(
-	provided: Option<String>,
-	base_url: Option<&str>,
-	last_url: Option<&str>,
-	has_cdp: bool,
-	policy: TargetPolicy,
-) -> Result<ResolvedTarget> {
+pub fn resolve_target(provided: Option<String>, base_url: Option<&str>, last_url: Option<&str>, has_cdp: bool, policy: TargetPolicy) -> Result<ResolvedTarget> {
 	// 1. Explicit URL provided
 	if let Some(u) = provided {
 		let url = apply_base_url(&u, base_url)?;
@@ -161,8 +155,7 @@ pub fn resolve_target(
 
 	// 4. Fall back to base_url
 	if let Some(b) = base_url {
-		let url = Url::parse(b)
-			.map_err(|e| PwError::Context(format!("invalid base URL '{}': {}", b, e)))?;
+		let url = Url::parse(b).map_err(|e| PwError::Context(format!("invalid base URL '{}': {}", b, e)))?;
 		return Ok(ResolvedTarget {
 			target: Target::Navigate(url),
 			source: TargetSource::BaseUrl,
@@ -181,8 +174,7 @@ pub fn resolve_target(
 fn apply_base_url(url: &str, base: Option<&str>) -> Result<Url> {
 	// Check if URL is already absolute
 	if is_absolute(url) {
-		return Url::parse(url)
-			.map_err(|e| PwError::Context(format!("invalid URL '{}': {}", url, e)));
+		return Url::parse(url).map_err(|e| PwError::Context(format!("invalid URL '{}': {}", url, e)));
 	}
 
 	// Relative URL needs a base
@@ -194,15 +186,11 @@ fn apply_base_url(url: &str, base: Option<&str>) -> Result<Url> {
 	};
 
 	// Parse base and join
-	let base_url = Url::parse(base_str)
-		.map_err(|e| PwError::Context(format!("invalid base URL '{}': {}", base_str, e)))?;
+	let base_url = Url::parse(base_str).map_err(|e| PwError::Context(format!("invalid base URL '{}': {}", base_str, e)))?;
 
-	base_url.join(url).map_err(|e| {
-		PwError::Context(format!(
-			"failed to join '{}' with base '{}': {}",
-			url, base_str, e
-		))
-	})
+	base_url
+		.join(url)
+		.map_err(|e| PwError::Context(format!("failed to join '{}' with base '{}': {}", url, base_str, e)))
 }
 
 fn is_absolute(url: &str) -> bool {
@@ -235,34 +223,16 @@ pub struct ResolveEnv<'a> {
 impl<'a> ResolveEnv<'a> {
 	/// Create a new resolution environment.
 	pub fn new(ctx_state: &'a ContextState, has_cdp: bool, command: &'static str) -> Self {
-		Self {
-			ctx_state,
-			has_cdp,
-			command,
-		}
+		Self { ctx_state, has_cdp, command }
 	}
 
 	/// Resolve a target URL using context and CDP state.
-	pub fn resolve_target(
-		&self,
-		provided: Option<String>,
-		policy: TargetPolicy,
-	) -> Result<ResolvedTarget> {
-		resolve_target(
-			provided,
-			self.ctx_state.base_url(),
-			self.ctx_state.last_url(),
-			self.has_cdp,
-			policy,
-		)
+	pub fn resolve_target(&self, provided: Option<String>, policy: TargetPolicy) -> Result<ResolvedTarget> {
+		resolve_target(provided, self.ctx_state.base_url(), self.ctx_state.last_url(), self.has_cdp, policy)
 	}
 
 	/// Resolve a selector with optional fallback.
-	pub fn resolve_selector(
-		&self,
-		provided: Option<String>,
-		fallback: Option<&str>,
-	) -> Result<String> {
+	pub fn resolve_selector(&self, provided: Option<String>, fallback: Option<&str>) -> Result<String> {
 		self.ctx_state.resolve_selector(provided, fallback)
 	}
 }
@@ -315,14 +285,7 @@ mod tests {
 
 	#[test]
 	fn cdp_mode_returns_current_page() {
-		let result = resolve_target(
-			None,
-			Some("https://base.com"),
-			Some("https://last.com"),
-			true,
-			TargetPolicy::AllowCurrentPage,
-		)
-		.unwrap();
+		let result = resolve_target(None, Some("https://base.com"), Some("https://last.com"), true, TargetPolicy::AllowCurrentPage).unwrap();
 
 		assert!(result.is_current_page());
 		assert_eq!(result.source, TargetSource::CdpCurrentPageDefault);
@@ -330,14 +293,7 @@ mod tests {
 
 	#[test]
 	fn cdp_mode_require_url_falls_back_to_last() {
-		let result = resolve_target(
-			None,
-			Some("https://base.com"),
-			Some("https://last.com"),
-			true,
-			TargetPolicy::RequireUrl,
-		)
-		.unwrap();
+		let result = resolve_target(None, Some("https://base.com"), Some("https://last.com"), true, TargetPolicy::RequireUrl).unwrap();
 
 		assert!(matches!(result.target, Target::Navigate(_)));
 		assert_eq!(result.source, TargetSource::ContextLastUrl);
@@ -346,14 +302,7 @@ mod tests {
 
 	#[test]
 	fn falls_back_to_last_url() {
-		let result = resolve_target(
-			None,
-			None,
-			Some("https://last.com"),
-			false,
-			TargetPolicy::AllowCurrentPage,
-		)
-		.unwrap();
+		let result = resolve_target(None, None, Some("https://last.com"), false, TargetPolicy::AllowCurrentPage).unwrap();
 
 		assert_eq!(result.source, TargetSource::ContextLastUrl);
 		assert_eq!(result.url_str(), Some("https://last.com/"));
@@ -361,14 +310,7 @@ mod tests {
 
 	#[test]
 	fn falls_back_to_base_url() {
-		let result = resolve_target(
-			None,
-			Some("https://base.com"),
-			None,
-			false,
-			TargetPolicy::AllowCurrentPage,
-		)
-		.unwrap();
+		let result = resolve_target(None, Some("https://base.com"), None, false, TargetPolicy::AllowCurrentPage).unwrap();
 
 		assert_eq!(result.source, TargetSource::BaseUrl);
 		assert_eq!(result.url_str(), Some("https://base.com/"));
@@ -397,13 +339,7 @@ mod tests {
 
 	#[test]
 	fn relative_url_without_base_errors() {
-		let result = resolve_target(
-			Some("/path/to/page".into()),
-			None,
-			None,
-			false,
-			TargetPolicy::AllowCurrentPage,
-		);
+		let result = resolve_target(Some("/path/to/page".into()), None, None, false, TargetPolicy::AllowCurrentPage);
 
 		assert!(result.is_err());
 	}
@@ -419,34 +355,20 @@ mod tests {
 		)
 		.unwrap();
 
-		assert_eq!(
-			result.preferred_url(Some("https://last.com")),
-			Some("https://example.com/")
-		);
+		assert_eq!(result.preferred_url(Some("https://last.com")), Some("https://example.com/"));
 	}
 
 	#[test]
 	fn preferred_url_for_current_page_uses_last() {
-		let result =
-			resolve_target(None, None, None, true, TargetPolicy::AllowCurrentPage).unwrap();
+		let result = resolve_target(None, None, None, true, TargetPolicy::AllowCurrentPage).unwrap();
 
-		assert_eq!(
-			result.preferred_url(Some("https://last.com")),
-			Some("https://last.com")
-		);
+		assert_eq!(result.preferred_url(Some("https://last.com")), Some("https://last.com"));
 		assert_eq!(result.preferred_url(None), None);
 	}
 
 	#[test]
 	fn data_url_is_absolute() {
-		let result = resolve_target(
-			Some("data:text/html,<h1>Test</h1>".into()),
-			None,
-			None,
-			false,
-			TargetPolicy::AllowCurrentPage,
-		)
-		.unwrap();
+		let result = resolve_target(Some("data:text/html,<h1>Test</h1>".into()), None, None, false, TargetPolicy::AllowCurrentPage).unwrap();
 
 		assert_eq!(result.source, TargetSource::Explicit);
 		assert_eq!(result.url_str(), Some("data:text/html,<h1>Test</h1>"));

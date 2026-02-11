@@ -12,9 +12,7 @@ use std::sync::Arc;
 
 use pw_runtime::Result;
 use pw_runtime::channel::Channel;
-use pw_runtime::channel_owner::{
-	ChannelOwner, ChannelOwnerImpl, DisposeReason, ParentOrConnection,
-};
+use pw_runtime::channel_owner::{ChannelOwner, ChannelOwnerImpl, DisposeReason, ParentOrConnection};
 use pw_runtime::connection::ConnectionLike;
 use serde_json::Value;
 

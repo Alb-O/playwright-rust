@@ -31,21 +31,10 @@ fn run_pw(args: &[&str]) -> (bool, String, String) {
 	let workspace_str = workspace.to_string_lossy().to_string();
 
 	// Use JSON format for tests since assertions expect JSON structure
-	let mut all_args = vec![
-		"--no-project",
-		"--workspace",
-		&workspace_str,
-		"--namespace",
-		"default",
-		"-f",
-		"json",
-	];
+	let mut all_args = vec!["--no-project", "--workspace", &workspace_str, "--namespace", "default", "-f", "json"];
 	all_args.extend_from_slice(args);
 
-	let output = Command::new(pw_binary())
-		.args(&all_args)
-		.output()
-		.expect("Failed to execute pw");
+	let output = Command::new(pw_binary()).args(&all_args).output().expect("Failed to execute pw");
 
 	let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 	let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -61,12 +50,7 @@ fn screenshot_creates_file() {
 	// Clean up any existing file
 	let _ = std::fs::remove_file(&output_path);
 
-	let (success, _stdout, stderr) = run_pw(&[
-		"screenshot",
-		"data:text/html,<h1>Test Screenshot</h1>",
-		"-o",
-		output_path.to_str().unwrap(),
-	]);
+	let (success, _stdout, stderr) = run_pw(&["screenshot", "data:text/html,<h1>Test Screenshot</h1>", "-o", output_path.to_str().unwrap()]);
 
 	assert!(success, "Command failed: {}", stderr);
 	assert!(output_path.exists(), "Screenshot file was not created");
@@ -96,30 +80,18 @@ fn html_with_selector() {
 
 #[test]
 fn text_simple() {
-	let (success, stdout, stderr) = run_pw(&[
-		"page",
-		"text",
-		"data:text/html,<p id='msg'>Hello World</p>",
-		"#msg",
-	]);
+	let (success, stdout, stderr) = run_pw(&["page", "text", "data:text/html,<p id='msg'>Hello World</p>", "#msg"]);
 
 	assert!(success, "Command failed: {}", stderr);
 	// JSON envelope contains the text
-	assert!(
-		stdout.contains("Hello World"),
-		"Expected 'Hello World' in output"
-	);
+	assert!(stdout.contains("Hello World"), "Expected 'Hello World' in output");
 	assert!(stdout.contains("\"ok\": true"), "Expected success in JSON");
-	assert!(
-		stdout.contains("\"matchCount\": 1"),
-		"Expected matchCount in output"
-	);
+	assert!(stdout.contains("\"matchCount\": 1"), "Expected matchCount in output");
 }
 
 #[test]
 fn eval_simple_expression() {
-	let (success, stdout, stderr) =
-		run_pw(&["page", "eval", "1 + 1", "data:text/html,<h1>Test</h1>"]);
+	let (success, stdout, stderr) = run_pw(&["page", "eval", "1 + 1", "data:text/html,<h1>Test</h1>"]);
 
 	assert!(success, "Command failed: {}", stderr);
 	// JSON envelope contains result in data.result
@@ -137,11 +109,7 @@ fn eval_document_title() {
 	]);
 
 	assert!(success, "Command failed: {}", stderr);
-	assert!(
-		stdout.contains("My Title"),
-		"Expected title in output: {}",
-		stdout
-	);
+	assert!(stdout.contains("My Title"), "Expected title in output: {}", stdout);
 }
 
 #[test]
@@ -154,11 +122,7 @@ fn eval_query_selector() {
 	]);
 
 	assert!(success, "Command failed: {}", stderr);
-	assert!(
-		stdout.contains("Content"),
-		"Expected 'Content' in output: {}",
-		stdout
-	);
+	assert!(stdout.contains("Content"), "Expected 'Content' in output: {}", stdout);
 }
 
 #[test]
@@ -179,12 +143,7 @@ fn coords_finds_element() {
 
 #[test]
 fn coords_element_not_found() {
-	let (success, stdout, _stderr) = run_pw(&[
-		"page",
-		"coords",
-		"data:text/html,<div>No button here</div>",
-		"#nonexistent",
-	]);
+	let (success, stdout, _stderr) = run_pw(&["page", "coords", "data:text/html,<div>No button here</div>", "#nonexistent"]);
 
 	// Command should fail with SELECTOR_NOT_FOUND error
 	assert!(!success, "Command should fail when element not found");
@@ -212,12 +171,7 @@ fn coords_all_multiple_elements() {
 
 #[test]
 fn coords_all_empty_result() {
-	let (success, stdout, stderr) = run_pw(&[
-		"page",
-		"coords-all",
-		"data:text/html,<div>Nothing here</div>",
-		".nonexistent",
-	]);
+	let (success, stdout, stderr) = run_pw(&["page", "coords-all", "data:text/html,<div>Nothing here</div>", ".nonexistent"]);
 
 	assert!(success, "Command failed: {}", stderr);
 	assert!(stdout.contains("[]"), "Expected empty array");
@@ -225,10 +179,7 @@ fn coords_all_empty_result() {
 
 #[test]
 fn navigate_returns_json() {
-	let (success, stdout, stderr) = run_pw(&[
-		"navigate",
-		"data:text/html,<html><head><title>Nav Test</title></head></html>",
-	]);
+	let (success, stdout, stderr) = run_pw(&["navigate", "data:text/html,<html><head><title>Nav Test</title></head></html>"]);
 
 	assert!(success, "Command failed: {}", stderr);
 	assert!(stdout.contains("\"ok\": true"), "Expected ok in JSON");
@@ -249,41 +200,27 @@ fn wait_timeout() {
 
 #[test]
 fn wait_load_state() {
-	let (success, stdout, stderr) =
-		run_pw(&["wait", "data:text/html,<div>Test</div>", "networkidle"]);
+	let (success, stdout, stderr) = run_pw(&["wait", "data:text/html,<div>Test</div>", "networkidle"]);
 
 	assert!(success, "Command failed: {}", stderr);
 	assert!(stdout.contains("\"ok\": true"), "Expected success in JSON");
-	assert!(
-		stdout.contains("networkidle"),
-		"Expected load state confirmation"
-	);
+	assert!(stdout.contains("networkidle"), "Expected load state confirmation");
 }
 
 #[test]
 fn wait_selector_found() {
-	let (success, stdout, stderr) = run_pw(&[
-		"wait",
-		"data:text/html,<div id='target'>Exists</div>",
-		"#target",
-	]);
+	let (success, stdout, stderr) = run_pw(&["wait", "data:text/html,<div id='target'>Exists</div>", "#target"]);
 
 	assert!(success, "Command failed: {}", stderr);
 	assert!(stdout.contains("\"ok\": true"), "Expected success in JSON");
-	assert!(
-		stdout.contains("selector") || stdout.contains("#target"),
-		"Expected selector confirmation"
-	);
+	assert!(stdout.contains("selector") || stdout.contains("#target"), "Expected selector confirmation");
 }
 
 #[test]
 fn missing_required_args() {
 	let (success, _stdout, _stderr) = run_pw(&["--no-context", "screenshot"]);
 
-	assert!(
-		!success,
-		"Command should fail without URL when context is disabled"
-	);
+	assert!(!success, "Command should fail without URL when context is disabled");
 }
 
 #[test]
@@ -291,10 +228,7 @@ fn unknown_command() {
 	let (success, _stdout, stderr) = run_pw(&["unknown-command"]);
 
 	assert!(!success, "Command should fail for unknown command");
-	assert!(
-		stderr.contains("error") || stderr.contains("invalid"),
-		"Expected error message"
-	);
+	assert!(stderr.contains("error") || stderr.contains("invalid"), "Expected error message");
 }
 
 #[test]
@@ -304,13 +238,7 @@ fn verbose_output() {
 
 	let _ = std::fs::remove_file(&output_path);
 
-	let (success, _stdout, stderr) = run_pw(&[
-		"-v",
-		"screenshot",
-		"data:text/html,<h1>Verbose Test</h1>",
-		"-o",
-		output_path.to_str().unwrap(),
-	]);
+	let (success, _stdout, stderr) = run_pw(&["-v", "screenshot", "data:text/html,<h1>Verbose Test</h1>", "-o", output_path.to_str().unwrap()]);
 
 	assert!(success, "Command failed: {}", stderr);
 	// Verbose mode should produce more output, but we just verify it doesn't break
@@ -334,10 +262,7 @@ fn version_flag() {
 	let (success, stdout, _stderr) = run_pw(&["--version"]);
 
 	assert!(success, "Version should succeed");
-	assert!(
-		stdout.contains("pw") || stdout.contains("0.1"),
-		"Expected version info"
-	);
+	assert!(stdout.contains("pw") || stdout.contains("0.1"), "Expected version info");
 }
 
 #[test]
@@ -345,9 +270,6 @@ fn subcommand_help() {
 	let (success, stdout, _stderr) = run_pw(&["screenshot", "--help"]);
 
 	assert!(success, "Subcommand help should succeed");
-	assert!(
-		stdout.contains("screenshot"),
-		"Expected screenshot description"
-	);
+	assert!(stdout.contains("screenshot"), "Expected screenshot description");
 	assert!(stdout.contains("URL"), "Expected URL argument");
 }

@@ -65,11 +65,7 @@ impl Resolve for LoginRaw {
 		let output = self.output.unwrap_or_else(|| PathBuf::from("auth.json"));
 		let timeout_secs = self.timeout_secs.unwrap_or(300);
 
-		Ok(LoginResolved {
-			target,
-			output,
-			timeout_secs,
-		})
+		Ok(LoginResolved { target, output, timeout_secs })
 	}
 }
 
@@ -85,10 +81,7 @@ pub struct CookiesRaw {
 
 impl CookiesRaw {
 	pub fn from_cli(url: Option<String>, format: String) -> Self {
-		Self {
-			url,
-			format: Some(format),
-		}
+		Self { url, format: Some(format) }
 	}
 }
 
@@ -128,12 +121,7 @@ impl Resolve for CookiesRaw {
 /// - Browser launch fails
 /// - Navigation fails
 /// - File I/O fails when saving the auth state
-pub async fn login_resolved(
-	args: &LoginResolved,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	last_url: Option<&str>,
-) -> Result<()> {
+pub async fn login_resolved(args: &LoginResolved, ctx: &CommandContext, broker: &mut SessionBroker<'_>, last_url: Option<&str>) -> Result<()> {
 	let url_display = args.target.url_str().unwrap_or("<current page>");
 	info!(target = "pw", url = %url_display, path = %args.output.display(), browser = %ctx.browser, "starting interactive login");
 
@@ -146,9 +134,7 @@ pub async fn login_resolved(
 				.with_preferred_url(preferred_url),
 		)
 		.await?;
-	session
-		.goto_target(&args.target.target, ctx.timeout_ms())
-		.await?;
+	session.goto_target(&args.target.target, ctx.timeout_ms()).await?;
 
 	println!("Browser opened at: {url_display}");
 	println!();
@@ -181,10 +167,7 @@ pub async fn login_resolved(
 	println!("  Cookies: {}", state.cookies.len());
 	println!("  Origins with localStorage: {}", state.origins.len());
 	println!();
-	println!(
-		"Use with other commands: pw --auth {} <command>",
-		args.output.display()
-	);
+	println!("Use with other commands: pw --auth {} <command>", args.output.display());
 
 	session.close().await
 }
@@ -197,25 +180,16 @@ pub async fn login_resolved(
 /// # Errors
 ///
 /// Returns an error if browser launch or navigation fails.
-pub async fn cookies_resolved(
-	args: &CookiesResolved,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	last_url: Option<&str>,
-) -> Result<()> {
+pub async fn cookies_resolved(args: &CookiesResolved, ctx: &CommandContext, broker: &mut SessionBroker<'_>, last_url: Option<&str>) -> Result<()> {
 	let url_display = args.target.url_str().unwrap_or("<current page>");
 	info!(target = "pw", url = %url_display, browser = %ctx.browser, "fetching cookies");
 
 	let preferred_url = args.preferred_url(last_url);
 	let session = broker
-		.session(
-			SessionRequest::from_context(WaitUntil::Load, ctx).with_preferred_url(preferred_url),
-		)
+		.session(SessionRequest::from_context(WaitUntil::Load, ctx).with_preferred_url(preferred_url))
 		.await?;
 
-	session
-		.goto_target(&args.target.target, ctx.timeout_ms())
-		.await?;
+	session.goto_target(&args.target.target, ctx.timeout_ms()).await?;
 
 	// Get the actual URL for cookie filtering
 	let cookie_url = match &args.target.target {
@@ -265,8 +239,7 @@ fn print_cookies_table(cookies: &[pw_rs::Cookie], url: &str) {
 ///
 /// Returns an error if the file cannot be read or parsed.
 pub async fn show(file: &Path) -> Result<()> {
-	let state = StorageState::from_file(file)
-		.map_err(|e| PwError::BrowserLaunch(format!("Failed to load auth file: {e}")))?;
+	let state = StorageState::from_file(file).map_err(|e| PwError::BrowserLaunch(format!("Failed to load auth file: {e}")))?;
 
 	println!("Authentication state from: {}", file.display());
 	println!();

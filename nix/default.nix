@@ -218,7 +218,10 @@ conn.on("error", () => {
       '';
     in
     {
-      treefmt = import ./treefmt.nix { inherit pkgs; };
+      treefmt = {
+        projectRootFile = "flake.nix";
+        programs.rustfmt.enable = true;
+      };
 
       packages = {
         rust = rustPlatform.buildRustPackage {

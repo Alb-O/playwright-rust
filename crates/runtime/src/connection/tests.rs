@@ -135,11 +135,7 @@ fn test_error_type_parsing() {
 	});
 	assert!(error.is_timeout());
 	match &error {
-		Error::Remote {
-			name,
-			message,
-			stack,
-		} => {
+		Error::Remote { name, message, stack } => {
 			assert_eq!(name, "TimeoutError");
 			assert_eq!(message, "timeout");
 			assert_eq!(stack.as_deref(), Some("stack trace"));

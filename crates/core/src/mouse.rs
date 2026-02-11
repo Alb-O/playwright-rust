@@ -25,12 +25,7 @@ impl Mouse {
 	/// Dispatches a `mousemove` event.
 	///
 	/// See: <https://playwright.dev/docs/api/class-mouse#mouse-move>
-	pub async fn move_to(
-		&self,
-		x: i32,
-		y: i32,
-		options: Option<crate::MouseOptions>,
-	) -> Result<()> {
+	pub async fn move_to(&self, x: i32, y: i32, options: Option<crate::MouseOptions>) -> Result<()> {
 		self.page.mouse_move(x, y, options).await
 	}
 
@@ -44,12 +39,7 @@ impl Mouse {
 	/// Shortcut performing `move()`, `down()`, `up()`, `down()`, and `up()` sequentially.
 	///
 	/// See: <https://playwright.dev/docs/api/class-mouse#mouse-dblclick>
-	pub async fn dblclick(
-		&self,
-		x: i32,
-		y: i32,
-		options: Option<crate::MouseOptions>,
-	) -> Result<()> {
+	pub async fn dblclick(&self, x: i32, y: i32, options: Option<crate::MouseOptions>) -> Result<()> {
 		self.page.mouse_dblclick(x, y, options).await
 	}
 

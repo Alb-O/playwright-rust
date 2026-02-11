@@ -141,16 +141,9 @@ impl PwError {
 				let mut msg = format!("Navigation to {url} failed: {source}");
 				// If the URL looks like a CSS selector, add a helpful hint
 				if looks_like_selector(url) {
-					msg.push_str(&format!(
-						". Did you mean to use `-s {}` for a CSS selector?",
-						url
-					));
+					msg.push_str(&format!(". Did you mean to use `-s {}` for a CSS selector?", url));
 				}
-				(
-					ErrorCode::NavigationFailed,
-					msg,
-					Some(serde_json::json!({ "url": url })),
-				)
+				(ErrorCode::NavigationFailed, msg, Some(serde_json::json!({ "url": url })))
 			}
 			PwError::ElementNotFound { selector } => (
 				ErrorCode::SelectorNotFound,
@@ -179,10 +172,6 @@ impl PwError {
 			PwError::Anyhow(err) => (ErrorCode::InternalError, err.to_string(), None),
 		};
 
-		CommandError {
-			code,
-			message,
-			details,
-		}
+		CommandError { code, message, details }
 	}
 }

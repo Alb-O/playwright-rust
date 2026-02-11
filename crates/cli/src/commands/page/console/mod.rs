@@ -86,10 +86,7 @@ impl CommandDef for ConsoleCommand {
 		})
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -102,16 +99,11 @@ impl CommandDef for ConsoleCommand {
 			let target = args.target.target.clone();
 			let capture_timeout_ms = args.timeout_ms;
 
-			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx).with_preferred_url(preferred_url);
 
 			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
 				Box::pin(async move {
-					if let Err(err) = session
-						.page()
-						.evaluate(console_capture_injection_js())
-						.await
-					{
+					if let Err(err) = session.page().evaluate(console_capture_injection_js()).await {
 						warn!(target = "pw.browser.console", error = %err, "failed to inject console capture");
 					}
 
@@ -125,8 +117,7 @@ impl CommandDef for ConsoleCommand {
 						.await
 						.unwrap_or_else(|_| "[]".to_string());
 
-					let messages: Vec<ConsoleMessage> =
-						serde_json::from_str(&messages_json).unwrap_or_default();
+					let messages: Vec<ConsoleMessage> = serde_json::from_str(&messages_json).unwrap_or_default();
 
 					for msg in &messages {
 						info!(

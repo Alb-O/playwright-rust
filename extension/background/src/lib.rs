@@ -70,19 +70,10 @@ enum BackgroundResponse {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum ServerMessage {
-	Welcome {
-		version: String,
-	},
-	Rejected {
-		reason: String,
-	},
-	Received {
-		domains_saved: usize,
-		paths: Vec<String>,
-	},
-	Error {
-		message: String,
-	},
+	Welcome { version: String },
+	Rejected { reason: String },
+	Received { domains_saved: usize, paths: Vec<String> },
+	Error { message: String },
 }
 
 /// Messages sent to the server (mirrors `pw_protocol::ExtensionMessage`).
@@ -143,10 +134,7 @@ fn get_f64(obj: &JsValue, key: &str) -> Option<f64> {
 }
 
 fn get_bool(obj: &JsValue, key: &str) -> bool {
-	Reflect::get(obj, &key.into())
-		.ok()
-		.and_then(|v| v.as_bool())
-		.unwrap_or(false)
+	Reflect::get(obj, &key.into()).ok().and_then(|v| v.as_bool()).unwrap_or(false)
 }
 
 thread_local! {
@@ -173,19 +161,17 @@ impl ConnectionState {
 pub fn start() {
 	console_error_panic_hook::set_once();
 
-	let listener = Closure::<dyn FnMut(JsValue, JsValue, JsValue) -> JsValue>::new(
-		|message: JsValue, _sender: JsValue, send_response: JsValue| {
-			let send_fn = js_sys::Function::from(send_response);
+	let listener = Closure::<dyn FnMut(JsValue, JsValue, JsValue) -> JsValue>::new(|message: JsValue, _sender: JsValue, send_response: JsValue| {
+		let send_fn = js_sys::Function::from(send_response);
 
-			wasm_bindgen_futures::spawn_local(async move {
-				let response = handle_popup_message(message).await;
-				let response_js = serde_wasm_bindgen::to_value(&response).unwrap_or(JsValue::NULL);
-				let _ = send_fn.call1(&JsValue::NULL, &response_js);
-			});
+		wasm_bindgen_futures::spawn_local(async move {
+			let response = handle_popup_message(message).await;
+			let response_js = serde_wasm_bindgen::to_value(&response).unwrap_or(JsValue::NULL);
+			let _ = send_fn.call1(&JsValue::NULL, &response_js);
+		});
 
-			JsValue::TRUE
-		},
-	);
+		JsValue::TRUE
+	});
 
 	runtime_on_message_add_listener(&listener);
 	listener.forget();
@@ -215,10 +201,7 @@ fn get_status() -> BackgroundResponse {
 	STATE.with(|state| {
 		let s = state.borrow();
 		BackgroundResponse::Status {
-			connected: s
-				.ws
-				.as_ref()
-				.is_some_and(|ws| ws.ready_state() == WebSocket::OPEN),
+			connected: s.ws.as_ref().is_some_and(|ws| ws.ready_state() == WebSocket::OPEN),
 			authenticated: s.authenticated,
 			server: s.server.clone(),
 		}
@@ -248,17 +231,13 @@ async fn get_active_tab_domain() -> Result<Option<String>, JsValue> {
 	}
 
 	let tab = tabs.get(0);
-	let url = Reflect::get(&tab, &"url".into())?
-		.as_string()
-		.unwrap_or_default();
+	let url = Reflect::get(&tab, &"url".into())?.as_string().unwrap_or_default();
 
 	Ok(extract_domain(&url))
 }
 
 fn extract_domain(url: &str) -> Option<String> {
-	let url = url
-		.strip_prefix("https://")
-		.or_else(|| url.strip_prefix("http://"))?;
+	let url = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))?;
 	let domain = url.split('/').next()?;
 	let domain = domain.split(':').next()?;
 	Some(domain.to_string())
@@ -297,9 +276,7 @@ async fn connect_to_server(server: &str, token: &str) -> BackgroundResponse {
 	let token_clone = token.clone();
 	let onopen = Closure::<dyn FnMut()>::new(move || {
 		log("Connected, sending hello");
-		let hello = ExtensionMessage::Hello {
-			token: token_clone.clone(),
-		};
+		let hello = ExtensionMessage::Hello { token: token_clone.clone() };
 		if let Ok(json) = serde_json::to_string(&hello) {
 			let _ = ws_clone.send_with_str(&json);
 		}
@@ -364,10 +341,7 @@ fn handle_server_message(text: &str) {
 			});
 			notify_popup(&BackgroundResponse::Error { message: reason });
 		}
-		ServerMessage::Received {
-			domains_saved,
-			paths,
-		} => {
+		ServerMessage::Received { domains_saved, paths } => {
 			log(&format!("Saved {domains_saved} domain(s)"));
 			notify_popup(&BackgroundResponse::ExportResult {
 				success: true,
@@ -433,9 +407,7 @@ async fn export_cookies(domains: Vec<String>) -> BackgroundResponse {
 		};
 	}
 
-	let msg = ExtensionMessage::PushCookies {
-		domains: domain_cookies,
-	};
+	let msg = ExtensionMessage::PushCookies { domains: domain_cookies };
 	match serde_json::to_string(&msg) {
 		Ok(json) => {
 			if let Err(e) = ws.send_with_str(&json) {
@@ -463,11 +435,7 @@ async fn fetch_cookies_for_domain(domain: &str) -> Result<Vec<ChromeCookie>, JsV
 
 	for domain_pattern in [domain.to_string(), format!(".{domain}")] {
 		let query = Object::new();
-		Reflect::set(
-			&query,
-			&"domain".into(),
-			&JsValue::from_str(&domain_pattern),
-		)?;
+		Reflect::set(&query, &"domain".into(), &JsValue::from_str(&domain_pattern))?;
 
 		let cookies_val = JsFuture::from(cookies_get_all(&query)).await?;
 		let cookies = Array::from(&cookies_val);
@@ -475,11 +443,9 @@ async fn fetch_cookies_for_domain(domain: &str) -> Result<Vec<ChromeCookie>, JsV
 		for i in 0..cookies.length() {
 			let cookie = cookies.get(i);
 			if let Some(c) = ChromeCookie::from_js(&cookie) {
-				let is_duplicate = all_cookies.iter().any(|existing: &ChromeCookie| {
-					existing.name == c.name
-						&& existing.domain == c.domain
-						&& existing.path == c.path
-				});
+				let is_duplicate = all_cookies
+					.iter()
+					.any(|existing: &ChromeCookie| existing.name == c.name && existing.domain == c.domain && existing.path == c.path);
 				if !is_duplicate {
 					all_cookies.push(c);
 				}
@@ -503,9 +469,7 @@ extern "C" {
 	fn cookies_get_all(details: &JsValue) -> Promise;
 
 	#[wasm_bindgen(js_namespace = ["chrome", "runtime", "onMessage"], js_name = addListener)]
-	fn runtime_on_message_add_listener(
-		callback: &Closure<dyn FnMut(JsValue, JsValue, JsValue) -> JsValue>,
-	);
+	fn runtime_on_message_add_listener(callback: &Closure<dyn FnMut(JsValue, JsValue, JsValue) -> JsValue>);
 
 	#[wasm_bindgen(js_namespace = ["chrome", "runtime"], js_name = sendMessage)]
 	fn runtime_send_message(message: &JsValue) -> Promise;

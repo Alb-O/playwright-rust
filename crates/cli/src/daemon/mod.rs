@@ -51,12 +51,7 @@ pub async fn try_connect() -> Option<DaemonClient> {
 /// Request a browser from the daemon with a deterministic session key.
 ///
 /// Browsers are reused only when session keys match exactly.
-pub async fn request_browser(
-	_client: &DaemonClient,
-	kind: BrowserKind,
-	headless: bool,
-	session_key: &str,
-) -> Result<String> {
+pub async fn request_browser(_client: &DaemonClient, kind: BrowserKind, headless: bool, session_key: &str) -> Result<String> {
 	let response = send_request(DaemonRequest::AcquireBrowser {
 		browser: kind,
 		headless,
@@ -72,9 +67,7 @@ pub async fn request_browser(
 }
 
 async fn send_request(request: DaemonRequest) -> Result<DaemonResponse> {
-	let stream = connect_daemon()
-		.await
-		.context("Failed to connect to daemon")?;
+	let stream = connect_daemon().await.context("Failed to connect to daemon")?;
 	send_request_stream(stream, request).await
 }
 
@@ -89,10 +82,7 @@ async fn connect_daemon() -> std::io::Result<TcpStream> {
 }
 
 fn is_not_running(err: &std::io::Error) -> bool {
-	matches!(
-		err.kind(),
-		std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused
-	)
+	matches!(err.kind(), std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused)
 }
 
 async fn send_request_stream<S>(mut stream: S, request: DaemonRequest) -> Result<DaemonResponse>
@@ -104,17 +94,11 @@ where
 		.write_all(format!("{}\n", payload).as_bytes())
 		.await
 		.context("Failed writing daemon request")?;
-	stream
-		.flush()
-		.await
-		.context("Failed flushing daemon request")?;
+	stream.flush().await.context("Failed flushing daemon request")?;
 
 	let mut reader = BufReader::new(stream);
 	let mut line = String::new();
-	reader
-		.read_line(&mut line)
-		.await
-		.context("Failed reading daemon response")?;
+	reader.read_line(&mut line).await.context("Failed reading daemon response")?;
 	let response = serde_json::from_str(&line).context("Failed parsing daemon response")?;
 	Ok(response)
 }

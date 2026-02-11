@@ -23,17 +23,9 @@ impl Page {
 		Fut: Future<Output = Result<()>> + Send + 'static,
 	{
 		let id = next_handler_id();
-		let handler: HandlerFn<Download> =
-			Arc::new(move |download: Download| -> HandlerFuture { Box::pin(handler(download)) });
+		let handler: HandlerFn<Download> = Arc::new(move |download: Download| -> HandlerFuture { Box::pin(handler(download)) });
 
-		self.download_handlers.lock().insert(
-			id,
-			HandlerEntry {
-				id,
-				meta: (),
-				handler,
-			},
-		);
+		self.download_handlers.lock().insert(id, HandlerEntry { id, meta: (), handler });
 
 		Subscription::from_handler_map(id, &self.download_handlers)
 	}
@@ -51,17 +43,9 @@ impl Page {
 		Fut: Future<Output = Result<()>> + Send + 'static,
 	{
 		let id = next_handler_id();
-		let handler: HandlerFn<Dialog> =
-			Arc::new(move |dialog: Dialog| -> HandlerFuture { Box::pin(handler(dialog)) });
+		let handler: HandlerFn<Dialog> = Arc::new(move |dialog: Dialog| -> HandlerFuture { Box::pin(handler(dialog)) });
 
-		self.dialog_handlers.lock().insert(
-			id,
-			HandlerEntry {
-				id,
-				meta: (),
-				handler,
-			},
-		);
+		self.dialog_handlers.lock().insert(id, HandlerEntry { id, meta: (), handler });
 
 		Subscription::from_handler_map(id, &self.dialog_handlers)
 	}
@@ -79,11 +63,7 @@ impl Page {
 	///
 	/// Returns [`Error::Timeout`](pw_runtime::Error::Timeout) or
 	/// [`Error::ChannelClosed`](pw_runtime::Error::ChannelClosed).
-	pub async fn wait_for_console<F>(
-		&self,
-		predicate: F,
-		timeout: std::time::Duration,
-	) -> Result<ConsoleMessage>
+	pub async fn wait_for_console<F>(&self, predicate: F, timeout: std::time::Duration) -> Result<ConsoleMessage>
 	where
 		F: Fn(&ConsoleMessage) -> bool,
 	{

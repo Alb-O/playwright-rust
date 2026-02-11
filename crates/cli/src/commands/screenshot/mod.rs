@@ -59,22 +59,13 @@ impl CommandDef for ScreenshotCommand {
 		let url = raw.url_flag.or(raw.url);
 		let target = env.resolve_target(url, TargetPolicy::AllowCurrentPage)?;
 
-		let output = raw
-			.output
-			.unwrap_or_else(|| PathBuf::from("screenshot.png"));
+		let output = raw.output.unwrap_or_else(|| PathBuf::from("screenshot.png"));
 		let full_page = raw.full_page.unwrap_or(false);
 
-		Ok(ScreenshotResolved {
-			target,
-			output,
-			full_page,
-		})
+		Ok(ScreenshotResolved { target, output, full_page })
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -101,8 +92,7 @@ impl CommandDef for ScreenshotCommand {
 			let output = args.output.clone();
 			let full_page = args.full_page;
 
-			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx).with_preferred_url(preferred_url);
 
 			with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
 				let output = output.clone();
@@ -114,10 +104,7 @@ impl CommandDef for ScreenshotCommand {
 						..Default::default()
 					};
 
-					session
-						.page()
-						.screenshot_to_file(&output, Some(screenshot_opts))
-						.await?;
+					session.page().screenshot_to_file(&output, Some(screenshot_opts)).await?;
 
 					Ok(())
 				})

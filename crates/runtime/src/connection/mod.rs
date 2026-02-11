@@ -44,19 +44,10 @@ use crate::transport::{Transport, TransportParts, TransportReceiver};
 /// the generic parameters W and R. The Connection struct implements this trait.
 pub trait ConnectionLike: Send + Sync {
 	/// Send a message to the Playwright server and await response
-	fn send_message(
-		&self,
-		guid: &str,
-		method: &str,
-		params: Value,
-	) -> Pin<Box<dyn Future<Output = Result<Value>> + Send + '_>>;
+	fn send_message(&self, guid: &str, method: &str, params: Value) -> Pin<Box<dyn Future<Output = Result<Value>> + Send + '_>>;
 
 	/// Register an object in the connection's registry
-	fn register_object(
-		&self,
-		guid: Arc<str>,
-		object: Arc<dyn ChannelOwner>,
-	) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>;
+	fn register_object(&self, guid: Arc<str>, object: Arc<dyn ChannelOwner>) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>;
 
 	/// Unregister an object from the connection's registry (synchronous)
 	///
@@ -78,8 +69,7 @@ pub trait ConnectionLike: Send + Sync {
 }
 
 /// Type alias for complex async return type
-pub type AsyncChannelOwnerResult<'a> =
-	Pin<Box<dyn Future<Output = Result<Arc<dyn ChannelOwner>>> + Send + 'a>>;
+pub type AsyncChannelOwnerResult<'a> = Pin<Box<dyn Future<Output = Result<Arc<dyn ChannelOwner>>> + Send + 'a>>;
 
 /// Factory trait for creating protocol objects.
 ///
@@ -97,13 +87,7 @@ pub trait ObjectFactory: Send + Sync {
 	///
 	/// # Returns
 	/// The created protocol object, or an error if the type is unknown.
-	fn create_object(
-		&self,
-		parent: ParentOrConnection,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> AsyncChannelOwnerResult<'_>;
+	fn create_object(&self, parent: ParentOrConnection, type_name: String, guid: Arc<str>, initializer: Value) -> AsyncChannelOwnerResult<'_>;
 }
 
 /// Metadata attached to every Playwright protocol message
@@ -142,10 +126,7 @@ impl Metadata {
 	/// Create minimal metadata with current timestamp
 	pub fn now() -> Self {
 		Self {
-			wall_time: std::time::SystemTime::now()
-				.duration_since(std::time::UNIX_EPOCH)
-				.unwrap()
-				.as_millis() as i64,
+			wall_time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64,
 			internal: Some(false),
 			location: None,
 			title: None,
@@ -159,10 +140,7 @@ pub struct Request {
 	/// Unique request ID for correlating responses
 	pub id: u32,
 	/// GUID of the target object (format: "type@hash")
-	#[serde(
-		serialize_with = "serialize_arc_str",
-		deserialize_with = "deserialize_arc_str"
-	)]
+	#[serde(serialize_with = "serialize_arc_str", deserialize_with = "deserialize_arc_str")]
 	pub guid: Arc<str>,
 	/// Method name to invoke
 	pub method: String,
@@ -224,10 +202,7 @@ pub struct ErrorPayload {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {
 	/// GUID of the object that emitted the event
-	#[serde(
-		serialize_with = "serialize_arc_str",
-		deserialize_with = "deserialize_arc_str"
-	)]
+	#[serde(serialize_with = "serialize_arc_str", deserialize_with = "deserialize_arc_str")]
 	pub guid: Arc<str>,
 	/// Event method name
 	pub method: String,
@@ -345,12 +320,7 @@ impl Connection {
 	pub async fn send_message(&self, guid: &str, method: &str, params: Value) -> Result<Value> {
 		let id = self.last_id.fetch_add(1, Ordering::SeqCst);
 
-		tracing::debug!(
-			"Sending message: id={}, guid='{}', method='{}'",
-			id,
-			guid,
-			method
-		);
+		tracing::debug!("Sending message: id={}, guid='{}', method='{}'", id, guid, method);
 
 		let (tx, rx) = oneshot::channel();
 		self.callbacks.insert(id, tx);
@@ -451,12 +421,10 @@ impl Connection {
 		match message {
 			Message::Response(response) => {
 				tracing::debug!("Processing response for ID: {}", response.id);
-				let (_, callback) = self.callbacks.remove(&response.id).ok_or_else(|| {
-					Error::ProtocolError(format!(
-						"Cannot find request to respond: id={}",
-						response.id
-					))
-				})?;
+				let (_, callback) = self
+					.callbacks
+					.remove(&response.id)
+					.ok_or_else(|| Error::ProtocolError(format!("Cannot find request to respond: id={}", response.id)))?;
 
 				let result = if let Some(error_wrapper) = response.error {
 					Err(parse_protocol_error(error_wrapper.error))
@@ -477,11 +445,7 @@ impl Connection {
 						Ok(())
 					}
 					None => {
-						tracing::debug!(
-							"Event for unknown object (ignored): guid={}, method={}",
-							event.guid,
-							event.method
-						);
+						tracing::debug!("Event for unknown object (ignored): guid={}, method={}", event.guid, event.method);
 						Ok(())
 					}
 				},
@@ -489,8 +453,7 @@ impl Connection {
 			Message::Unknown(value) => {
 				tracing::debug!(
 					"Unknown message type (forward-compatible, ignored): {}",
-					serde_json::to_string(&value)
-						.unwrap_or_else(|_| "<serialization failed>".to_string())
+					serde_json::to_string(&value).unwrap_or_else(|_| "<serialization failed>".to_string())
 				);
 				Ok(())
 			}
@@ -510,20 +473,12 @@ impl Connection {
 				.ok_or_else(|| Error::ProtocolError("__create__ missing 'guid'".to_string()))?,
 		);
 
-		tracing::debug!(
-			"__create__: type={}, guid={}, parent_guid={}",
-			type_name,
-			object_guid,
-			event.guid
-		);
+		tracing::debug!("__create__: type={}, guid={}, parent_guid={}", type_name, object_guid, event.guid);
 
 		let initializer = event.params["initializer"].clone();
 
 		let parent_obj = self.objects.try_get(&event.guid).ok_or_else(|| {
-			tracing::debug!(
-				"Parent object not found for type={type_name}, parent_guid={}",
-				event.guid
-			);
+			tracing::debug!("Parent object not found for type={type_name}, parent_guid={}", event.guid);
 			Error::ProtocolError(format!("Parent object not found: {}", event.guid))
 		})?;
 
@@ -533,26 +488,19 @@ impl Connection {
 			ParentOrConnection::Parent(parent_obj.clone())
 		};
 
-		let factory = self.factory.get().ok_or_else(|| {
-			Error::ProtocolError("ObjectFactory not set - call set_factory() before run()".into())
-		})?;
+		let factory = self
+			.factory
+			.get()
+			.ok_or_else(|| Error::ProtocolError("ObjectFactory not set - call set_factory() before run()".into()))?;
 
 		let object = factory
-			.create_object(
-				parent_or_conn,
-				type_name.clone(),
-				object_guid.clone(),
-				initializer,
-			)
+			.create_object(parent_or_conn, type_name.clone(), object_guid.clone(), initializer)
 			.await
 			.inspect_err(|e| {
-				tracing::debug!(
-					"Failed to create object type={type_name}, guid={object_guid}, error={e}"
-				);
+				tracing::debug!("Failed to create object type={type_name}, guid={object_guid}, error={e}");
 			})?;
 
-		self.register_object(Arc::clone(&object_guid), object.clone())
-			.await;
+		self.register_object(Arc::clone(&object_guid), object.clone()).await;
 		parent_obj.add_child(Arc::clone(&object_guid), object);
 		tracing::debug!("Created object: type={type_name}, guid={object_guid}");
 
@@ -590,21 +538,11 @@ impl Connection {
 		match (new_parent, child) {
 			(Some(parent), Some(child_obj)) => {
 				parent.adopt(child_obj);
-				tracing::debug!(
-					"Adopted object: child={}, new_parent={}",
-					child_guid,
-					event.guid
-				);
+				tracing::debug!("Adopted object: child={}, new_parent={}", child_guid, event.guid);
 				Ok(())
 			}
-			(None, _) => Err(Error::ProtocolError(format!(
-				"Parent object not found: {}",
-				event.guid
-			))),
-			(_, None) => Err(Error::ProtocolError(format!(
-				"Child object not found: {}",
-				child_guid
-			))),
+			(None, _) => Err(Error::ProtocolError(format!("Parent object not found: {}", event.guid))),
+			(_, None) => Err(Error::ProtocolError(format!("Child object not found: {}", child_guid))),
 		}
 	}
 }
@@ -620,22 +558,13 @@ fn parse_protocol_error(error: ErrorPayload) -> Error {
 
 // Implement ConnectionLike trait for Connection
 impl ConnectionLike for Connection {
-	fn send_message(
-		&self,
-		guid: &str,
-		method: &str,
-		params: Value,
-	) -> Pin<Box<dyn Future<Output = Result<Value>> + Send + '_>> {
+	fn send_message(&self, guid: &str, method: &str, params: Value) -> Pin<Box<dyn Future<Output = Result<Value>> + Send + '_>> {
 		let guid = guid.to_string();
 		let method = method.to_string();
 		Box::pin(async move { Connection::send_message(self, &guid, &method, params).await })
 	}
 
-	fn register_object(
-		&self,
-		guid: Arc<str>,
-		object: Arc<dyn ChannelOwner>,
-	) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
+	fn register_object(&self, guid: Arc<str>, object: Arc<dyn ChannelOwner>) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
 		Box::pin(async move {
 			self.objects.insert(guid, object);
 		})

@@ -142,53 +142,38 @@ fn extract_metadata(html: &str, url: Option<&str>) -> PageMetadata {
 		title: extract_meta_content(html, "og:title")
 			.or_else(|| extract_meta_content(html, "twitter:title"))
 			.or_else(|| extract_title_tag(html)),
-		author: extract_meta_content(html, "author")
-			.or_else(|| extract_meta_content(html, "article:author")),
+		author: extract_meta_content(html, "author").or_else(|| extract_meta_content(html, "article:author")),
 		description: extract_meta_content(html, "og:description")
 			.or_else(|| extract_meta_content(html, "description"))
 			.or_else(|| extract_meta_content(html, "twitter:description")),
-		image: extract_meta_content(html, "og:image")
-			.or_else(|| extract_meta_content(html, "twitter:image")),
+		image: extract_meta_content(html, "og:image").or_else(|| extract_meta_content(html, "twitter:image")),
 		site,
-		published: extract_meta_content(html, "article:published_time")
-			.or_else(|| extract_meta_content(html, "datePublished")),
+		published: extract_meta_content(html, "article:published_time").or_else(|| extract_meta_content(html, "datePublished")),
 	}
 }
 
 /// Extract content from a meta tag
 fn extract_meta_content(html: &str, name: &str) -> Option<String> {
 	// Try property attribute (og:*, article:*)
-	let property_pattern = format!(
-		r#"<meta[^>]*property=["']{}["'][^>]*content=["']([^"']+)["']"#,
-		regex_lite::escape(name)
-	);
+	let property_pattern = format!(r#"<meta[^>]*property=["']{}["'][^>]*content=["']([^"']+)["']"#, regex_lite::escape(name));
 	if let Some(caps) = Regex::new(&property_pattern).ok()?.captures(html) {
 		return Some(decode_html_entities(caps.get(1)?.as_str()));
 	}
 
 	// Try content first, then property (different order)
-	let property_pattern2 = format!(
-		r#"<meta[^>]*content=["']([^"']+)["'][^>]*property=["']{}["']"#,
-		regex_lite::escape(name)
-	);
+	let property_pattern2 = format!(r#"<meta[^>]*content=["']([^"']+)["'][^>]*property=["']{}["']"#, regex_lite::escape(name));
 	if let Some(caps) = Regex::new(&property_pattern2).ok()?.captures(html) {
 		return Some(decode_html_entities(caps.get(1)?.as_str()));
 	}
 
 	// Try name attribute
-	let name_pattern = format!(
-		r#"<meta[^>]*name=["']{}["'][^>]*content=["']([^"']+)["']"#,
-		regex_lite::escape(name)
-	);
+	let name_pattern = format!(r#"<meta[^>]*name=["']{}["'][^>]*content=["']([^"']+)["']"#, regex_lite::escape(name));
 	if let Some(caps) = Regex::new(&name_pattern).ok()?.captures(html) {
 		return Some(decode_html_entities(caps.get(1)?.as_str()));
 	}
 
 	// Try content first, then name
-	let name_pattern2 = format!(
-		r#"<meta[^>]*content=["']([^"']+)["'][^>]*name=["']{}["']"#,
-		regex_lite::escape(name)
-	);
+	let name_pattern2 = format!(r#"<meta[^>]*content=["']([^"']+)["'][^>]*name=["']{}["']"#, regex_lite::escape(name));
 	if let Some(caps) = Regex::new(&name_pattern2).ok()?.captures(html) {
 		return Some(decode_html_entities(caps.get(1)?.as_str()));
 	}
@@ -198,13 +183,9 @@ fn extract_meta_content(html: &str, name: &str) -> Option<String> {
 
 /// Extract title from <title> tag
 fn extract_title_tag(html: &str) -> Option<String> {
-	static TITLE_RE: LazyLock<Regex> =
-		LazyLock::new(|| Regex::new(r"<title[^>]*>([^<]+)</title>").unwrap());
+	static TITLE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<title[^>]*>([^<]+)</title>").unwrap());
 
-	TITLE_RE
-		.captures(html)
-		.and_then(|c| c.get(1))
-		.map(|m| decode_html_entities(m.as_str().trim()))
+	TITLE_RE.captures(html).and_then(|c| c.get(1)).map(|m| decode_html_entities(m.as_str().trim()))
 }
 
 /// Decode HTML entities
@@ -222,9 +203,7 @@ fn decode_html_entities(s: &str) -> String {
 /// Extract domain from a URL string
 fn extract_domain(url: &str) -> Option<String> {
 	// Simple URL parsing without external crate
-	let url = url
-		.strip_prefix("https://")
-		.or_else(|| url.strip_prefix("http://"))?;
+	let url = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))?;
 	let domain = url.split('/').next()?;
 	let domain = domain.split(':').next()?; // Remove port if present
 	Some(domain.trim_start_matches("www.").to_string())
@@ -238,10 +217,7 @@ fn remove_clutter(html: &str) -> String {
 	result = remove_tags(&result, &["script", "style", "noscript", "svg"]);
 
 	// Remove elements by tag name
-	let remove_tags_list = [
-		"nav", "header", "footer", "aside", "form", "button", "input", "select", "textarea",
-		"iframe",
-	];
+	let remove_tags_list = ["nav", "header", "footer", "aside", "form", "button", "input", "select", "textarea", "iframe"];
 	result = remove_tags(&result, &remove_tags_list);
 
 	// Remove elements with clutter classes/ids
@@ -274,12 +250,7 @@ fn remove_tags(html: &str, tags: &[&str]) -> String {
 /// Remove elements that have clutter-indicating classes or IDs
 fn remove_elements_by_attribute(html: &str) -> String {
 	// Build a set of non-content patterns for quick lookup
-	let non_content: HashSet<&str> = CLUTTER
-		.scoring
-		.non_content_patterns
-		.iter()
-		.map(|s| s.as_str())
-		.collect();
+	let non_content: HashSet<&str> = CLUTTER.scoring.non_content_patterns.iter().map(|s| s.as_str()).collect();
 
 	let mut result = html.to_string();
 
@@ -289,10 +260,7 @@ fn remove_elements_by_attribute(html: &str) -> String {
 
 	for tag in tags {
 		// Pattern to match the complete element with its content
-		let element_pattern = format!(
-			r#"(?is)<{tag}[^>]*(class|id)=["']([^"']+)["'][^>]*>.*?</{tag}>"#,
-			tag = tag
-		);
+		let element_pattern = format!(r#"(?is)<{tag}[^>]*(class|id)=["']([^"']+)["'][^>]*>.*?</{tag}>"#, tag = tag);
 
 		if let Ok(element_re) = Regex::new(&element_pattern) {
 			// Process from innermost to outermost by iterating multiple times
@@ -305,17 +273,14 @@ fn remove_elements_by_attribute(html: &str) -> String {
 						let attr_lower = attr_value.as_str().to_lowercase();
 
 						// Check if this element should be removed
-						let should_remove = non_content.iter().any(|p| attr_lower.contains(p))
-							|| PARTIAL_PATTERN_REGEX.is_match(&attr_lower);
+						let should_remove = non_content.iter().any(|p| attr_lower.contains(p)) || PARTIAL_PATTERN_REGEX.is_match(&attr_lower);
 
 						if should_remove {
 							changed = true;
 							return "".to_string();
 						}
 					}
-					caps.get(0)
-						.map(|m| m.as_str().to_string())
-						.unwrap_or_default()
+					caps.get(0).map(|m| m.as_str().to_string()).unwrap_or_default()
 				});
 
 				result = new_result.into_owned();
@@ -358,11 +323,7 @@ fn try_extract_by_selector(html: &str, selector: &str) -> Option<String> {
 	if let Some(id) = selector.strip_prefix('#') {
 		// ID selector - try common tags
 		for tag in ["div", "article", "section", "main", "aside"] {
-			let pattern = format!(
-				r#"(?is)<{tag}[^>]*id=["']{id}["'][^>]*>(.*?)</{tag}>"#,
-				tag = tag,
-				id = regex_lite::escape(id)
-			);
+			let pattern = format!(r#"(?is)<{tag}[^>]*id=["']{id}["'][^>]*>(.*?)</{tag}>"#, tag = tag, id = regex_lite::escape(id));
 			if let Ok(re) = Regex::new(&pattern) {
 				if let Some(caps) = re.captures(html) {
 					if let Some(m) = caps.get(1) {
@@ -391,10 +352,7 @@ fn try_extract_by_selector(html: &str, selector: &str) -> Option<String> {
 		None
 	} else if selector.starts_with('[') && selector.contains("role=") {
 		// Role attribute selector
-		if let Some(role) = selector
-			.strip_prefix("[role=\"")
-			.and_then(|s| s.strip_suffix("\"]"))
-		{
+		if let Some(role) = selector.strip_prefix("[role=\"").and_then(|s| s.strip_suffix("\"]")) {
 			for tag in ["div", "article", "section", "main", "aside"] {
 				let pattern = format!(
 					r#"(?is)<{tag}[^>]*role=["']{role}["'][^>]*>(.*?)</{tag}>"#,
@@ -429,13 +387,9 @@ fn try_extract_by_selector(html: &str, selector: &str) -> Option<String> {
 
 /// Extract body content
 fn extract_body(html: &str) -> Option<String> {
-	static BODY_RE: LazyLock<Regex> =
-		LazyLock::new(|| Regex::new(r"(?is)<body[^>]*>(.*)</body>").unwrap());
+	static BODY_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?is)<body[^>]*>(.*)</body>").unwrap());
 
-	BODY_RE
-		.captures(html)
-		.and_then(|c| c.get(1))
-		.map(|m| m.as_str().to_string())
+	BODY_RE.captures(html).and_then(|c| c.get(1)).map(|m| m.as_str().to_string())
 }
 
 /// Clean up whitespace
@@ -468,10 +422,7 @@ fn is_junk_line(line: &str) -> bool {
 	}
 
 	// If only whitespace and common separators remain, it's a junk line
-	remaining
-		.trim()
-		.chars()
-		.all(|c| c.is_whitespace() || "/-•·|:".contains(c))
+	remaining.trim().chars().all(|c| c.is_whitespace() || "/-•·|:".contains(c))
 }
 
 /// Convert HTML to plain text
@@ -482,9 +433,7 @@ fn html_to_text(html: &str) -> String {
 
 	// Add newlines before/after block elements
 	let mut result = html.to_string();
-	for tag in [
-		"p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr",
-	] {
+	for tag in ["p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr"] {
 		let open_pattern = format!("<{}", tag);
 		result = result.replace(&open_pattern, &format!("\n<{}", tag));
 	}
@@ -529,18 +478,9 @@ fn html_to_markdown(html: &str) -> String {
 		.unwrap()
 		.replace_all(&result, "**$1**")
 		.to_string();
-	result = Regex::new(r"(?i)<b[^>]*>([^<]*)</b>")
-		.unwrap()
-		.replace_all(&result, "**$1**")
-		.to_string();
-	result = Regex::new(r"(?i)<em[^>]*>([^<]*)</em>")
-		.unwrap()
-		.replace_all(&result, "*$1*")
-		.to_string();
-	result = Regex::new(r"(?i)<i[^>]*>([^<]*)</i>")
-		.unwrap()
-		.replace_all(&result, "*$1*")
-		.to_string();
+	result = Regex::new(r"(?i)<b[^>]*>([^<]*)</b>").unwrap().replace_all(&result, "**$1**").to_string();
+	result = Regex::new(r"(?i)<em[^>]*>([^<]*)</em>").unwrap().replace_all(&result, "*$1*").to_string();
+	result = Regex::new(r"(?i)<i[^>]*>([^<]*)</i>").unwrap().replace_all(&result, "*$1*").to_string();
 
 	// Links
 	result = Regex::new(r#"(?i)<a[^>]*href=["']([^"']+)["'][^>]*>([^<]*)</a>"#)
@@ -559,49 +499,28 @@ fn html_to_markdown(html: &str) -> String {
 		.to_string();
 
 	// Paragraphs and line breaks
-	result = Regex::new(r"(?i)<p[^>]*>")
-		.unwrap()
-		.replace_all(&result, "\n\n")
-		.to_string();
+	result = Regex::new(r"(?i)<p[^>]*>").unwrap().replace_all(&result, "\n\n").to_string();
 	result = result.replace("</p>", "\n");
-	result = Regex::new(r"(?i)<br\s*/?>")
-		.unwrap()
-		.replace_all(&result, "\n")
-		.to_string();
+	result = Regex::new(r"(?i)<br\s*/?>").unwrap().replace_all(&result, "\n").to_string();
 
 	// Lists
-	result = Regex::new(r"(?i)<li[^>]*>")
-		.unwrap()
-		.replace_all(&result, "\n- ")
-		.to_string();
+	result = Regex::new(r"(?i)<li[^>]*>").unwrap().replace_all(&result, "\n- ").to_string();
 	result = result.replace("</li>", "");
-	result = Regex::new(r"(?i)</?[uo]l[^>]*>")
-		.unwrap()
-		.replace_all(&result, "\n")
-		.to_string();
+	result = Regex::new(r"(?i)</?[uo]l[^>]*>").unwrap().replace_all(&result, "\n").to_string();
 
 	// Code
-	result = Regex::new(r"(?i)<code[^>]*>([^<]*)</code>")
-		.unwrap()
-		.replace_all(&result, "`$1`")
-		.to_string();
+	result = Regex::new(r"(?i)<code[^>]*>([^<]*)</code>").unwrap().replace_all(&result, "`$1`").to_string();
 	result = Regex::new(r"(?i)<pre[^>]*>([^<]*)</pre>")
 		.unwrap()
 		.replace_all(&result, "\n```\n$1\n```\n")
 		.to_string();
 
 	// Blockquotes
-	result = Regex::new(r"(?i)<blockquote[^>]*>")
-		.unwrap()
-		.replace_all(&result, "\n> ")
-		.to_string();
+	result = Regex::new(r"(?i)<blockquote[^>]*>").unwrap().replace_all(&result, "\n> ").to_string();
 	result = result.replace("</blockquote>", "\n");
 
 	// Remove remaining tags
-	result = Regex::new(r"<[^>]+>")
-		.unwrap()
-		.replace_all(&result, "")
-		.to_string();
+	result = Regex::new(r"<[^>]+>").unwrap().replace_all(&result, "").to_string();
 
 	// Decode entities and clean up
 	result = decode_html_entities(&result);

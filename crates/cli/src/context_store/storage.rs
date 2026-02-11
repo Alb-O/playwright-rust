@@ -28,9 +28,7 @@ pub struct StatePaths {
 
 impl StatePaths {
 	pub fn new(workspace_root: &Path, namespace: &str) -> Self {
-		let state_root = workspace_root
-			.join(dirs::PLAYWRIGHT)
-			.join(STATE_VERSION_DIR);
+		let state_root = workspace_root.join(dirs::PLAYWRIGHT).join(STATE_VERSION_DIR);
 		let namespace_dir = state_root.join("namespaces").join(namespace);
 		let sessions_dir = namespace_dir.join("sessions");
 		Self {
@@ -61,11 +59,7 @@ impl LoadedState {
 		let config = load_json::<CliConfig>(&paths.config).unwrap_or_default();
 		let cache = load_json::<CliCache>(&paths.cache).unwrap_or_default();
 
-		Ok(Self {
-			config,
-			cache,
-			paths,
-		})
+		Ok(Self { config, cache, paths })
 	}
 
 	pub fn save(&self) -> Result<()> {
@@ -76,9 +70,7 @@ impl LoadedState {
 }
 
 fn load_json<T: serde::de::DeserializeOwned>(path: &Path) -> Option<T> {
-	fs::read_to_string(path)
-		.ok()
-		.and_then(|content| serde_json::from_str(&content).ok())
+	fs::read_to_string(path).ok().and_then(|content| serde_json::from_str(&content).ok())
 }
 
 fn save_json<T: serde::Serialize>(path: &Path, data: &T) -> Result<()> {
@@ -101,16 +93,8 @@ mod tests {
 		let tmp = TempDir::new().unwrap();
 		let paths = StatePaths::new(tmp.path(), "default");
 
-		assert!(
-			paths
-				.config
-				.ends_with("playwright/.pw-cli-v3/namespaces/default/config.json")
-		);
-		assert!(
-			paths
-				.cache
-				.ends_with("playwright/.pw-cli-v3/namespaces/default/cache.json")
-		);
+		assert!(paths.config.ends_with("playwright/.pw-cli-v3/namespaces/default/config.json"));
+		assert!(paths.cache.ends_with("playwright/.pw-cli-v3/namespaces/default/cache.json"));
 		assert!(
 			paths
 				.session_descriptor
@@ -159,11 +143,7 @@ mod tests {
 		let cache = CliCache::default();
 		save_json(&path, &cache).unwrap();
 
-		let gitignore = tmp
-			.path()
-			.join("playwright")
-			.join(STATE_VERSION_DIR)
-			.join(".gitignore");
+		let gitignore = tmp.path().join("playwright").join(STATE_VERSION_DIR).join(".gitignore");
 		assert!(gitignore.exists());
 		assert_eq!(fs::read_to_string(gitignore).unwrap(), "*\n");
 	}

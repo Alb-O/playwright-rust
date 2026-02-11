@@ -225,57 +225,30 @@ impl MockPage {
 
 	/// Sets text content for a selector (also sets count to 1 if unset).
 	pub fn set_text_for_selector(&self, selector: &str, text: &str) {
-		self.text_by_selector
-			.lock()
-			.unwrap()
-			.insert(selector.to_string(), text.to_string());
-		self.count_by_selector
-			.lock()
-			.unwrap()
-			.entry(selector.to_string())
-			.or_insert(1);
+		self.text_by_selector.lock().unwrap().insert(selector.to_string(), text.to_string());
+		self.count_by_selector.lock().unwrap().entry(selector.to_string()).or_insert(1);
 	}
 
 	/// Sets inner HTML for a selector (also sets count to 1 if unset).
 	pub fn set_html_for_selector(&self, selector: &str, html: &str) {
-		self.html_by_selector
-			.lock()
-			.unwrap()
-			.insert(selector.to_string(), html.to_string());
-		self.count_by_selector
-			.lock()
-			.unwrap()
-			.entry(selector.to_string())
-			.or_insert(1);
+		self.html_by_selector.lock().unwrap().insert(selector.to_string(), html.to_string());
+		self.count_by_selector.lock().unwrap().entry(selector.to_string()).or_insert(1);
 	}
 
 	/// Sets element count for a selector.
 	pub fn set_count_for_selector(&self, selector: &str, count: usize) {
-		self.count_by_selector
-			.lock()
-			.unwrap()
-			.insert(selector.to_string(), count);
+		self.count_by_selector.lock().unwrap().insert(selector.to_string(), count);
 	}
 
 	/// Sets bounding box for a selector (also sets count to 1 if unset).
 	pub fn set_bbox_for_selector(&self, selector: &str, bbox: BoundingBox) {
-		self.bbox_by_selector
-			.lock()
-			.unwrap()
-			.insert(selector.to_string(), bbox);
-		self.count_by_selector
-			.lock()
-			.unwrap()
-			.entry(selector.to_string())
-			.or_insert(1);
+		self.bbox_by_selector.lock().unwrap().insert(selector.to_string(), bbox);
+		self.count_by_selector.lock().unwrap().entry(selector.to_string()).or_insert(1);
 	}
 
 	/// Sets the result for an eval expression.
 	pub fn set_eval_result(&self, expression: &str, result: serde_json::Value) {
-		self.eval_results
-			.lock()
-			.unwrap()
-			.insert(expression.to_string(), result);
+		self.eval_results.lock().unwrap().insert(expression.to_string(), result);
 	}
 
 	/// Sets screenshot bytes to return.
@@ -306,12 +279,7 @@ impl MockPage {
 	}
 
 	fn get_count_for_selector(&self, selector: &str) -> usize {
-		self.count_by_selector
-			.lock()
-			.unwrap()
-			.get(selector)
-			.copied()
-			.unwrap_or(0)
+		self.count_by_selector.lock().unwrap().get(selector).copied().unwrap_or(0)
 	}
 
 	fn get_bbox_for_selector(&self, selector: &str) -> Option<BoundingBox> {
@@ -348,10 +316,7 @@ impl PageLike for MockPage {
 		});
 
 		let results = self.eval_results.lock().unwrap();
-		Ok(results
-			.get(expression)
-			.cloned()
-			.unwrap_or(serde_json::Value::Null))
+		Ok(results.get(expression).cloned().unwrap_or(serde_json::Value::Null))
 	}
 
 	fn locator(&self, selector: &str) -> Box<dyn LocatorLike + '_> {
@@ -409,17 +374,11 @@ impl<'a> LocatorLike for MockLocator<'a> {
 	}
 
 	async fn inner_text(&self) -> Result<String> {
-		Ok(self
-			.page
-			.get_text_for_selector(&self.selector)
-			.unwrap_or_default())
+		Ok(self.page.get_text_for_selector(&self.selector).unwrap_or_default())
 	}
 
 	async fn inner_html(&self) -> Result<String> {
-		Ok(self
-			.page
-			.get_html_for_selector(&self.selector)
-			.unwrap_or_default())
+		Ok(self.page.get_html_for_selector(&self.selector).unwrap_or_default())
 	}
 
 	async fn outer_html(&self) -> Result<String> {
@@ -501,9 +460,7 @@ impl MockSession {
 #[async_trait]
 impl SessionLike for MockSession {
 	async fn goto(&self, url: &str) -> Result<()> {
-		self.page.record_action(MockAction::Goto {
-			url: url.to_string(),
-		});
+		self.page.record_action(MockAction::Goto { url: url.to_string() });
 		*self.current_url.lock().unwrap() = url.to_string();
 		self.page.set_url(url);
 		Ok(())
@@ -556,10 +513,7 @@ mod tests {
 
 		let locator = page.locator("h1");
 		assert_eq!(locator.count().await.unwrap(), 1);
-		assert_eq!(
-			locator.text_content().await.unwrap(),
-			Some("Hello World".to_string())
-		);
+		assert_eq!(locator.text_content().await.unwrap(), Some("Hello World".to_string()));
 	}
 
 	#[tokio::test]
@@ -625,14 +579,8 @@ mod tests {
 		page.set_url("https://example.com");
 		page.set_eval_result("document.title", serde_json::json!("Test Page"));
 
-		assert_eq!(
-			page.evaluate_value("window.location.href").await.unwrap(),
-			"https://example.com"
-		);
-		assert_eq!(
-			page.evaluate_value("document.title").await.unwrap(),
-			"Test Page"
-		);
+		assert_eq!(page.evaluate_value("window.location.href").await.unwrap(), "https://example.com");
+		assert_eq!(page.evaluate_value("document.title").await.unwrap(), "Test Page");
 	}
 
 	#[tokio::test]

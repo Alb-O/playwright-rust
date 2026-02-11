@@ -7,9 +7,7 @@
 use std::path::PathBuf;
 
 use crate::cli::Cli;
-use crate::context::{
-	BlockConfig, CommandContext, CommandContextConfig, DownloadConfig, HarConfig,
-};
+use crate::context::{BlockConfig, CommandContext, CommandContextConfig, DownloadConfig, HarConfig};
 use crate::context_store::ContextState;
 use crate::error::Result;
 use crate::output::CdpEndpointSource;
@@ -113,11 +111,7 @@ impl From<&Cli> for RuntimeConfig {
 /// ```
 pub fn build_runtime(config: &RuntimeConfig) -> Result<RuntimeContext> {
 	// Step 1: Resolve workspace + namespace identity
-	let scope = WorkspaceScope::resolve(
-		config.workspace.as_deref(),
-		Some(config.namespace.as_str()),
-		config.no_project,
-	)?;
+	let scope = WorkspaceScope::resolve(config.workspace.as_deref(), Some(config.namespace.as_str()), config.no_project)?;
 
 	// Step 2: Create context state
 	let ctx_state = ContextState::new(
@@ -150,9 +144,7 @@ pub fn build_runtime(config: &RuntimeConfig) -> Result<RuntimeContext> {
 			Err(e) => tracing::warn!(target = "pw", %e, "failed to load block file"),
 		}
 	}
-	let block_config = BlockConfig {
-		patterns: block_patterns,
-	};
+	let block_config = BlockConfig { patterns: block_patterns };
 
 	// Step 6: Build download configuration
 	let download_config = DownloadConfig {
@@ -301,11 +293,7 @@ mod tests {
 	fn explicit_workspace_is_not_collapsed_to_project_root() {
 		let tmp = tempfile::TempDir::new().unwrap();
 		let project_root = tmp.path();
-		std::fs::write(
-			project_root.join(pw_rs::dirs::CONFIG_JS),
-			"export default {}",
-		)
-		.unwrap();
+		std::fs::write(project_root.join(pw_rs::dirs::CONFIG_JS), "export default {}").unwrap();
 
 		let workspace = project_root.join("agents").join("agent-a");
 		std::fs::create_dir_all(&workspace).unwrap();
@@ -357,11 +345,7 @@ mod tests {
 				"urlFilter": "*.api.example.com",
 			}
 		});
-		std::fs::write(
-			&config_path,
-			serde_json::to_string_pretty(&persisted).unwrap(),
-		)
-		.unwrap();
+		std::fs::write(&config_path, serde_json::to_string_pretty(&persisted).unwrap()).unwrap();
 
 		let config = RuntimeConfig {
 			auth: None,

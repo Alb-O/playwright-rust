@@ -31,18 +31,8 @@ impl Dialog {
 	///
 	/// This is called by the object factory when the server sends a `__create__` message
 	/// for a Dialog object.
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent),
-			type_name,
-			guid,
-			initializer,
-		);
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent), type_name, guid, initializer);
 
 		Ok(Self { base })
 	}
@@ -57,20 +47,14 @@ impl Dialog {
 	///
 	/// See: <https://playwright.dev/docs/api/class-dialog#dialog-type>
 	pub fn type_(&self) -> &str {
-		self.initializer()
-			.get("type")
-			.and_then(|v| v.as_str())
-			.unwrap_or("")
+		self.initializer().get("type").and_then(|v| v.as_str()).unwrap_or("")
 	}
 
 	/// Returns the message displayed in the dialog.
 	///
 	/// See: <https://playwright.dev/docs/api/class-dialog#dialog-message>
 	pub fn message(&self) -> &str {
-		self.initializer()
-			.get("message")
-			.and_then(|v| v.as_str())
-			.unwrap_or("")
+		self.initializer().get("message").and_then(|v| v.as_str()).unwrap_or("")
 	}
 
 	/// Returns the default value for prompt dialogs.
@@ -80,10 +64,7 @@ impl Dialog {
 	///
 	/// See: <https://playwright.dev/docs/api/class-dialog#dialog-default-value>
 	pub fn default_value(&self) -> &str {
-		self.initializer()
-			.get("defaultValue")
-			.and_then(|v| v.as_str())
-			.unwrap_or("")
+		self.initializer().get("defaultValue").and_then(|v| v.as_str()).unwrap_or("")
 	}
 
 	/// Accepts the dialog.

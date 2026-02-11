@@ -125,18 +125,8 @@ impl BrowserContext {
 	/// # Errors
 	///
 	/// Returns error if initializer is malformed
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent),
-			type_name,
-			guid,
-			initializer,
-		);
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent), type_name, guid, initializer);
 
 		let context = Self { base };
 
@@ -205,21 +195,15 @@ impl BrowserContext {
 		}
 
 		// Send newPage RPC to server
-		let response: NewPageResponse = self
-			.channel()
-			.send("newPage", serde_json::json!({}))
-			.await?;
+		let response: NewPageResponse = self.channel().send("newPage", serde_json::json!({})).await?;
 
 		// Retrieve the Page object from the connection registry
 		let page_arc = self.connection().get_object(&response.page.guid).await?;
 
 		// Downcast to Page
-		let page = page_arc.downcast_ref::<Page>().ok_or_else(|| {
-			pw_runtime::Error::ProtocolError(format!(
-				"Expected Page object, got {}",
-				page_arc.type_name()
-			))
-		})?;
+		let page = page_arc
+			.downcast_ref::<Page>()
+			.ok_or_else(|| pw_runtime::Error::ProtocolError(format!("Expected Page object, got {}", page_arc.type_name())))?;
 
 		Ok(page.clone())
 	}
@@ -238,9 +222,7 @@ impl BrowserContext {
 	/// See: <https://playwright.dev/docs/api/class-browsercontext#browser-context-close>
 	pub async fn close(&self) -> Result<()> {
 		// Send close RPC to server
-		self.channel()
-			.send_no_result("close", serde_json::json!({}))
-			.await
+		self.channel().send_no_result("close", serde_json::json!({})).await
 	}
 
 	/// Adds cookies to the browser context.
@@ -276,9 +258,7 @@ impl BrowserContext {
 	///
 	/// See: <https://playwright.dev/docs/api/class-browsercontext#browser-context-add-cookies>
 	pub async fn add_cookies(&self, cookies: Vec<Cookie>) -> Result<()> {
-		self.channel()
-			.send_no_result("addCookies", serde_json::json!({ "cookies": cookies }))
-			.await
+		self.channel().send_no_result("addCookies", serde_json::json!({ "cookies": cookies })).await
 	}
 
 	/// Returns all cookies in the browser context.
@@ -401,10 +381,7 @@ impl BrowserContext {
 	/// - File write fails (if path is specified)
 	///
 	/// See: <https://playwright.dev/docs/api/class-browsercontext#browser-context-storage-state>
-	pub async fn storage_state(
-		&self,
-		options: Option<StorageStateOptions>,
-	) -> Result<StorageState> {
+	pub async fn storage_state(&self, options: Option<StorageStateOptions>) -> Result<StorageState> {
 		let params = match &options {
 			Some(opts) => serde_json::to_value(opts).unwrap_or_default(),
 			None => serde_json::json!({}),
@@ -488,11 +465,7 @@ impl BrowserContext {
 	/// [`Error::IoError`]: pw_runtime::Error::IoError
 	///
 	/// See: <https://playwright.dev/docs/api/class-browsercontext#browser-context-route-from-har>
-	pub async fn route_from_har(
-		&self,
-		har_path: impl AsRef<std::path::Path>,
-		options: Option<RouteFromHarOptions>,
-	) -> Result<()> {
+	pub async fn route_from_har(&self, har_path: impl AsRef<std::path::Path>, options: Option<RouteFromHarOptions>) -> Result<()> {
 		let mut params = serde_json::json!({
 			"har": har_path.as_ref().to_string_lossy()
 		});
@@ -540,12 +513,7 @@ impl BrowserContext {
 	pub fn tracing(&self) -> Option<Tracing> {
 		// The Tracing object is created as a child of BrowserContext
 		// Its GUID is in the initializer: {"tracing": {"guid": "tracing@..."}}
-		let tracing_guid = self
-			.base
-			.initializer()
-			.get("tracing")
-			.and_then(|v| v.get("guid"))
-			.and_then(|v| v.as_str())?;
+		let tracing_guid = self.base.initializer().get("tracing").and_then(|v| v.get("guid")).and_then(|v| v.as_str())?;
 
 		self.base
 			.children()
@@ -653,16 +621,10 @@ impl BrowserContext {
 		let response: HarExportResponse = self.channel().send("harExport", params).await?;
 
 		// Get the artifact object
-		let artifact_arc = self
-			.connection()
-			.get_object(&response.artifact.guid)
-			.await?;
-		let artifact = artifact_arc.downcast_ref::<Artifact>().ok_or_else(|| {
-			pw_runtime::Error::ProtocolError(format!(
-				"Expected Artifact object, got {}",
-				artifact_arc.type_name()
-			))
-		})?;
+		let artifact_arc = self.connection().get_object(&response.artifact.guid).await?;
+		let artifact = artifact_arc
+			.downcast_ref::<Artifact>()
+			.ok_or_else(|| pw_runtime::Error::ProtocolError(format!("Expected Artifact object, got {}", artifact_arc.type_name())))?;
 
 		// Save the artifact to the path
 		artifact.save_as(path.as_ref()).await?;
@@ -723,11 +685,7 @@ impl ChannelOwner for BrowserContext {
 				// Dialog events come to BrowserContext, need to forward to the associated Page
 				// Event format: {dialog: {guid: "..."}}
 				// The Dialog protocol object has the Page as its parent
-				if let Some(dialog_guid) = params
-					.get("dialog")
-					.and_then(|v| v.get("guid"))
-					.and_then(|v| v.as_str())
-				{
+				if let Some(dialog_guid) = params.get("dialog").and_then(|v| v.get("guid")).and_then(|v| v.as_str()) {
 					let connection = self.connection();
 					let dialog_guid_owned = dialog_guid.to_string();
 
@@ -774,9 +732,7 @@ impl ChannelOwner for BrowserContext {
 
 impl std::fmt::Debug for BrowserContext {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("BrowserContext")
-			.field("guid", &self.guid())
-			.finish()
+		f.debug_struct("BrowserContext").field("guid", &self.guid()).finish()
 	}
 }
 

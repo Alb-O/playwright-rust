@@ -231,11 +231,7 @@ impl BatchResponse {
 ///
 /// Returns `Ok(())` on graceful exit (EOF or quit command). Individual command
 /// errors are reported in the response stream, not as function errors.
-pub async fn execute<'ctx>(
-	ctx: &'ctx CommandContext,
-	ctx_state: &mut ContextState,
-	broker: &mut SessionBroker<'ctx>,
-) -> Result<()> {
+pub async fn execute<'ctx>(ctx: &'ctx CommandContext, ctx_state: &mut ContextState, broker: &mut SessionBroker<'ctx>) -> Result<()> {
 	let stdin = tokio::io::stdin();
 	let mut reader = BufReader::new(stdin);
 	let mut stdout = std::io::stdout();
@@ -260,27 +256,18 @@ pub async fn execute<'ctx>(
 		let request: BatchRequest = match serde_json::from_str(line) {
 			Ok(r) => r,
 			Err(e) => {
-				output_response(
-					&mut stdout,
-					&BatchResponse::error(None, "unknown", "PARSE_ERROR", &e.to_string()),
-				);
+				output_response(&mut stdout, &BatchResponse::error(None, "unknown", "PARSE_ERROR", &e.to_string()));
 				continue;
 			}
 		};
 
 		match request.command.as_str() {
 			"ping" => {
-				output_response(
-					&mut stdout,
-					&BatchResponse::success_empty(request.id, "ping"),
-				);
+				output_response(&mut stdout, &BatchResponse::success_empty(request.id, "ping"));
 				continue;
 			}
 			"quit" | "exit" => {
-				output_response(
-					&mut stdout,
-					&BatchResponse::success_empty(request.id, "quit"),
-				);
+				output_response(&mut stdout, &BatchResponse::success_empty(request.id, "quit"));
 				break;
 			}
 			_ => {}

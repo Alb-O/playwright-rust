@@ -88,10 +88,7 @@ impl CommandDef for ElementsCommand {
 		})
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -105,54 +102,46 @@ impl CommandDef for ElementsCommand {
 			let wait = args.wait;
 			let poll_timeout_ms = args.timeout_ms;
 
-			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx).with_preferred_url(preferred_url);
 
-			let data = with_session(
-				&mut exec,
-				req,
-				ArtifactsPolicy::OnError {
-					command: "elements",
-				},
-				move |session| {
-					Box::pin(async move {
-						session.goto_target(&target, timeout_ms).await?;
+			let data = with_session(&mut exec, req, ArtifactsPolicy::OnError { command: "elements" }, move |session| {
+				Box::pin(async move {
+					session.goto_target(&target, timeout_ms).await?;
 
-						let js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
+					let js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
 
-						let raw_elements: Vec<RawElement> = if wait {
-							poll_for_elements(session, &js, poll_timeout_ms).await?
-						} else {
-							let raw_result = session.page().evaluate_value(&js).await?;
-							serde_json::from_str(&raw_result)?
-						};
+					let raw_elements: Vec<RawElement> = if wait {
+						poll_for_elements(session, &js, poll_timeout_ms).await?
+					} else {
+						let raw_result = session.page().evaluate_value(&js).await?;
+						serde_json::from_str(&raw_result)?
+					};
 
-						let elements: Vec<InteractiveElement> = raw_elements
-							.into_iter()
-							.map(|e| InteractiveElement {
-								tag: e.kind,
-								selector: e.selector,
-								text: if e.label.is_empty() || e.label == "(unlabeled)" {
-									None
-								} else {
-									Some(e.label)
-								},
-								href: None,
-								name: e.extra,
-								id: None,
-								x: e.x,
-								y: e.y,
-								width: e.width,
-								height: e.height,
-							})
-							.collect();
+					let elements: Vec<InteractiveElement> = raw_elements
+						.into_iter()
+						.map(|e| InteractiveElement {
+							tag: e.kind,
+							selector: e.selector,
+							text: if e.label.is_empty() || e.label == "(unlabeled)" {
+								None
+							} else {
+								Some(e.label)
+							},
+							href: None,
+							name: e.extra,
+							id: None,
+							x: e.x,
+							y: e.y,
+							width: e.width,
+							height: e.height,
+						})
+						.collect();
 
-						let count = elements.len();
+					let count = elements.len();
 
-						Ok(ElementsData { elements, count })
-					})
-				},
-			)
+					Ok(ElementsData { elements, count })
+				})
+			})
 			.await?;
 
 			let inputs = CommandInputs {
@@ -332,11 +321,7 @@ const EXTRACT_ELEMENTS_JS: &str = r#"
 "#;
 
 /// Polls for elements until some appear or timeout is reached.
-async fn poll_for_elements(
-	session: &SessionHandle,
-	js: &str,
-	timeout_ms: u64,
-) -> Result<Vec<RawElement>> {
+async fn poll_for_elements(session: &SessionHandle, js: &str, timeout_ms: u64) -> Result<Vec<RawElement>> {
 	let start = std::time::Instant::now();
 	let poll_interval = std::time::Duration::from_millis(500);
 	let timeout = std::time::Duration::from_millis(timeout_ms);

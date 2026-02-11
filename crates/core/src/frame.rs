@@ -32,18 +32,8 @@ impl Frame {
 	///
 	/// This is called by the object factory when the server sends a `__create__` message
 	/// for a Frame object.
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent),
-			type_name,
-			guid,
-			initializer,
-		);
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent), type_name, guid, initializer);
 
 		Ok(Self { base })
 	}
@@ -105,21 +95,16 @@ impl Frame {
 
 		if let Some(response_ref) = goto_result.response {
 			// Wait for Response object - __create__ may arrive after the response
-			let response_arc = self
-				.connection()
-				.wait_for_object(&response_ref.guid, std::time::Duration::from_secs(1))
-				.await?;
+			let response_arc = self.connection().wait_for_object(&response_ref.guid, std::time::Duration::from_secs(1)).await?;
 
 			let initializer = response_arc.initializer();
-			let status = initializer["status"].as_u64().ok_or_else(|| {
-				pw_runtime::Error::ProtocolError("Response missing status".to_string())
-			})? as u16;
+			let status = initializer["status"]
+				.as_u64()
+				.ok_or_else(|| pw_runtime::Error::ProtocolError("Response missing status".to_string()))? as u16;
 
 			let headers = initializer["headers"]
 				.as_array()
-				.ok_or_else(|| {
-					pw_runtime::Error::ProtocolError("Response missing headers".to_string())
-				})?
+				.ok_or_else(|| pw_runtime::Error::ProtocolError("Response missing headers".to_string()))?
 				.iter()
 				.filter_map(|h| {
 					let name = h["name"].as_str()?;
@@ -131,9 +116,7 @@ impl Frame {
 			Ok(Some(Response {
 				url: initializer["url"]
 					.as_str()
-					.ok_or_else(|| {
-						pw_runtime::Error::ProtocolError("Response missing url".to_string())
-					})?
+					.ok_or_else(|| pw_runtime::Error::ProtocolError("Response missing url".to_string()))?
 					.to_string(),
 				status,
 				status_text: initializer["statusText"].as_str().unwrap_or("").to_string(),
@@ -163,10 +146,7 @@ impl Frame {
 	/// Returns the first element matching the selector, or None if not found.
 	///
 	/// See: <https://playwright.dev/docs/api/class-frame#frame-query-selector>
-	pub async fn query_selector(
-		&self,
-		selector: &str,
-	) -> Result<Option<Arc<crate::ElementHandle>>> {
+	pub async fn query_selector(&self, selector: &str) -> Result<Option<Arc<crate::ElementHandle>>> {
 		let response: serde_json::Value = self
 			.channel()
 			.send(
@@ -209,9 +189,7 @@ impl Frame {
 		let handle = element
 			.downcast_ref::<crate::ElementHandle>()
 			.map(|e| Arc::new(e.clone()))
-			.ok_or_else(|| {
-				pw_runtime::Error::ProtocolError(format!("Object {} is not an ElementHandle", guid))
-			})?;
+			.ok_or_else(|| pw_runtime::Error::ProtocolError(format!("Object {} is not an ElementHandle", guid)))?;
 
 		Ok(Some(handle))
 	}
@@ -219,10 +197,7 @@ impl Frame {
 	/// Returns all elements matching the selector.
 	///
 	/// See: <https://playwright.dev/docs/api/class-frame#frame-query-selector-all>
-	pub async fn query_selector_all(
-		&self,
-		selector: &str,
-	) -> Result<Vec<Arc<crate::ElementHandle>>> {
+	pub async fn query_selector_all(&self, selector: &str) -> Result<Vec<Arc<crate::ElementHandle>>> {
 		#[derive(Deserialize)]
 		struct QueryAllResponse {
 			elements: Vec<serde_json::Value>,
@@ -243,21 +218,16 @@ impl Frame {
 		let mut handles = Vec::new();
 
 		for element_value in response.elements {
-			let guid = element_value["guid"].as_str().ok_or_else(|| {
-				pw_runtime::Error::ProtocolError("Element GUID missing".to_string())
-			})?;
+			let guid = element_value["guid"]
+				.as_str()
+				.ok_or_else(|| pw_runtime::Error::ProtocolError("Element GUID missing".to_string()))?;
 
 			let element = connection.get_object(guid).await?;
 
 			let handle = element
 				.downcast_ref::<crate::ElementHandle>()
 				.map(|e| Arc::new(e.clone()))
-				.ok_or_else(|| {
-					pw_runtime::Error::ProtocolError(format!(
-						"Object {} is not an ElementHandle",
-						guid
-					))
-				})?;
+				.ok_or_else(|| pw_runtime::Error::ProtocolError(format!("Object {} is not an ElementHandle", guid)))?;
 
 			handles.push(handle);
 		}
@@ -356,11 +326,7 @@ impl Frame {
 	}
 
 	/// Returns the value of the specified attribute.
-	pub(crate) async fn locator_get_attribute(
-		&self,
-		selector: &str,
-		name: &str,
-	) -> Result<Option<String>> {
+	pub(crate) async fn locator_get_attribute(&self, selector: &str, name: &str) -> Result<Option<String>> {
 		#[derive(Deserialize)]
 		struct GetAttributeResponse {
 			value: Option<String>,
@@ -514,11 +480,7 @@ impl Frame {
 	// Action delegate methods
 
 	/// Clicks the element matching the selector.
-	pub(crate) async fn locator_click(
-		&self,
-		selector: &str,
-		options: Option<crate::ClickOptions>,
-	) -> Result<()> {
+	pub(crate) async fn locator_click(&self, selector: &str, options: Option<crate::ClickOptions>) -> Result<()> {
 		let mut params = serde_json::json!({
 			"selector": selector,
 			"strict": true
@@ -535,23 +497,14 @@ impl Frame {
 			params["timeout"] = serde_json::json!(pw_protocol::options::DEFAULT_TIMEOUT_MS);
 		}
 
-		self.channel()
-			.send_no_result("click", params)
-			.await
-			.map_err(|e| match e {
-				Error::Timeout(msg) => {
-					Error::Timeout(format!("{} (selector: '{}')", msg, selector))
-				}
-				other => other,
-			})
+		self.channel().send_no_result("click", params).await.map_err(|e| match e {
+			Error::Timeout(msg) => Error::Timeout(format!("{} (selector: '{}')", msg, selector)),
+			other => other,
+		})
 	}
 
 	/// Double clicks the element matching the selector.
-	pub(crate) async fn locator_dblclick(
-		&self,
-		selector: &str,
-		options: Option<crate::ClickOptions>,
-	) -> Result<()> {
+	pub(crate) async fn locator_dblclick(&self, selector: &str, options: Option<crate::ClickOptions>) -> Result<()> {
 		let mut params = serde_json::json!({
 			"selector": selector,
 			"strict": true
@@ -572,12 +525,7 @@ impl Frame {
 	}
 
 	/// Fills the element with text.
-	pub(crate) async fn locator_fill(
-		&self,
-		selector: &str,
-		text: &str,
-		options: Option<crate::FillOptions>,
-	) -> Result<()> {
+	pub(crate) async fn locator_fill(&self, selector: &str, text: &str, options: Option<crate::FillOptions>) -> Result<()> {
 		let mut params = serde_json::json!({
 			"selector": selector,
 			"value": text,
@@ -599,11 +547,7 @@ impl Frame {
 	}
 
 	/// Clears the element's value.
-	pub(crate) async fn locator_clear(
-		&self,
-		selector: &str,
-		options: Option<crate::FillOptions>,
-	) -> Result<()> {
+	pub(crate) async fn locator_clear(&self, selector: &str, options: Option<crate::FillOptions>) -> Result<()> {
 		let mut params = serde_json::json!({
 			"selector": selector,
 			"value": "",
@@ -625,12 +569,7 @@ impl Frame {
 	}
 
 	/// Presses a key on the element.
-	pub(crate) async fn locator_press(
-		&self,
-		selector: &str,
-		key: &str,
-		options: Option<crate::PressOptions>,
-	) -> Result<()> {
+	pub(crate) async fn locator_press(&self, selector: &str, key: &str, options: Option<crate::PressOptions>) -> Result<()> {
 		let mut params = serde_json::json!({
 			"selector": selector,
 			"key": key,
@@ -651,11 +590,7 @@ impl Frame {
 		self.channel().send_no_result("press", params).await
 	}
 
-	pub(crate) async fn locator_check(
-		&self,
-		selector: &str,
-		options: Option<crate::CheckOptions>,
-	) -> Result<()> {
+	pub(crate) async fn locator_check(&self, selector: &str, options: Option<crate::CheckOptions>) -> Result<()> {
 		let mut params = serde_json::json!({
 			"selector": selector,
 			"strict": true
@@ -675,11 +610,7 @@ impl Frame {
 		self.channel().send_no_result("check", params).await
 	}
 
-	pub(crate) async fn locator_uncheck(
-		&self,
-		selector: &str,
-		options: Option<crate::CheckOptions>,
-	) -> Result<()> {
+	pub(crate) async fn locator_uncheck(&self, selector: &str, options: Option<crate::CheckOptions>) -> Result<()> {
 		let mut params = serde_json::json!({
 			"selector": selector,
 			"strict": true
@@ -699,11 +630,7 @@ impl Frame {
 		self.channel().send_no_result("uncheck", params).await
 	}
 
-	pub(crate) async fn locator_hover(
-		&self,
-		selector: &str,
-		options: Option<crate::HoverOptions>,
-	) -> Result<()> {
+	pub(crate) async fn locator_hover(&self, selector: &str, options: Option<crate::HoverOptions>) -> Result<()> {
 		let mut params = serde_json::json!({
 			"selector": selector,
 			"strict": true
@@ -744,12 +671,7 @@ impl Frame {
 		Ok(response.value)
 	}
 
-	pub(crate) async fn locator_select_option(
-		&self,
-		selector: &str,
-		value: crate::SelectOption,
-		options: Option<crate::SelectOptions>,
-	) -> Result<Vec<String>> {
+	pub(crate) async fn locator_select_option(&self, selector: &str, value: crate::SelectOption, options: Option<crate::SelectOptions>) -> Result<Vec<String>> {
 		#[derive(Deserialize)]
 		struct SelectOptionResponse {
 			values: Vec<String>,
@@ -814,11 +736,7 @@ impl Frame {
 		Ok(response.values)
 	}
 
-	pub(crate) async fn locator_set_input_files(
-		&self,
-		selector: &str,
-		file: &std::path::PathBuf,
-	) -> Result<()> {
+	pub(crate) async fn locator_set_input_files(&self, selector: &str, file: &std::path::PathBuf) -> Result<()> {
 		use std::io::Read;
 
 		use base64::Engine as _;
@@ -854,11 +772,7 @@ impl Frame {
 			.await
 	}
 
-	pub(crate) async fn locator_set_input_files_multiple(
-		&self,
-		selector: &str,
-		files: &[&std::path::PathBuf],
-	) -> Result<()> {
+	pub(crate) async fn locator_set_input_files_multiple(&self, selector: &str, files: &[&std::path::PathBuf]) -> Result<()> {
 		use std::io::Read;
 
 		use base64::Engine as _;
@@ -891,9 +805,7 @@ impl Frame {
 			let file_name = file_path
 				.file_name()
 				.and_then(|n| n.to_str())
-				.ok_or_else(|| {
-					pw_runtime::Error::InvalidArgument("Invalid file path".to_string())
-				})?;
+				.ok_or_else(|| pw_runtime::Error::InvalidArgument("Invalid file path".to_string()))?;
 
 			file_objects.push(serde_json::json!({
 				"name": file_name,
@@ -914,11 +826,7 @@ impl Frame {
 			.await
 	}
 
-	pub(crate) async fn locator_set_input_files_payload(
-		&self,
-		selector: &str,
-		file: crate::FilePayload,
-	) -> Result<()> {
+	pub(crate) async fn locator_set_input_files_payload(&self, selector: &str, file: crate::FilePayload) -> Result<()> {
 		use base64::Engine as _;
 		use base64::engine::general_purpose;
 
@@ -942,11 +850,7 @@ impl Frame {
 			.await
 	}
 
-	pub(crate) async fn locator_set_input_files_payload_multiple(
-		&self,
-		selector: &str,
-		files: &[crate::FilePayload],
-	) -> Result<()> {
+	pub(crate) async fn locator_set_input_files_payload_multiple(&self, selector: &str, files: &[crate::FilePayload]) -> Result<()> {
 		use base64::Engine as _;
 		use base64::engine::general_purpose;
 
@@ -1083,10 +987,7 @@ impl Frame {
 	/// # Errors
 	///
 	/// Returns [`Error::ProtocolError`] if the expression throws or contains non-serializable values.
-	pub(crate) async fn frame_evaluate_expression_json(
-		&self,
-		expression: &str,
-	) -> Result<serde_json::Value> {
+	pub(crate) async fn frame_evaluate_expression_json(&self, expression: &str) -> Result<serde_json::Value> {
 		let params = serde_json::json!({
 			"expression": expression,
 			"arg": {
@@ -1117,15 +1018,10 @@ impl Frame {
 	/// Returns [`Error::ProtocolError`] if:
 	/// - JavaScript evaluation fails
 	/// - Result cannot be deserialized to type `T`
-	pub(crate) async fn frame_evaluate_expression_typed<T: DeserializeOwned>(
-		&self,
-		expression: &str,
-	) -> Result<T> {
+	pub(crate) async fn frame_evaluate_expression_typed<T: DeserializeOwned>(&self, expression: &str) -> Result<T> {
 		let json_value = self.frame_evaluate_expression_json(expression).await?;
 
-		serde_json::from_value(json_value).map_err(|e| {
-			Error::ProtocolError(format!("Failed to deserialize evaluate result: {}", e))
-		})
+		serde_json::from_value(json_value).map_err(|e| Error::ProtocolError(format!("Failed to deserialize evaluate result: {}", e)))
 	}
 
 	/// Converts Playwright protocol value format to standard JSON.
@@ -1168,16 +1064,13 @@ impl Frame {
 					};
 				}
 				if let Some(arr) = map.get("a").and_then(|v| v.as_array()) {
-					let converted: Result<Vec<Value>> =
-						arr.iter().map(Self::protocol_value_to_json).collect();
+					let converted: Result<Vec<Value>> = arr.iter().map(Self::protocol_value_to_json).collect();
 					return Ok(Value::Array(converted?));
 				}
 				if let Some(obj_arr) = map.get("o").and_then(|v| v.as_array()) {
 					let mut result_map = serde_json::Map::new();
 					for entry in obj_arr {
-						if let (Some(key), Some(val)) =
-							(entry.get("k").and_then(|k| k.as_str()), entry.get("v"))
-						{
+						if let (Some(key), Some(val)) = (entry.get("k").and_then(|k| k.as_str()), entry.get("v")) {
 							result_map.insert(key.to_string(), Self::protocol_value_to_json(val)?);
 						}
 					}
@@ -1190,9 +1083,7 @@ impl Frame {
 					return Ok(Value::String(bigint_str.to_string()));
 				}
 				if map.contains_key("h") {
-					return Err(Error::ProtocolError(
-						"Cannot serialize handle reference to JSON".to_string(),
-					));
+					return Err(Error::ProtocolError("Cannot serialize handle reference to JSON".to_string()));
 				}
 				Ok(value.clone())
 			}

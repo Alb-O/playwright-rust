@@ -90,10 +90,7 @@ impl CommandDef for ReadCommand {
 		})
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -108,8 +105,7 @@ impl CommandDef for ReadCommand {
 			let include_metadata = args.include_metadata;
 			let url_str = args.target.url_str().map(String::from);
 
-			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx).with_preferred_url(preferred_url);
 
 			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
 				let url_str = url_str.clone();
@@ -119,11 +115,7 @@ impl CommandDef for ReadCommand {
 					let locator = session.page().locator("html").await;
 					let html = locator.inner_html().await?;
 					let readable = extract_readable(&html, url_str.as_deref());
-					Ok(ReadData::from_readable(
-						readable,
-						output_format,
-						include_metadata,
-					))
+					Ok(ReadData::from_readable(readable, output_format, include_metadata))
 				})
 			})
 			.await?;
@@ -185,18 +177,11 @@ pub struct ReadData {
 }
 
 impl ReadData {
-	fn from_readable(
-		readable: ReadableContent,
-		output_format: ReadOutputFormat,
-		include_metadata: bool,
-	) -> Self {
+	fn from_readable(readable: ReadableContent, output_format: ReadOutputFormat, include_metadata: bool) -> Self {
 		let (content, format) = match output_format {
 			ReadOutputFormat::Text => (readable.text, "text".to_string()),
 			ReadOutputFormat::Html => (readable.html, "html".to_string()),
-			ReadOutputFormat::Markdown => (
-				readable.markdown.unwrap_or_else(|| readable.text.clone()),
-				"markdown".to_string(),
-			),
+			ReadOutputFormat::Markdown => (readable.markdown.unwrap_or_else(|| readable.text.clone()), "markdown".to_string()),
 		};
 
 		let word_count = content.split_whitespace().count();

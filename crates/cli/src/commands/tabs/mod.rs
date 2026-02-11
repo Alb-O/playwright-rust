@@ -20,9 +20,7 @@ struct TabInfo {
 /// Check if a URL matches any protected pattern
 fn is_protected(url: &str, protected_patterns: &[String]) -> bool {
 	let url_lower = url.to_lowercase();
-	protected_patterns
-		.iter()
-		.any(|pattern| url_lower.contains(&pattern.to_lowercase()))
+	protected_patterns.iter().any(|pattern| url_lower.contains(&pattern.to_lowercase()))
 }
 
 /// Get URL for a page (via JS evaluation for accuracy)
@@ -49,14 +47,8 @@ async fn sort_pages_by_url(pages: &[pw_rs::Page]) -> Vec<(String, String, &pw_rs
 	page_info
 }
 
-pub async fn list(
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-	protected_patterns: &[String],
-) -> Result<()> {
-	let request =
-		SessionRequest::from_context(WaitUntil::Load, ctx).with_protected_urls(protected_patterns);
+pub async fn list(ctx: &CommandContext, broker: &mut SessionBroker<'_>, format: OutputFormat, protected_patterns: &[String]) -> Result<()> {
+	let request = SessionRequest::from_context(WaitUntil::Load, ctx).with_protected_urls(protected_patterns);
 	let session = broker.session(request).await?;
 	let context = session.context();
 	let pages = context.pages();
@@ -85,15 +77,8 @@ pub async fn list(
 	session.close().await
 }
 
-pub async fn switch(
-	target: &str,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-	protected_patterns: &[String],
-) -> Result<()> {
-	let request =
-		SessionRequest::from_context(WaitUntil::Load, ctx).with_protected_urls(protected_patterns);
+pub async fn switch(target: &str, ctx: &CommandContext, broker: &mut SessionBroker<'_>, format: OutputFormat, protected_patterns: &[String]) -> Result<()> {
+	let request = SessionRequest::from_context(WaitUntil::Load, ctx).with_protected_urls(protected_patterns);
 	let session = broker.session(request).await?;
 	let context = session.context();
 	let pages = context.pages();
@@ -116,15 +101,8 @@ pub async fn switch(
 	session.close().await
 }
 
-pub async fn close_tab(
-	target: &str,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-	protected_patterns: &[String],
-) -> Result<()> {
-	let request =
-		SessionRequest::from_context(WaitUntil::Load, ctx).with_protected_urls(protected_patterns);
+pub async fn close_tab(target: &str, ctx: &CommandContext, broker: &mut SessionBroker<'_>, format: OutputFormat, protected_patterns: &[String]) -> Result<()> {
+	let request = SessionRequest::from_context(WaitUntil::Load, ctx).with_protected_urls(protected_patterns);
 	let session = broker.session(request).await?;
 	let context = session.context();
 	let pages = context.pages();
@@ -147,12 +125,7 @@ pub async fn close_tab(
 	session.close().await
 }
 
-pub async fn new_tab(
-	url: Option<&str>,
-	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
-	format: OutputFormat,
-) -> Result<()> {
+pub async fn new_tab(url: Option<&str>, ctx: &CommandContext, broker: &mut SessionBroker<'_>, format: OutputFormat) -> Result<()> {
 	let request = SessionRequest::from_context(WaitUntil::Load, ctx);
 	let session = broker.session(request).await?;
 	let context = session.context();
@@ -163,10 +136,7 @@ pub async fn new_tab(
 		page.goto(url, None).await?;
 	}
 
-	let final_url = page
-		.evaluate_value("window.location.href")
-		.await
-		.unwrap_or_else(|_| page.url());
+	let final_url = page.evaluate_value("window.location.href").await.unwrap_or_else(|_| page.url());
 	let final_url = final_url.trim_matches('"').to_string();
 	let title = page.title().await.unwrap_or_default();
 
@@ -194,13 +164,9 @@ fn find_page<'a>(
 ) -> Result<(usize, String, String, &'a pw_rs::Page)> {
 	// Try parsing as index first
 	if let Ok(index) = target.parse::<usize>() {
-		let (url, title, page) = sorted_pages.get(index).ok_or_else(|| {
-			PwError::Context(format!(
-				"Tab index {} out of range (0-{})",
-				index,
-				sorted_pages.len().saturating_sub(1)
-			))
-		})?;
+		let (url, title, page) = sorted_pages
+			.get(index)
+			.ok_or_else(|| PwError::Context(format!("Tab index {} out of range (0-{})", index, sorted_pages.len().saturating_sub(1))))?;
 
 		// Check if the indexed tab is protected
 		if is_protected(url, protected_patterns) {
@@ -229,8 +195,5 @@ fn find_page<'a>(
 		}
 	}
 
-	Err(PwError::Context(format!(
-		"No tab found matching '{}' (protected tabs are excluded)",
-		target
-	)))
+	Err(PwError::Context(format!("No tab found matching '{}' (protected tabs are excluded)", target)))
 }

@@ -7,8 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::StorageState;
 use crate::types::{
-	Geolocation, HarContentPolicy, HarMode, HarNotFound, KeyboardModifier, MouseButton, Position,
-	ScreenshotClip, ScreenshotType, Viewport, WaitUntil,
+	Geolocation, HarContentPolicy, HarMode, HarNotFound, KeyboardModifier, MouseButton, Position, ScreenshotClip, ScreenshotType, Viewport, WaitUntil,
 };
 
 /// Default timeout in milliseconds for Playwright operations.
@@ -729,10 +728,7 @@ impl BrowserContextOptionsBuilder {
 	}
 
 	/// Sets extra HTTP headers.
-	pub fn extra_http_headers(
-		mut self,
-		headers: std::collections::HashMap<String, String>,
-	) -> Self {
+	pub fn extra_http_headers(mut self, headers: std::collections::HashMap<String, String>) -> Self {
 		self.inner.extra_http_headers = Some(headers);
 		self
 	}

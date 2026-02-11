@@ -275,10 +275,7 @@ mod tests {
 		let paths = ProjectPaths::from_root(PathBuf::from("/project"));
 		let screenshot = paths.screenshot_path("test.png");
 		// Verify it uses the correct directory structure
-		let expected = PathBuf::from("/project")
-			.join(dirs::PLAYWRIGHT)
-			.join(dirs::SCREENSHOTS)
-			.join("test.png");
+		let expected = PathBuf::from("/project").join(dirs::PLAYWRIGHT).join(dirs::SCREENSHOTS).join("test.png");
 		assert_eq!(screenshot, expected);
 	}
 
@@ -287,10 +284,7 @@ mod tests {
 		let paths = ProjectPaths::from_root(PathBuf::from("/project"));
 		let auth = paths.auth_file("session.json");
 		// Verify it uses the correct directory structure
-		let expected = PathBuf::from("/project")
-			.join(dirs::PLAYWRIGHT)
-			.join(dirs::AUTH)
-			.join("session.json");
+		let expected = PathBuf::from("/project").join(dirs::PLAYWRIGHT).join(dirs::AUTH).join("session.json");
 		assert_eq!(auth, expected);
 	}
 }

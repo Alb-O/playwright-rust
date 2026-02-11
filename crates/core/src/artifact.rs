@@ -23,18 +23,8 @@ pub struct Artifact {
 
 impl Artifact {
 	/// Creates a new Artifact from protocol initialization
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent),
-			type_name,
-			guid,
-			initializer,
-		);
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent), type_name, guid, initializer);
 
 		Ok(Self { base })
 	}
@@ -63,9 +53,7 @@ impl Artifact {
 	///
 	/// Returns error if the artifact cannot be deleted.
 	pub async fn delete(&self) -> Result<()> {
-		self.channel()
-			.send_no_result("delete", serde_json::json!({}))
-			.await
+		self.channel().send_no_result("delete", serde_json::json!({})).await
 	}
 }
 
@@ -123,8 +111,6 @@ impl ChannelOwner for Artifact {
 
 impl std::fmt::Debug for Artifact {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("Artifact")
-			.field("guid", &self.guid())
-			.finish()
+		f.debug_struct("Artifact").field("guid", &self.guid()).finish()
 	}
 }

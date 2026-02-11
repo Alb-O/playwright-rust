@@ -107,10 +107,7 @@ impl CommandDef for SnapshotCommand {
 		})
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -125,49 +122,36 @@ impl CommandDef for SnapshotCommand {
 			let full = args.full;
 			let max_text_length = args.max_text_length;
 
-			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx).with_preferred_url(preferred_url);
 
-			let (final_url, data) = with_session(
-				&mut exec,
-				req,
-				ArtifactsPolicy::OnError {
-					command: "snapshot",
-				},
-				move |session| {
-					Box::pin(async move {
-						session.goto_target(&target, timeout_ms).await?;
+			let (final_url, data) = with_session(&mut exec, req, ArtifactsPolicy::OnError { command: "snapshot" }, move |session| {
+				Box::pin(async move {
+					session.goto_target(&target, timeout_ms).await?;
 
-						let meta_js = format!("JSON.stringify({})", EXTRACT_META_JS);
-						let meta: PageMeta =
-							serde_json::from_str(&session.page().evaluate_value(&meta_js).await?)?;
+					let meta_js = format!("JSON.stringify({})", EXTRACT_META_JS);
+					let meta: PageMeta = serde_json::from_str(&session.page().evaluate_value(&meta_js).await?)?;
 
-						let text_js = format!(
-							"JSON.stringify({}({}, {}))",
-							EXTRACT_TEXT_JS, max_text_length, full
-						);
-						let text: String =
-							serde_json::from_str(&session.page().evaluate_value(&text_js).await?)?;
+					let text_js = format!("JSON.stringify({}({}, {}))", EXTRACT_TEXT_JS, max_text_length, full);
+					let text: String = serde_json::from_str(&session.page().evaluate_value(&text_js).await?)?;
 
-						let elements = extract_elements_if_needed(session, text_only).await?;
-						let element_count = elements.len();
+					let elements = extract_elements_if_needed(session, text_only).await?;
+					let element_count = elements.len();
 
-						let final_url = meta.url.clone();
+					let final_url = meta.url.clone();
 
-						let data = SnapshotData {
-							url: meta.url,
-							title: meta.title,
-							viewport_width: meta.viewport_width,
-							viewport_height: meta.viewport_height,
-							text,
-							elements,
-							element_count,
-						};
+					let data = SnapshotData {
+						url: meta.url,
+						title: meta.title,
+						viewport_width: meta.viewport_width,
+						viewport_height: meta.viewport_height,
+						text,
+						elements,
+						element_count,
+					};
 
-						Ok((final_url, data))
-					})
-				},
-			)
+					Ok((final_url, data))
+				})
+			})
 			.await?;
 
 			let inputs = CommandInputs {
@@ -421,17 +405,13 @@ pub(crate) const EXTRACT_ELEMENTS_JS: &str = r#"
 "#;
 
 /// Extracts interactive elements unless `text_only` mode is enabled.
-async fn extract_elements_if_needed(
-	session: &SessionHandle,
-	text_only: bool,
-) -> Result<Vec<InteractiveElement>> {
+async fn extract_elements_if_needed(session: &SessionHandle, text_only: bool) -> Result<Vec<InteractiveElement>> {
 	if text_only {
 		return Ok(Vec::new());
 	}
 
 	let elements_js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
-	let raw_elements: Vec<RawElement> =
-		serde_json::from_str(&session.page().evaluate_value(&elements_js).await?)?;
+	let raw_elements: Vec<RawElement> = serde_json::from_str(&session.page().evaluate_value(&elements_js).await?)?;
 
 	Ok(raw_elements.into_iter().map(Into::into).collect())
 }

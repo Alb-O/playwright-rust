@@ -1,9 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use pw_rs::{
-	BrowserContextOptions, GotoOptions, Playwright, StorageState, Subscription, WaitUntil,
-};
+use pw_rs::{BrowserContextOptions, GotoOptions, Playwright, StorageState, Subscription, WaitUntil};
 use tracing::debug;
 
 use crate::context::{BlockConfig, DownloadConfig, HarConfig};
@@ -22,11 +20,7 @@ pub struct DownloadInfo {
 }
 
 /// Build BrowserContextOptions with optional HAR and download configuration
-fn build_context_options(
-	storage_state: Option<StorageState>,
-	har_config: &HarConfig,
-	download_config: &DownloadConfig,
-) -> BrowserContextOptions {
+fn build_context_options(storage_state: Option<StorageState>, har_config: &HarConfig, download_config: &DownloadConfig) -> BrowserContextOptions {
 	let mut builder = BrowserContextOptions::builder();
 
 	if let Some(state) = storage_state {
@@ -132,26 +126,14 @@ impl BrowserSession {
 	}
 
 	/// Create a session with optional auth file (convenience for commands)
-	pub async fn with_auth(
-		wait_until: WaitUntil,
-		auth_file: Option<&Path>,
-		cdp_endpoint: Option<&str>,
-	) -> Result<Self> {
-		Self::with_auth_and_browser(wait_until, auth_file, BrowserKind::default(), cdp_endpoint)
-			.await
+	pub async fn with_auth(wait_until: WaitUntil, auth_file: Option<&Path>, cdp_endpoint: Option<&str>) -> Result<Self> {
+		Self::with_auth_and_browser(wait_until, auth_file, BrowserKind::default(), cdp_endpoint).await
 	}
 
 	/// Create a session with optional auth file and specific browser
-	pub async fn with_auth_and_browser(
-		wait_until: WaitUntil,
-		auth_file: Option<&Path>,
-		browser_kind: BrowserKind,
-		cdp_endpoint: Option<&str>,
-	) -> Result<Self> {
+	pub async fn with_auth_and_browser(wait_until: WaitUntil, auth_file: Option<&Path>, browser_kind: BrowserKind, cdp_endpoint: Option<&str>) -> Result<Self> {
 		match auth_file {
-			Some(path) => {
-				Self::with_auth_file_and_browser(wait_until, path, browser_kind, cdp_endpoint).await
-			}
+			Some(path) => Self::with_auth_file_and_browser(wait_until, path, browser_kind, cdp_endpoint).await,
 			None => {
 				let har_config = HarConfig::default();
 				let block_config = BlockConfig::default();
@@ -197,9 +179,7 @@ impl BrowserSession {
 			launch_server,
 			"starting Playwright..."
 		);
-		let mut playwright = Playwright::launch()
-			.await
-			.map_err(|e| PwError::BrowserLaunch(e.to_string()))?;
+		let mut playwright = Playwright::launch().await.map_err(|e| PwError::BrowserLaunch(e.to_string()))?;
 
 		let mut ws_endpoint = None;
 		let mut cdp_endpoint_stored = None;
@@ -213,9 +193,7 @@ impl BrowserSession {
 			// Store the CDP endpoint for later retrieval
 			cdp_endpoint_stored = Some(endpoint.to_string());
 			if browser_kind != BrowserKind::Chromium {
-				return Err(PwError::BrowserLaunch(
-					"CDP endpoint connections require the chromium browser".to_string(),
-				));
+				return Err(PwError::BrowserLaunch("CDP endpoint connections require the chromium browser".to_string()));
 			}
 
 			let connect_result = playwright
@@ -225,11 +203,9 @@ impl BrowserSession {
 				.map_err(|e| PwError::BrowserLaunch(e.to_string()))?;
 
 			let browser = connect_result.browser;
-			let needs_custom_context =
-				storage_state.is_some() || har_config.is_enabled() || download_config.is_enabled();
+			let needs_custom_context = storage_state.is_some() || har_config.is_enabled() || download_config.is_enabled();
 			let context = if needs_custom_context {
-				let options =
-					build_context_options(storage_state.clone(), har_config, download_config);
+				let options = build_context_options(storage_state.clone(), har_config, download_config);
 				browser.new_context_with_options(options).await?
 			} else if let Some(default_ctx) = connect_result.default_context {
 				// Reuse existing pages when using default context from CDP
@@ -271,11 +247,9 @@ impl BrowserSession {
 			launched_server = Some(launched.clone());
 
 			let browser = launched.browser().clone();
-			let needs_custom_context =
-				storage_state.is_some() || har_config.is_enabled() || download_config.is_enabled();
+			let needs_custom_context = storage_state.is_some() || har_config.is_enabled() || download_config.is_enabled();
 			let context = if needs_custom_context {
-				let options =
-					build_context_options(storage_state.clone(), har_config, download_config);
+				let options = build_context_options(storage_state.clone(), har_config, download_config);
 				browser.new_context_with_options(options).await?
 			} else {
 				browser.new_context().await?
@@ -290,29 +264,13 @@ impl BrowserSession {
 
 			// Select browser type based on browser_kind
 			let browser = match browser_kind {
-				BrowserKind::Chromium => {
-					playwright
-						.chromium()
-						.launch_with_options(launch_options)
-						.await?
-				}
-				BrowserKind::Firefox => {
-					playwright
-						.firefox()
-						.launch_with_options(launch_options)
-						.await?
-				}
-				BrowserKind::Webkit => {
-					playwright
-						.webkit()
-						.launch_with_options(launch_options)
-						.await?
-				}
+				BrowserKind::Chromium => playwright.chromium().launch_with_options(launch_options).await?,
+				BrowserKind::Firefox => playwright.firefox().launch_with_options(launch_options).await?,
+				BrowserKind::Webkit => playwright.webkit().launch_with_options(launch_options).await?,
 			};
 
 			// Create context with optional storage state, HAR, or download config
-			let needs_custom_context =
-				storage_state.is_some() || har_config.is_enabled() || download_config.is_enabled();
+			let needs_custom_context = storage_state.is_some() || har_config.is_enabled() || download_config.is_enabled();
 			let context = if needs_custom_context {
 				let options = build_context_options(storage_state, har_config, download_config);
 				browser.new_context_with_options(options).await?
@@ -333,9 +291,7 @@ impl BrowserSession {
 
 			for page in existing_pages {
 				let url = page.url();
-				let is_protected = protected_urls
-					.iter()
-					.any(|pattern| url.to_lowercase().contains(&pattern.to_lowercase()));
+				let is_protected = protected_urls.iter().any(|pattern| url.to_lowercase().contains(&pattern.to_lowercase()));
 
 				if is_protected {
 					debug!(target = "pw", url = %url, "skipping protected page");
@@ -344,10 +300,7 @@ impl BrowserSession {
 
 				// Check if this page matches the preferred URL
 				if let Some(pref) = preferred_url {
-					if url.starts_with(pref)
-						|| pref.starts_with(&url)
-						|| urls_match_loosely(&url, pref)
-					{
+					if url.starts_with(pref) || pref.starts_with(&url) || urls_match_loosely(&url, pref) {
 						debug!(target = "pw", url = %url, preferred = %pref, "found preferred page");
 						preferred_page = Some(page);
 						break;
@@ -386,9 +339,10 @@ impl BrowserSession {
 				mode: har_config.mode,
 				url_glob: har_config.url_filter.clone(),
 			};
-			let har_id = context.har_start(options).await.map_err(|e| {
-				PwError::BrowserLaunch(format!("Failed to start HAR recording: {}", e))
-			})?;
+			let har_id = context
+				.har_start(options)
+				.await
+				.map_err(|e| PwError::BrowserLaunch(format!("Failed to start HAR recording: {}", e)))?;
 			Some(HarRecording {
 				id: har_id,
 				path: path.clone(),
@@ -417,9 +371,7 @@ impl BrowserSession {
 
 			// Ensure downloads directory exists
 			if let Err(e) = std::fs::create_dir_all(&downloads_dir) {
-				return Err(PwError::BrowserLaunch(format!(
-					"failed to create downloads dir: {e}"
-				)));
+				return Err(PwError::BrowserLaunch(format!("failed to create downloads dir: {e}")));
 			}
 
 			let sub = page.on_download(move |download| {
@@ -478,14 +430,8 @@ impl BrowserSession {
 	}
 
 	/// Create a session with auth loaded from a file and specific browser
-	pub async fn with_auth_file_and_browser(
-		wait_until: WaitUntil,
-		auth_file: &Path,
-		browser_kind: BrowserKind,
-		cdp_endpoint: Option<&str>,
-	) -> Result<Self> {
-		let storage_state = StorageState::from_file(auth_file)
-			.map_err(|e| PwError::BrowserLaunch(format!("Failed to load auth file: {}", e)))?;
+	pub async fn with_auth_file_and_browser(wait_until: WaitUntil, auth_file: &Path, browser_kind: BrowserKind, cdp_endpoint: Option<&str>) -> Result<Self> {
+		let storage_state = StorageState::from_file(auth_file).map_err(|e| PwError::BrowserLaunch(format!("Failed to load auth file: {}", e)))?;
 		let har_config = HarConfig::default();
 		let block_config = BlockConfig::default();
 		let download_config = DownloadConfig::default();
@@ -505,12 +451,7 @@ impl BrowserSession {
 		.await
 	}
 
-	pub async fn launch_server_session(
-		wait_until: WaitUntil,
-		storage_state: Option<StorageState>,
-		headless: bool,
-		browser_kind: BrowserKind,
-	) -> Result<Self> {
+	pub async fn launch_server_session(wait_until: WaitUntil, storage_state: Option<StorageState>, headless: bool, browser_kind: BrowserKind) -> Result<Self> {
 		let har_config = HarConfig::default();
 		let block_config = BlockConfig::default();
 		let download_config = DownloadConfig::default();
@@ -549,9 +490,7 @@ impl BrowserSession {
 			"launching persistent session..."
 		);
 
-		let mut playwright = Playwright::launch()
-			.await
-			.map_err(|e| PwError::BrowserLaunch(e.to_string()))?;
+		let mut playwright = Playwright::launch().await.map_err(|e| PwError::BrowserLaunch(e.to_string()))?;
 
 		// For persistent sessions, prevent the driver from killing the browser on exit
 		if keep_browser_running {
@@ -568,15 +507,10 @@ impl BrowserSession {
 			..Default::default()
 		};
 
-		let browser = playwright
-			.chromium()
-			.launch_with_options(launch_options)
-			.await?;
+		let browser = playwright.chromium().launch_with_options(launch_options).await?;
 
 		let context = if let Some(state) = storage_state {
-			let options = BrowserContextOptions::builder()
-				.storage_state(state)
-				.build();
+			let options = BrowserContextOptions::builder().storage_state(state).build();
 			browser.new_context_with_options(options).await?
 		} else {
 			browser.new_context().await?
@@ -616,14 +550,10 @@ impl BrowserSession {
 			goto_opts.timeout = Some(std::time::Duration::from_millis(ms));
 		}
 
-		self.page
-			.goto(url, Some(goto_opts))
-			.await
-			.map(|_| ())
-			.map_err(|e| PwError::Navigation {
-				url: url.to_string(),
-				source: anyhow::Error::new(e),
-			})
+		self.page.goto(url, Some(goto_opts)).await.map(|_| ()).map_err(|e| PwError::Navigation {
+			url: url.to_string(),
+			source: anyhow::Error::new(e),
+		})
 	}
 
 	pub fn page(&self) -> &pw_rs::Page {
@@ -731,9 +661,7 @@ impl BrowserSession {
 fn urls_match_loosely(a: &str, b: &str) -> bool {
 	// Extract host from URLs
 	fn get_host(url: &str) -> Option<&str> {
-		let url = url
-			.strip_prefix("https://")
-			.or_else(|| url.strip_prefix("http://"))?;
+		let url = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))?;
 		url.split('/').next()
 	}
 

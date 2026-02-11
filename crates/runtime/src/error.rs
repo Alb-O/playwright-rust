@@ -61,17 +61,11 @@ pub enum Error {
 
 	/// Target was closed (browser, context, or page).
 	#[error("Target closed: Cannot perform operation on closed {target_type}. {context}")]
-	TargetClosed {
-		target_type: String,
-		context: String,
-	},
+	TargetClosed { target_type: String, context: String },
 
 	/// Object not found in the connection registry.
 	#[error("Object not found: {guid}{}", expected.map(|t| format!(" (expected {})", t)).unwrap_or_default())]
-	ObjectNotFound {
-		guid: String,
-		expected: Option<&'static str>,
-	},
+	ObjectNotFound { guid: String, expected: Option<&'static str> },
 
 	/// Unknown protocol object type.
 	#[error("Unknown protocol object type: {0}")]
@@ -114,9 +108,7 @@ impl Error {
 	/// Returns true if this is a timeout error.
 	pub fn is_timeout(&self) -> bool {
 		match self {
-			Error::Timeout(_) | Error::NavigationTimeout { .. } | Error::AssertionTimeout(_) => {
-				true
-			}
+			Error::Timeout(_) | Error::NavigationTimeout { .. } | Error::AssertionTimeout(_) => true,
 			Error::Remote { name, .. } => name == "TimeoutError",
 			_ => false,
 		}

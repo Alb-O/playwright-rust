@@ -37,15 +37,10 @@ struct AuthApplySummary {
 }
 
 fn load_auth_state(auth_file: &Path) -> Result<StorageState> {
-	StorageState::from_file(auth_file)
-		.map_err(|e| PwError::BrowserLaunch(format!("Failed to load auth file: {}", e)))
+	StorageState::from_file(auth_file).map_err(|e| PwError::BrowserLaunch(format!("Failed to load auth file: {}", e)))
 }
 
-async fn apply_auth_state_to_cdp(
-	endpoint: &str,
-	auth_file: &Path,
-	state: StorageState,
-) -> Result<AuthApplySummary> {
+async fn apply_auth_state_to_cdp(endpoint: &str, auth_file: &Path, state: StorageState) -> Result<AuthApplySummary> {
 	let cookies_applied = state.cookies.len();
 	let origins_present = state.origins.len();
 
@@ -56,27 +51,17 @@ async fn apply_auth_state_to_cdp(
 		.chromium()
 		.connect_over_cdp(endpoint)
 		.await
-		.map_err(|e| {
-			PwError::Context(format!(
-				"Failed to connect over CDP for auth injection: {}",
-				e
-			))
-		})?;
+		.map_err(|e| PwError::Context(format!("Failed to connect over CDP for auth injection: {}", e)))?;
 
-	let context = connected.default_context.ok_or_else(|| {
-		PwError::Context(
-			"Connected browser did not expose a default context for auth injection".into(),
-		)
-	})?;
+	let context = connected
+		.default_context
+		.ok_or_else(|| PwError::Context("Connected browser did not expose a default context for auth injection".into()))?;
 
 	if cookies_applied > 0 {
-		context.add_cookies(state.cookies).await.map_err(|e| {
-			PwError::Context(format!(
-				"Failed to inject auth cookies from {}: {}",
-				auth_file.display(),
-				e
-			))
-		})?;
+		context
+			.add_cookies(state.cookies)
+			.await
+			.map_err(|e| PwError::Context(format!("Failed to inject auth cookies from {}: {}", auth_file.display(), e)))?;
 	}
 
 	Ok(AuthApplySummary {
@@ -86,10 +71,7 @@ async fn apply_auth_state_to_cdp(
 	})
 }
 
-async fn maybe_apply_auth(
-	endpoint: &str,
-	auth_file: Option<&Path>,
-) -> Result<Option<AuthApplySummary>> {
+async fn maybe_apply_auth(endpoint: &str, auth_file: Option<&Path>) -> Result<Option<AuthApplySummary>> {
 	let Some(path) = auth_file else {
 		return Ok(None);
 	};
@@ -198,10 +180,7 @@ async fn fetch_cdp_endpoint(port: u16) -> Result<CdpVersionInfo> {
 		return Ok(info);
 	}
 
-	Err(PwError::Context(format!(
-		"Failed to connect to port {}: {}",
-		port, last_error
-	)))
+	Err(PwError::Context(format!("Failed to connect to port {}: {}", port, last_error)))
 }
 
 /// Discover Chrome instances running with remote debugging enabled
@@ -218,10 +197,7 @@ async fn discover_chrome(port: u16) -> Result<CdpVersionInfo> {
 }
 
 /// Launch Chrome with remote debugging enabled
-async fn launch_chrome(
-	port: u16,
-	user_data_dir: Option<&std::path::Path>,
-) -> Result<CdpVersionInfo> {
+async fn launch_chrome(port: u16, user_data_dir: Option<&std::path::Path>) -> Result<CdpVersionInfo> {
 	let chrome_path = find_chrome_executable().ok_or_else(|| {
 		PwError::Context(
 			"Could not find Chrome/Chromium executable. \n\
@@ -242,18 +218,15 @@ async fn launch_chrome(
 
 	// Spawn Chrome as a detached process
 	let mut cmd = Command::new(&chrome_path);
-	cmd.args(&args)
-		.stdin(Stdio::null())
-		.stdout(Stdio::null())
-		.stderr(Stdio::null());
+	cmd.args(&args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
 
 	// On Unix, create a new process group so Chrome survives CLI exit
 	#[cfg(unix)]
 	std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
 
-	let mut child = cmd.spawn().map_err(|e| {
-		PwError::Context(format!("Failed to launch Chrome at {}: {}", chrome_path, e))
-	})?;
+	let mut child = cmd
+		.spawn()
+		.map_err(|e| PwError::Context(format!("Failed to launch Chrome at {}: {}", chrome_path, e)))?;
 
 	// Wait for Chrome to start and expose the debugging endpoint
 	let max_attempts = 8;
@@ -290,10 +263,7 @@ async fn launch_chrome(
 	)))
 }
 
-fn resolve_user_data_dir(
-	ctx_state: &ContextState,
-	user_data_dir: Option<&std::path::Path>,
-) -> Result<std::path::PathBuf> {
+fn resolve_user_data_dir(ctx_state: &ContextState, user_data_dir: Option<&std::path::Path>) -> Result<std::path::PathBuf> {
 	let resolved = if let Some(dir) = user_data_dir {
 		if dir.is_absolute() {
 			dir.to_path_buf()
@@ -301,15 +271,9 @@ fn resolve_user_data_dir(
 			ctx_state.workspace_root().join(dir)
 		}
 	} else {
-		let state_root = ctx_state
-			.workspace_root()
-			.join(dirs::PLAYWRIGHT)
-			.join(STATE_VERSION_DIR);
+		let state_root = ctx_state.workspace_root().join(dirs::PLAYWRIGHT).join(STATE_VERSION_DIR);
 		ensure_state_root_gitignore(&state_root)?;
-		state_root
-			.join("namespaces")
-			.join(ctx_state.namespace())
-			.join("connect-user-data")
+		state_root.join("namespaces").join(ctx_state.namespace()).join("connect-user-data")
 	};
 
 	std::fs::create_dir_all(&resolved)?;
@@ -336,10 +300,7 @@ async fn kill_chrome(port: u16) -> Result<Option<String>> {
 			.map_err(|e| PwError::Context(format!("Failed to run lsof: {}", e)))?;
 
 		if !output.status.success() || output.stdout.is_empty() {
-			return Err(PwError::Context(format!(
-				"Could not find process listening on port {}",
-				port
-			)));
+			return Err(PwError::Context(format!("Could not find process listening on port {}", port)));
 		}
 
 		let pids: Vec<&str> = std::str::from_utf8(&output.stdout)
@@ -349,10 +310,7 @@ async fn kill_chrome(port: u16) -> Result<Option<String>> {
 			.collect();
 
 		if pids.is_empty() {
-			return Err(PwError::Context(format!(
-				"No process found on port {}",
-				port
-			)));
+			return Err(PwError::Context(format!("No process found on port {}", port)));
 		}
 
 		// Kill each PID
@@ -369,10 +327,7 @@ async fn kill_chrome(port: u16) -> Result<Option<String>> {
 		}
 
 		if killed.is_empty() {
-			return Err(PwError::Context(format!(
-				"Failed to kill process on port {}",
-				port
-			)));
+			return Err(PwError::Context(format!("Failed to kill process on port {}", port)));
 		}
 
 		Ok(Some(killed.join(", ")))
@@ -402,18 +357,11 @@ async fn kill_chrome(port: u16) -> Result<Option<String>> {
 			}
 		}
 
-		Err(PwError::Context(format!(
-			"Could not find or kill process on port {}",
-			port
-		)))
+		Err(PwError::Context(format!("Could not find or kill process on port {}", port)))
 	}
 }
 
-pub async fn run(
-	ctx_state: &mut ContextState,
-	format: OutputFormat,
-	opts: ConnectOptions,
-) -> Result<()> {
+pub async fn run(ctx_state: &mut ContextState, format: OutputFormat, opts: ConnectOptions) -> Result<()> {
 	let ConnectOptions {
 		endpoint,
 		clear,
@@ -472,8 +420,7 @@ pub async fn run(
 	if launch {
 		let launch_data_dir = resolve_user_data_dir(ctx_state, user_data_dir.as_deref())?;
 		let info = launch_chrome(port, Some(launch_data_dir.as_path())).await?;
-		let auth_applied =
-			maybe_apply_auth(&info.web_socket_debugger_url, auth_file.as_deref()).await?;
+		let auth_applied = maybe_apply_auth(&info.web_socket_debugger_url, auth_file.as_deref()).await?;
 		ctx_state.set_cdp_endpoint(Some(info.web_socket_debugger_url.clone()));
 
 		let result = ResultBuilder::<serde_json::Value>::new("connect")
@@ -507,8 +454,7 @@ pub async fn run(
 	// Discover existing Chrome instance
 	if discover {
 		let info = discover_chrome(port).await?;
-		let auth_applied =
-			maybe_apply_auth(&info.web_socket_debugger_url, auth_file.as_deref()).await?;
+		let auth_applied = maybe_apply_auth(&info.web_socket_debugger_url, auth_file.as_deref()).await?;
 		ctx_state.set_cdp_endpoint(Some(info.web_socket_debugger_url.clone()));
 
 		let result = ResultBuilder::<serde_json::Value>::new("connect")
@@ -607,13 +553,7 @@ mod tests {
 			"resolved path was {}",
 			dir.display()
 		);
-		assert!(
-			temp.path()
-				.join("playwright")
-				.join(".pw-cli-v3")
-				.join(".gitignore")
-				.exists()
-		);
+		assert!(temp.path().join("playwright").join(".pw-cli-v3").join(".gitignore").exists());
 	}
 
 	#[test]

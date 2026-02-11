@@ -48,8 +48,7 @@ pub async fn start(foreground: bool, format: OutputFormat) -> Result<()> {
 	{
 		// Spawn a new process for the daemon rather than forking
 		// This avoids issues with tokio runtime after fork and keeps stdio working
-		let exe = std::env::current_exe()
-			.map_err(|e| PwError::Anyhow(anyhow!("Failed to get executable path: {e}")))?;
+		let exe = std::env::current_exe().map_err(|e| PwError::Anyhow(anyhow!("Failed to get executable path: {e}")))?;
 
 		let child = std::process::Command::new(&exe)
 			.arg("daemon")
@@ -108,18 +107,12 @@ pub async fn stop(format: OutputFormat) -> Result<()> {
 			Ok(())
 		}
 		Some(DaemonResponse::Ok) => {
-			let result = ResultBuilder::new("daemon stop")
-				.data(json!({ "stopped": true }))
-				.build();
+			let result = ResultBuilder::new("daemon stop").data(json!({ "stopped": true })).build();
 			print_result(&result, format);
 			Ok(())
 		}
-		Some(DaemonResponse::Error { code, message }) => {
-			Err(PwError::Anyhow(anyhow!("daemon error {code}: {message}")))
-		}
-		Some(other) => Err(PwError::Anyhow(anyhow!(
-			"unexpected daemon response: {other:?}"
-		))),
+		Some(DaemonResponse::Error { code, message }) => Err(PwError::Anyhow(anyhow!("daemon error {code}: {message}"))),
+		Some(other) => Err(PwError::Anyhow(anyhow!("unexpected daemon response: {other:?}"))),
 	}
 }
 
@@ -151,12 +144,8 @@ pub async fn status(format: OutputFormat) -> Result<()> {
 			print_result(&result, format);
 			Ok(())
 		}
-		DaemonResponse::Error { code, message } => {
-			Err(PwError::Anyhow(anyhow!("daemon error {code}: {message}")))
-		}
-		other => Err(PwError::Anyhow(anyhow!(
-			"unexpected daemon response: {other:?}"
-		))),
+		DaemonResponse::Error { code, message } => Err(PwError::Anyhow(anyhow!("daemon error {code}: {message}"))),
+		other => Err(PwError::Anyhow(anyhow!("unexpected daemon response: {other:?}"))),
 	}
 }
 
@@ -182,10 +171,7 @@ async fn connect_daemon() -> std::io::Result<TcpStream> {
 }
 
 fn is_not_running(err: &std::io::Error) -> bool {
-	matches!(
-		err.kind(),
-		std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused
-	)
+	matches!(err.kind(), std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused)
 }
 
 async fn send_request_stream<S>(mut stream: S, request: DaemonRequest) -> Result<DaemonResponse>
@@ -197,17 +183,11 @@ where
 		.write_all(format!("{}\n", payload).as_bytes())
 		.await
 		.context("Failed writing daemon request")?;
-	stream
-		.flush()
-		.await
-		.context("Failed flushing daemon request")?;
+	stream.flush().await.context("Failed flushing daemon request")?;
 
 	let mut reader = BufReader::new(stream);
 	let mut line = String::new();
-	reader
-		.read_line(&mut line)
-		.await
-		.context("Failed reading daemon response")?;
+	reader.read_line(&mut line).await.context("Failed reading daemon response")?;
 	let response = serde_json::from_str(&line).context("Failed parsing daemon response")?;
 	Ok(response)
 }

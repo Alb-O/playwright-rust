@@ -30,9 +30,7 @@ fn handle_error(err: PwError, format: OutputFormat) {
 
 	// Also emit JSON envelope to stdout with ok=false (for agents)
 	if format != OutputFormat::Text {
-		let result: output::CommandResult<()> = ResultBuilder::new("unknown")
-			.error(cmd_error.code, &cmd_error.message)
-			.build();
+		let result: output::CommandResult<()> = ResultBuilder::new("unknown").error(cmd_error.code, &cmd_error.message).build();
 		output::print_result(&result, format);
 	}
 }

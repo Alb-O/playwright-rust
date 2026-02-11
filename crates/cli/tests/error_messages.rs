@@ -35,19 +35,10 @@ fn clear_context_store() {
 fn run_pw(args: &[&str]) -> (bool, String, String) {
 	let workspace = workspace_root();
 	let workspace_str = workspace.to_string_lossy().to_string();
-	let mut full_args = vec![
-		"--no-project",
-		"--workspace",
-		&workspace_str,
-		"--namespace",
-		"default",
-	];
+	let mut full_args = vec!["--no-project", "--workspace", &workspace_str, "--namespace", "default"];
 	full_args.extend_from_slice(args);
 
-	let output = Command::new(pw_binary())
-		.args(&full_args)
-		.output()
-		.expect("Failed to execute pw");
+	let output = Command::new(pw_binary()).args(&full_args).output().expect("Failed to execute pw");
 
 	let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 	let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -67,8 +58,7 @@ fn error_suggests_selector_flag_for_selector_like_url() {
 	// Using --url with a selector-like value should fail and suggest -s
 	// Note: The smart detection in args.rs catches positional selector args,
 	// but explicit --url bypasses that
-	let (success, stdout, _stderr) =
-		run_pw(&["-f", "json", "page", "text", "--url", ".class-name"]);
+	let (success, stdout, _stderr) = run_pw(&["-f", "json", "page", "text", "--url", ".class-name"]);
 
 	// Command should fail because ".class-name" is not a valid URL
 	assert!(!success, "Expected failure with selector-like URL");
@@ -122,8 +112,7 @@ fn error_helpful_for_no_context_without_url() {
 	assert!(success, "Navigate failed: {}", stderr);
 
 	// Now try --no-context without URL
-	let (success, stdout, _stderr) =
-		run_pw(&["-f", "json", "--no-context", "page", "text", "-s", "body"]);
+	let (success, stdout, _stderr) = run_pw(&["-f", "json", "--no-context", "page", "text", "-s", "body"]);
 
 	// Should fail
 	assert!(!success, "Expected failure with --no-context and no URL");

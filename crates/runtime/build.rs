@@ -38,25 +38,17 @@ fn main() {
 		}
 		set_output_env_vars(&driver_dir, platform, &drivers_dir);
 	} else {
-		println!(
-			"cargo:warning=Downloading Playwright driver {} for {}...",
-			PLAYWRIGHT_VERSION, platform
-		);
+		println!("cargo:warning=Downloading Playwright driver {} for {}...", PLAYWRIGHT_VERSION, platform);
 
 		match download_and_extract_driver(&drivers_dir, platform) {
 			Ok(extracted_dir) => {
-				println!(
-					"cargo:warning=Playwright driver downloaded to {}",
-					extracted_dir.display()
-				);
+				println!("cargo:warning=Playwright driver downloaded to {}", extracted_dir.display());
 				set_output_env_vars(&extracted_dir, platform, &drivers_dir);
 			}
 			Err(e) => {
 				println!("cargo:warning=Failed to download Playwright driver: {}", e);
 				println!("cargo:warning=The driver will need to be installed manually or via npm.");
-				println!(
-					"cargo:warning=You can set PLAYWRIGHT_DRIVER_PATH to specify driver location."
-				);
+				println!("cargo:warning=You can set PLAYWRIGHT_DRIVER_PATH to specify driver location.");
 				return;
 			}
 		}
@@ -64,20 +56,11 @@ fn main() {
 
 	let test_dir = drivers_dir.join(format!("playwright-{}", PLAYWRIGHT_VERSION));
 	if !test_dir.exists() {
-		println!(
-			"cargo:warning=Downloading Playwright test runner {}...",
-			PLAYWRIGHT_VERSION
-		);
+		println!("cargo:warning=Downloading Playwright test runner {}...", PLAYWRIGHT_VERSION);
 
 		match download_playwright_package(&drivers_dir) {
-			Ok(dir) => println!(
-				"cargo:warning=Playwright test runner downloaded to {}",
-				dir.display()
-			),
-			Err(e) => println!(
-				"cargo:warning=Failed to download Playwright test runner: {}",
-				e
-			),
+			Ok(dir) => println!("cargo:warning=Playwright test runner downloaded to {}", dir.display()),
+			Err(e) => println!("cargo:warning=Failed to download Playwright test runner: {}", e),
 		}
 	} else {
 		// Always try to apply patches (idempotent - checks if already applied)
@@ -138,13 +121,8 @@ fn get_drivers_dir() -> PathBuf {
 		.join("playwright-rust")
 		.join(dir_names::DRIVERS);
 
-	println!(
-		"cargo:warning=No workspace found, using cache directory: {}",
-		cache_dir.display()
-	);
-	println!(
-		"cargo:warning=This matches playwright-python's approach for system-wide driver installation"
-	);
+	println!("cargo:warning=No workspace found, using cache directory: {}", cache_dir.display());
+	println!("cargo:warning=This matches playwright-python's approach for system-wide driver installation");
 
 	cache_dir
 }
@@ -159,19 +137,13 @@ fn select_drivers_dir(project_root: &Path) -> PathBuf {
 	// If playwright/ directory exists, put drivers inside it
 	if playwright_dir.exists() && playwright_dir.is_dir() {
 		let drivers_dir = playwright_dir.join(dir_names::DRIVERS);
-		println!(
-			"cargo:warning=Found playwright/ directory, using: {}",
-			drivers_dir.display()
-		);
+		println!("cargo:warning=Found playwright/ directory, using: {}", drivers_dir.display());
 		return drivers_dir;
 	}
 
 	// Otherwise use drivers/ at project root (legacy behavior)
 	let drivers_dir = project_root.join(dir_names::DRIVERS);
-	println!(
-		"cargo:warning=Using workspace drivers directory: {}",
-		drivers_dir.display()
-	);
+	println!("cargo:warning=Using workspace drivers directory: {}", drivers_dir.display());
 	drivers_dir
 }
 
@@ -207,36 +179,27 @@ fn download_and_extract_driver(drivers_dir: &Path, platform: &str) -> io::Result
 	println!("cargo:warning=Downloading from: {}", url);
 
 	// Download the file
-	let response = reqwest::blocking::get(&url)
-		.map_err(|e| io::Error::other(format!("Download failed: {}", e)))?;
+	let response = reqwest::blocking::get(&url).map_err(|e| io::Error::other(format!("Download failed: {}", e)))?;
 
 	if !response.status().is_success() {
-		return Err(io::Error::other(format!(
-			"Download failed with status: {}",
-			response.status()
-		)));
+		return Err(io::Error::other(format!("Download failed with status: {}", response.status())));
 	}
 
 	// Read response bytes
-	let bytes = response
-		.bytes()
-		.map_err(|e| io::Error::other(format!("Failed to read response: {}", e)))?;
+	let bytes = response.bytes().map_err(|e| io::Error::other(format!("Failed to read response: {}", e)))?;
 
 	println!("cargo:warning=Downloaded {} bytes", bytes.len());
 
 	// Extract ZIP file
 	let cursor = io::Cursor::new(bytes);
-	let mut archive = zip::ZipArchive::new(cursor)
-		.map_err(|e| io::Error::other(format!("Failed to open ZIP: {}", e)))?;
+	let mut archive = zip::ZipArchive::new(cursor).map_err(|e| io::Error::other(format!("Failed to open ZIP: {}", e)))?;
 
 	let extract_dir = drivers_dir.join(format!("playwright-{}-{}", PLAYWRIGHT_VERSION, platform));
 
 	println!("cargo:warning=Extracting to: {}", extract_dir.display());
 
 	for i in 0..archive.len() {
-		let mut file = archive
-			.by_index(i)
-			.map_err(|e| io::Error::other(format!("Failed to read ZIP entry: {}", e)))?;
+		let mut file = archive.by_index(i).map_err(|e| io::Error::other(format!("Failed to read ZIP entry: {}", e)))?;
 
 		let outpath = extract_dir.join(file.name());
 
@@ -255,9 +218,7 @@ fn download_and_extract_driver(drivers_dir: &Path, platform: &str) -> io::Result
 				use std::os::unix::fs::PermissionsExt;
 
 				// Make executable: node binary and any shell scripts
-				if outpath.ends_with("node")
-					|| outpath.extension().and_then(|s| s.to_str()) == Some("sh")
-				{
+				if outpath.ends_with("node") || outpath.extension().and_then(|s| s.to_str()) == Some("sh") {
 					let mut perms = fs::metadata(&outpath)?.permissions();
 					perms.set_mode(0o755);
 					fs::set_permissions(&outpath, perms)?;
@@ -266,10 +227,7 @@ fn download_and_extract_driver(drivers_dir: &Path, platform: &str) -> io::Result
 		}
 	}
 
-	println!(
-		"cargo:warning=Successfully extracted {} files",
-		archive.len()
-	);
+	println!("cargo:warning=Successfully extracted {} files", archive.len());
 
 	apply_driver_patches(&extract_dir)?;
 	Ok(extract_dir)
@@ -282,19 +240,13 @@ fn download_playwright_package(drivers_dir: &Path) -> io::Result<PathBuf> {
 
 	println!("cargo:warning=Downloading from: {}", url);
 
-	let response = reqwest::blocking::get(&url)
-		.map_err(|e| io::Error::other(format!("Download failed: {}", e)))?;
+	let response = reqwest::blocking::get(&url).map_err(|e| io::Error::other(format!("Download failed: {}", e)))?;
 
 	if !response.status().is_success() {
-		return Err(io::Error::other(format!(
-			"Download failed with status: {}",
-			response.status()
-		)));
+		return Err(io::Error::other(format!("Download failed with status: {}", response.status())));
 	}
 
-	let bytes = response
-		.bytes()
-		.map_err(|e| io::Error::other(format!("Failed to read response: {}", e)))?;
+	let bytes = response.bytes().map_err(|e| io::Error::other(format!("Failed to read response: {}", e)))?;
 
 	println!("cargo:warning=Downloaded {} bytes", bytes.len());
 
@@ -526,33 +478,18 @@ fn set_executable_if_shebang(path: &Path) -> io::Result<()> {
 
 /// Emits compile-time environment variables for driver paths.
 fn set_output_env_vars(driver_dir: &Path, platform: &str, drivers_dir: &Path) {
-	println!(
-		"cargo:rustc-env=PLAYWRIGHT_DRIVER_DIR={}",
-		driver_dir.display()
-	);
-	println!(
-		"cargo:rustc-env=PLAYWRIGHT_DRIVER_VERSION={}",
-		PLAYWRIGHT_VERSION
-	);
+	println!("cargo:rustc-env=PLAYWRIGHT_DRIVER_DIR={}", driver_dir.display());
+	println!("cargo:rustc-env=PLAYWRIGHT_DRIVER_VERSION={}", PLAYWRIGHT_VERSION);
 	println!("cargo:rustc-env=PLAYWRIGHT_DRIVER_PLATFORM={}", platform);
-	println!(
-		"cargo:rustc-env=PLAYWRIGHT_DRIVERS_DIR={}",
-		drivers_dir.display()
-	);
+	println!("cargo:rustc-env=PLAYWRIGHT_DRIVERS_DIR={}", drivers_dir.display());
 
 	let node_exe = driver_dir.join(if cfg!(windows) { "node.exe" } else { "node" });
 	if node_exe.exists() {
-		println!(
-			"cargo:rustc-env=PLAYWRIGHT_BUNDLED_NODE_EXE={}",
-			node_exe.display()
-		);
+		println!("cargo:rustc-env=PLAYWRIGHT_BUNDLED_NODE_EXE={}", node_exe.display());
 	}
 
 	let cli_js = driver_dir.join("package").join("cli.js");
 	if cli_js.exists() {
-		println!(
-			"cargo:rustc-env=PLAYWRIGHT_BUNDLED_CLI_JS={}",
-			cli_js.display()
-		);
+		println!("cargo:rustc-env=PLAYWRIGHT_BUNDLED_CLI_JS={}", cli_js.display());
 	}
 }

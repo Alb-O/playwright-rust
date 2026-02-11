@@ -58,9 +58,7 @@ fn test_complex_selectors() {
 	assert!(looks_like_selector(".titleline a >> nth=0"));
 	assert!(looks_like_selector("article.post > header h1"));
 	assert!(looks_like_selector("#main .content p:first-of-type"));
-	assert!(looks_like_selector(
-		"table tr:nth-child(odd) td:first-child"
-	));
+	assert!(looks_like_selector("table tr:nth-child(odd) td:first-child"));
 }
 
 #[test]
@@ -78,9 +76,7 @@ fn test_urls_not_selectors() {
 fn test_websocket_urls_not_selectors() {
 	assert!(!looks_like_selector("ws://localhost:9222"));
 	assert!(!looks_like_selector("wss://example.com/socket"));
-	assert!(!looks_like_selector(
-		"ws://127.0.0.1:9222/devtools/browser/abc"
-	));
+	assert!(!looks_like_selector("ws://127.0.0.1:9222/devtools/browser/abc"));
 }
 
 #[test]
@@ -92,9 +88,7 @@ fn test_file_urls_not_selectors() {
 #[test]
 fn test_data_urls_not_selectors() {
 	assert!(!looks_like_selector("data:text/html,<h1>Test</h1>"));
-	assert!(!looks_like_selector(
-		"data:text/html,<button id=btn>Go</button>"
-	));
+	assert!(!looks_like_selector("data:text/html,<button id=btn>Go</button>"));
 	assert!(!looks_like_selector("data:text/plain,Hello World"));
 }
 

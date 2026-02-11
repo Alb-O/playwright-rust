@@ -17,9 +17,7 @@ pub async fn with_session<'exec, 'ctx, T>(
 	exec: &mut ExecCtx<'exec, 'ctx>,
 	req: SessionRequest<'_>,
 	artifacts: ArtifactsPolicy,
-	f: impl for<'s> FnOnce(
-		&'s SessionHandle,
-	) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + 's>>,
+	f: impl for<'s> FnOnce(&'s SessionHandle) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + 's>>,
 ) -> Result<T>
 where
 	'ctx: 'exec,
@@ -35,13 +33,10 @@ where
 		}
 		Err(e) => {
 			if let ArtifactsPolicy::OnError { command } = artifacts {
-				let artifacts = session
-					.collect_failure_artifacts(exec.artifacts_dir, command)
-					.await;
+				let artifacts = session.collect_failure_artifacts(exec.artifacts_dir, command).await;
 
 				if !artifacts.is_empty() {
-					let failure = FailureWithArtifacts::new(e.to_command_error())
-						.with_artifacts(artifacts.artifacts);
+					let failure = FailureWithArtifacts::new(e.to_command_error()).with_artifacts(artifacts.artifacts);
 
 					let _ = session.close().await;
 

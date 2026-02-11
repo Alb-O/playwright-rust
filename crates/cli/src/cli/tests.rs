@@ -6,13 +6,7 @@ use super::*;
 
 #[test]
 fn parse_screenshot_command() {
-	let args = vec![
-		"pw",
-		"screenshot",
-		"https://example.com",
-		"-o",
-		"/tmp/test.png",
-	];
+	let args = vec!["pw", "screenshot", "https://example.com", "-o", "/tmp/test.png"];
 	let cli = Cli::try_parse_from(args).unwrap();
 
 	match cli.command {
@@ -85,31 +79,14 @@ fn verbose_flag_short_and_long() {
 
 #[test]
 fn parse_cdp_endpoint_flag() {
-	let args = vec![
-		"pw",
-		"--cdp-endpoint",
-		"ws://localhost:19988/cdp",
-		"navigate",
-		"https://example.com",
-	];
+	let args = vec!["pw", "--cdp-endpoint", "ws://localhost:19988/cdp", "navigate", "https://example.com"];
 	let cli = Cli::try_parse_from(args).unwrap();
-	assert_eq!(
-		cli.cdp_endpoint.as_deref(),
-		Some("ws://localhost:19988/cdp")
-	);
+	assert_eq!(cli.cdp_endpoint.as_deref(), Some("ws://localhost:19988/cdp"));
 }
 
 #[test]
 fn parse_workspace_and_namespace_flags() {
-	let args = vec![
-		"pw",
-		"--workspace",
-		"/tmp/my-ws",
-		"--namespace",
-		"agent-a",
-		"navigate",
-		"https://example.com",
-	];
+	let args = vec!["pw", "--workspace", "/tmp/my-ws", "--namespace", "agent-a", "navigate", "https://example.com"];
 	let cli = Cli::try_parse_from(args).unwrap();
 	assert_eq!(cli.workspace.as_deref(), Some("/tmp/my-ws"));
 	assert_eq!(cli.namespace, "agent-a");
@@ -170,14 +147,7 @@ fn invalid_command_fails() {
 #[test]
 fn parse_click_with_named_flags() {
 	// Test using named flags instead of positional args
-	let args = vec![
-		"pw",
-		"click",
-		"--url",
-		"https://example.com",
-		"--selector",
-		"button.submit",
-	];
+	let args = vec!["pw", "click", "--url", "https://example.com", "--selector", "button.submit"];
 	let cli = Cli::try_parse_from(args).unwrap();
 
 	match cli.command {
@@ -196,15 +166,7 @@ fn parse_click_with_named_flags() {
 #[test]
 fn parse_page_eval_with_named_flags() {
 	// Test eval with --expr and --url flags (order-independent)
-	let args = vec![
-		"pw",
-		"page",
-		"eval",
-		"--url",
-		"https://example.com",
-		"--expr",
-		"document.title",
-	];
+	let args = vec!["pw", "page", "eval", "--url", "https://example.com", "--expr", "document.title"];
 	let cli = Cli::try_parse_from(args).unwrap();
 
 	match cli.command {
@@ -237,14 +199,13 @@ fn parse_har_set_command_full_options() {
 
 	match cli.command {
 		Commands::Har {
-			action:
-				HarAction::Set {
-					file,
-					content,
-					mode,
-					omit_content,
-					url_filter,
-				},
+			action: HarAction::Set {
+				file,
+				content,
+				mode,
+				omit_content,
+				url_filter,
+			},
 		} => {
 			assert_eq!(file, PathBuf::from("network.har"));
 			assert_eq!(content, CliHarContentPolicy::Embed);
@@ -261,9 +222,7 @@ fn parse_har_show_command() {
 	let args = vec!["pw", "har", "show"];
 	let cli = Cli::try_parse_from(args).unwrap();
 	match cli.command {
-		Commands::Har {
-			action: HarAction::Show,
-		} => {}
+		Commands::Har { action: HarAction::Show } => {}
 		_ => panic!("Expected Har Show command"),
 	}
 }
@@ -273,9 +232,7 @@ fn parse_har_clear_command() {
 	let args = vec!["pw", "har", "clear"];
 	let cli = Cli::try_parse_from(args).unwrap();
 	match cli.command {
-		Commands::Har {
-			action: HarAction::Clear,
-		} => {}
+		Commands::Har { action: HarAction::Clear } => {}
 		_ => panic!("Expected Har Clear command"),
 	}
 }

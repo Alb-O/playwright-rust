@@ -65,11 +65,7 @@ impl CommandDef for HtmlCommand {
 	type Data = HtmlData;
 
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let resolved = args::resolve_url_and_selector(
-			raw.url.clone(),
-			raw.url_flag,
-			raw.selector_flag.or(raw.selector),
-		);
+		let resolved = args::resolve_url_and_selector(raw.url.clone(), raw.url_flag, raw.selector_flag.or(raw.selector));
 
 		let target = env.resolve_target(resolved.url, TargetPolicy::AllowCurrentPage)?;
 		let selector = env.resolve_selector(resolved.selector, Some("html"))?;
@@ -77,10 +73,7 @@ impl CommandDef for HtmlCommand {
 		Ok(HtmlResolved { target, selector })
 	}
 
-	fn execute<'exec, 'ctx>(
-		args: &'exec Self::Resolved,
-		mut exec: ExecCtx<'exec, 'ctx>,
-	) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -98,8 +91,7 @@ impl CommandDef for HtmlCommand {
 			let target = args.target.target.clone();
 			let selector = args.selector.clone();
 
-			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx)
-				.with_preferred_url(preferred_url);
+			let req = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.ctx).with_preferred_url(preferred_url);
 
 			let data = with_session(&mut exec, req, ArtifactsPolicy::Never, move |session| {
 				let selector = selector.clone();

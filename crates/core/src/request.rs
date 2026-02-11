@@ -25,18 +25,8 @@ impl Request {
 	///
 	/// This is called by the object factory when the server sends a `__create__` message
 	/// for a Request object.
-	pub fn new(
-		parent: Arc<dyn ChannelOwner>,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Result<Self> {
-		let base = ChannelOwnerImpl::new(
-			ParentOrConnection::Parent(parent),
-			type_name,
-			guid,
-			initializer,
-		);
+	pub fn new(parent: Arc<dyn ChannelOwner>, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Self> {
+		let base = ChannelOwnerImpl::new(ParentOrConnection::Parent(parent), type_name, guid, initializer);
 
 		Ok(Self { base })
 	}
@@ -45,30 +35,21 @@ impl Request {
 	///
 	/// See: <https://playwright.dev/docs/api/class-request#request-url>
 	pub fn url(&self) -> &str {
-		self.initializer()
-			.get("url")
-			.and_then(|v| v.as_str())
-			.unwrap_or("")
+		self.initializer().get("url").and_then(|v| v.as_str()).unwrap_or("")
 	}
 
 	/// Returns the HTTP method of the request (GET, POST, etc.).
 	///
 	/// See: <https://playwright.dev/docs/api/class-request#request-method>
 	pub fn method(&self) -> &str {
-		self.initializer()
-			.get("method")
-			.and_then(|v| v.as_str())
-			.unwrap_or("GET")
+		self.initializer().get("method").and_then(|v| v.as_str()).unwrap_or("GET")
 	}
 
 	/// Returns the resource type of the request (e.g., "document", "stylesheet", "image", "fetch", etc.).
 	///
 	/// See: <https://playwright.dev/docs/api/class-request#request-resource-type>
 	pub fn resource_type(&self) -> &str {
-		self.initializer()
-			.get("resourceType")
-			.and_then(|v| v.as_str())
-			.unwrap_or("other")
+		self.initializer().get("resourceType").and_then(|v| v.as_str()).unwrap_or("other")
 	}
 
 	/// Check if this request is for a navigation (main document).
@@ -134,8 +115,6 @@ impl ChannelOwner for Request {
 
 impl std::fmt::Debug for Request {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("Request")
-			.field("guid", &self.guid())
-			.finish()
+		f.debug_struct("Request").field("guid", &self.guid()).finish()
 	}
 }

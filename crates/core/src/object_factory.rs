@@ -19,10 +19,7 @@ use pw_runtime::{Error, Result};
 use serde_json::Value;
 
 use crate::artifact::Artifact;
-use crate::{
-	Browser, BrowserContext, BrowserType, Dialog, Frame, Page, Playwright, Request, ResponseObject,
-	Route, Tracing, Video,
-};
+use crate::{Browser, BrowserContext, BrowserType, Dialog, Frame, Page, Playwright, Request, ResponseObject, Route, Tracing, Video};
 
 /// Creates a protocol object from a `__create__` message.
 ///
@@ -67,12 +64,7 @@ use crate::{
 /// # Ok(())
 /// # }
 /// ```
-pub async fn create_object(
-	parent: ParentOrConnection,
-	type_name: String,
-	guid: Arc<str>,
-	initializer: Value,
-) -> Result<Arc<dyn ChannelOwner>> {
+pub async fn create_object(parent: ParentOrConnection, type_name: String, guid: Arc<str>, initializer: Value) -> Result<Arc<dyn ChannelOwner>> {
 	// Match on type name and call appropriate constructor
 	let object: Arc<dyn ChannelOwner> = match type_name.as_str() {
 		"Playwright" => {
@@ -80,9 +72,7 @@ pub async fn create_object(
 			let connection = match parent {
 				ParentOrConnection::Connection(conn) => conn,
 				ParentOrConnection::Parent(_) => {
-					return Err(Error::ProtocolError(
-						"Playwright must have Connection as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("Playwright must have Connection as parent".to_string()));
 				}
 			};
 
@@ -94,18 +84,11 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"BrowserType must have Playwright as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("BrowserType must have Playwright as parent".to_string()));
 				}
 			};
 
-			Arc::new(BrowserType::new(
-				parent_owner,
-				type_name,
-				guid,
-				initializer,
-			)?)
+			Arc::new(BrowserType::new(parent_owner, type_name, guid, initializer)?)
 		}
 
 		"Browser" => {
@@ -113,9 +96,7 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"Browser must have BrowserType as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("Browser must have BrowserType as parent".to_string()));
 				}
 			};
 
@@ -127,18 +108,11 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"BrowserContext must have Browser as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("BrowserContext must have Browser as parent".to_string()));
 				}
 			};
 
-			Arc::new(BrowserContext::new(
-				parent_owner,
-				type_name,
-				guid,
-				initializer,
-			)?)
+			Arc::new(BrowserContext::new(parent_owner, type_name, guid, initializer)?)
 		}
 
 		"Page" => {
@@ -146,9 +120,7 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"Page must have BrowserContext as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("Page must have BrowserContext as parent".to_string()));
 				}
 			};
 
@@ -160,9 +132,7 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"Frame must have Page as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("Frame must have Page as parent".to_string()));
 				}
 			};
 
@@ -174,9 +144,7 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"Request must have Frame as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("Request must have Frame as parent".to_string()));
 				}
 			};
 
@@ -188,9 +156,7 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"Route must have Frame as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("Route must have Frame as parent".to_string()));
 				}
 			};
 
@@ -202,18 +168,11 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"Response must have Request as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("Response must have Request as parent".to_string()));
 				}
 			};
 
-			Arc::new(ResponseObject::new(
-				parent_owner,
-				type_name,
-				guid,
-				initializer,
-			)?)
+			Arc::new(ResponseObject::new(parent_owner, type_name, guid, initializer)?)
 		}
 
 		"ElementHandle" => {
@@ -221,18 +180,11 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"ElementHandle must have Frame as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("ElementHandle must have Frame as parent".to_string()));
 				}
 			};
 
-			Arc::new(crate::ElementHandle::new(
-				parent_owner,
-				type_name,
-				guid,
-				initializer,
-			)?)
+			Arc::new(crate::ElementHandle::new(parent_owner, type_name, guid, initializer)?)
 		}
 
 		"Artifact" => {
@@ -240,9 +192,7 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"Artifact must have BrowserContext as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("Artifact must have BrowserContext as parent".to_string()));
 				}
 			};
 
@@ -254,9 +204,7 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"Dialog must have Page as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("Dialog must have Page as parent".to_string()));
 				}
 			};
 
@@ -268,9 +216,7 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"Tracing must have BrowserContext as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("Tracing must have BrowserContext as parent".to_string()));
 				}
 			};
 
@@ -282,9 +228,7 @@ pub async fn create_object(
 			let parent_owner = match parent {
 				ParentOrConnection::Parent(p) => p,
 				ParentOrConnection::Connection(_) => {
-					return Err(Error::ProtocolError(
-						"Video must have Page as parent".to_string(),
-					));
+					return Err(Error::ProtocolError("Video must have Page as parent".to_string()));
 				}
 			};
 
@@ -306,12 +250,7 @@ struct UnknownObject {
 }
 
 impl UnknownObject {
-	fn new(
-		parent: ParentOrConnection,
-		type_name: String,
-		guid: Arc<str>,
-		initializer: Value,
-	) -> Self {
+	fn new(parent: ParentOrConnection, type_name: String, guid: Arc<str>, initializer: Value) -> Self {
 		let base = ChannelOwnerImpl::new(parent, type_name, guid, initializer);
 		Self { base }
 	}

@@ -91,12 +91,7 @@ impl ContextState {
 	}
 
 	pub fn session_key(&self, browser: BrowserKind, headless: bool) -> String {
-		format!(
-			"{}:{}:{}",
-			self.namespace_id(),
-			browser,
-			if headless { "headless" } else { "headful" }
-		)
+		format!("{}:{}:{}", self.namespace_id(), browser, if headless { "headless" } else { "headful" })
 	}
 
 	pub fn session_descriptor_path(&self) -> Option<PathBuf> {
@@ -118,23 +113,18 @@ impl ContextState {
 		if self.base_url_override.is_some() {
 			return true;
 		}
-		(!self.refresh && self.state.cache.last_url.is_some())
-			|| self.state.config.defaults.base_url.is_some()
+		(!self.refresh && self.state.cache.last_url.is_some()) || self.state.config.defaults.base_url.is_some()
 	}
 
-	pub fn resolve_selector(
-		&self,
-		provided: Option<String>,
-		fallback: Option<&str>,
-	) -> Result<String> {
+	pub fn resolve_selector(&self, provided: Option<String>, fallback: Option<&str>) -> Result<String> {
 		if let Some(selector) = provided {
 			return Ok(selector);
 		}
 
 		if self.no_context {
-			return fallback.map(String::from).ok_or_else(|| {
-				PwError::Context("Selector is required when context usage is disabled".into())
-			});
+			return fallback
+				.map(String::from)
+				.ok_or_else(|| PwError::Context("Selector is required when context usage is disabled".into()));
 		}
 
 		if !self.refresh {
@@ -143,9 +133,7 @@ impl ContextState {
 			}
 		}
 
-		fallback
-			.map(String::from)
-			.ok_or_else(|| PwError::Context("No selector available".into()))
+		fallback.map(String::from).ok_or_else(|| PwError::Context("No selector available".into()))
 	}
 
 	/// Returns the CDP endpoint from config defaults.
@@ -223,9 +211,7 @@ impl ContextState {
 	/// Returns true if the URL matches any protected pattern.
 	pub fn is_protected(&self, url: &str) -> bool {
 		let url_lower = url.to_lowercase();
-		self.protected_urls()
-			.iter()
-			.any(|pattern| url_lower.contains(&pattern.to_lowercase()))
+		self.protected_urls().iter().any(|pattern| url_lower.contains(&pattern.to_lowercase()))
 	}
 
 	/// Adds a URL pattern to the protected list. Returns true if added.
@@ -234,13 +220,7 @@ impl ContextState {
 			return false;
 		}
 		let pattern_lower = pattern.to_lowercase();
-		if self
-			.state
-			.config
-			.protected_urls
-			.iter()
-			.any(|p| p.to_lowercase() == pattern_lower)
-		{
+		if self.state.config.protected_urls.iter().any(|p| p.to_lowercase() == pattern_lower) {
 			return false;
 		}
 		self.state.config.protected_urls.push(pattern);
@@ -254,10 +234,7 @@ impl ContextState {
 		}
 		let pattern_lower = pattern.to_lowercase();
 		let before_len = self.state.config.protected_urls.len();
-		self.state
-			.config
-			.protected_urls
-			.retain(|p| p.to_lowercase() != pattern_lower);
+		self.state.config.protected_urls.retain(|p| p.to_lowercase() != pattern_lower);
 		self.state.config.protected_urls.len() < before_len
 	}
 
@@ -293,11 +270,7 @@ impl ContextState {
 	}
 
 	/// Records context from a resolved target.
-	pub fn record_from_target(
-		&mut self,
-		target: &crate::target::ResolvedTarget,
-		selector: Option<&str>,
-	) {
+	pub fn record_from_target(&mut self, target: &crate::target::ResolvedTarget, selector: Option<&str>) {
 		self.apply_delta(crate::commands::def::ContextDelta {
 			url: target.url_str().map(String::from),
 			selector: selector.map(String::from),
@@ -315,9 +288,7 @@ impl ContextState {
 
 	/// Returns the effective base URL.
 	pub fn base_url(&self) -> Option<&str> {
-		self.base_url_override
-			.as_deref()
-			.or(self.state.config.defaults.base_url.as_deref())
+		self.base_url_override.as_deref().or(self.state.config.defaults.base_url.as_deref())
 	}
 
 	/// Returns the loaded state.
@@ -332,8 +303,5 @@ impl ContextState {
 }
 
 fn now_ts() -> u64 {
-	std::time::SystemTime::now()
-		.duration_since(std::time::UNIX_EPOCH)
-		.unwrap_or_default()
-		.as_secs()
+	std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
 }

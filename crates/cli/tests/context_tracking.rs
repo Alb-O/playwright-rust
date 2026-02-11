@@ -41,9 +41,7 @@ fn clear_context_store() {
 
 fn read_context_store() -> Option<serde_json::Value> {
 	let path = context_store_path();
-	std::fs::read_to_string(&path)
-		.ok()
-		.and_then(|content| serde_json::from_str(&content).ok())
+	std::fs::read_to_string(&path).ok().and_then(|content| serde_json::from_str(&content).ok())
 }
 
 fn get_last_url_from_context() -> Option<String> {
@@ -55,19 +53,10 @@ fn get_last_url_from_context() -> Option<String> {
 fn run_pw(args: &[&str]) -> (bool, String, String) {
 	let workspace = workspace_root();
 	let workspace_str = workspace.to_string_lossy().to_string();
-	let mut full_args = vec![
-		"--no-project",
-		"--workspace",
-		&workspace_str,
-		"--namespace",
-		"default",
-	];
+	let mut full_args = vec!["--no-project", "--workspace", &workspace_str, "--namespace", "default"];
 	full_args.extend_from_slice(args);
 
-	let output = Command::new(pw_binary())
-		.args(&full_args)
-		.output()
-		.expect("Failed to execute pw");
+	let output = Command::new(pw_binary()).args(&full_args).output().expect("Failed to execute pw");
 
 	let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 	let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -89,22 +78,14 @@ fn click_updates_context_with_actual_url() {
 	let html = "data:text/html,<button id=btn onclick=\"history.pushState(null,null,location.href+'?changed=1')\">Go</button>";
 
 	// Run click command
-	let (success, stdout, stderr) =
-		run_pw(&["-f", "json", "click", html, "#btn", "--wait-ms", "100"]);
+	let (success, stdout, stderr) = run_pw(&["-f", "json", "click", html, "#btn", "--wait-ms", "100"]);
 
 	assert!(success, "Click command failed: {}", stderr);
-	assert!(
-		stdout.contains("\"ok\": true"),
-		"Expected success: {}",
-		stdout
-	);
+	assert!(stdout.contains("\"ok\": true"), "Expected success: {}", stdout);
 
 	// Verify context was updated with the new URL (containing changed=1)
 	let last_url = get_last_url_from_context();
-	assert!(
-		last_url.is_some(),
-		"Expected lastUrl to be set in context store"
-	);
+	assert!(last_url.is_some(), "Expected lastUrl to be set in context store");
 
 	let last_url = last_url.unwrap();
 	assert!(
@@ -131,17 +112,10 @@ fn navigate_stores_url_in_context() {
 
 	// Verify context has the URL
 	let last_url = get_last_url_from_context();
-	assert!(
-		last_url.is_some(),
-		"Expected lastUrl to be set after navigate"
-	);
+	assert!(last_url.is_some(), "Expected lastUrl to be set after navigate");
 
 	let last_url = last_url.unwrap();
-	assert!(
-		last_url.contains("data:text/html"),
-		"Context should store the navigated URL: {}",
-		last_url
-	);
+	assert!(last_url.contains("data:text/html"), "Context should store the navigated URL: {}", last_url);
 }
 
 /// Test: Subsequent command can use URL from context
@@ -161,9 +135,5 @@ fn subsequent_command_uses_context_url() {
 	// Now run text command without URL - should use context
 	let (success, stdout, stderr) = run_pw(&["-f", "json", "page", "text", "-s", "h1"]);
 	assert!(success, "Text command failed: {}", stderr);
-	assert!(
-		stdout.contains("Title"),
-		"Expected to find Title in output: {}",
-		stdout
-	);
+	assert!(stdout.contains("Title"), "Expected to find Title in output: {}", stdout);
 }

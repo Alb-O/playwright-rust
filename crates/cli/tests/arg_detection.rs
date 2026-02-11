@@ -36,19 +36,10 @@ fn clear_context_store() {
 fn run_pw(args: &[&str]) -> (bool, String, String) {
 	let workspace = workspace_root();
 	let workspace_str = workspace.to_string_lossy().to_string();
-	let mut full_args = vec![
-		"--no-project",
-		"--workspace",
-		&workspace_str,
-		"--namespace",
-		"default",
-	];
+	let mut full_args = vec!["--no-project", "--workspace", &workspace_str, "--namespace", "default"];
 	full_args.extend_from_slice(args);
 
-	let output = Command::new(pw_binary())
-		.args(&full_args)
-		.output()
-		.expect("Failed to execute pw");
+	let output = Command::new(pw_binary()).args(&full_args).output().expect("Failed to execute pw");
 
 	let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 	let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -73,11 +64,7 @@ fn selector_positional_with_context() {
 	// Now run text with just a selector - should use context URL
 	let (success, stdout, stderr) = run_pw(&["-f", "json", "page", "text", ".content"]);
 	assert!(success, "Text command failed: {}", stderr);
-	assert!(
-		stdout.contains("Hello World"),
-		"Expected content in output: {}",
-		stdout
-	);
+	assert!(stdout.contains("Hello World"), "Expected content in output: {}", stdout);
 }
 
 /// Test: URL-like positional argument
@@ -92,11 +79,7 @@ fn url_positional_treated_as_url() {
 	let url = "data:text/html,<body>Page Content</body>";
 	let (success, stdout, stderr) = run_pw(&["-f", "json", "page", "text", url, "-s", "body"]);
 	assert!(success, "Text command failed: {}", stderr);
-	assert!(
-		stdout.contains("Page Content"),
-		"Expected page content: {}",
-		stdout
-	);
+	assert!(stdout.contains("Page Content"), "Expected page content: {}", stdout);
 }
 
 /// Test: Both URL and selector as positional arguments
@@ -111,11 +94,7 @@ fn both_url_and_selector_positional() {
 	let url = "data:text/html,<h1>Title</h1><p class=\"para\">Paragraph</p>";
 	let (success, stdout, stderr) = run_pw(&["-f", "json", "page", "text", url, ".para"]);
 	assert!(success, "Text command failed: {}", stderr);
-	assert!(
-		stdout.contains("Paragraph"),
-		"Expected paragraph content: {}",
-		stdout
-	);
+	assert!(stdout.contains("Paragraph"), "Expected paragraph content: {}", stdout);
 }
 
 /// Test: Explicit -s flag for selector (backward compatibility)
@@ -135,11 +114,7 @@ fn explicit_selector_flag() {
 	// Use explicit -s flag
 	let (success, stdout, stderr) = run_pw(&["-f", "json", "page", "text", "-s", "#test"]);
 	assert!(success, "Text command failed: {}", stderr);
-	assert!(
-		stdout.contains("Test Text"),
-		"Expected test text: {}",
-		stdout
-	);
+	assert!(stdout.contains("Test Text"), "Expected test text: {}", stdout);
 }
 
 /// Test: ID selector detection
@@ -157,11 +132,7 @@ fn id_selector_detection() {
 	// #main should be detected as selector
 	let (success, stdout, stderr) = run_pw(&["-f", "json", "page", "text", "#main"]);
 	assert!(success, "Text command failed: {}", stderr);
-	assert!(
-		stdout.contains("Main Content"),
-		"Expected main content: {}",
-		stdout
-	);
+	assert!(stdout.contains("Main Content"), "Expected main content: {}", stdout);
 }
 
 /// Test: Complex selector detection
@@ -179,11 +150,7 @@ fn complex_selector_detection() {
 	// Complex selector with combinator - use :first-child to match exactly one element
 	let (success, stdout, stderr) = run_pw(&["-f", "json", "page", "text", "li:first-child"]);
 	assert!(success, "Text command failed: {}", stderr);
-	assert!(
-		stdout.contains("First"),
-		"Expected first item content: {}",
-		stdout
-	);
+	assert!(stdout.contains("First"), "Expected first item content: {}", stdout);
 }
 
 /// Test: Click command with selector detection
@@ -201,11 +168,7 @@ fn click_with_selector_detection() {
 	// .btn should be detected as selector
 	let (success, stdout, stderr) = run_pw(&["-f", "json", "click", ".btn"]);
 	assert!(success, "Click command failed: {}", stderr);
-	assert!(
-		stdout.contains("\"ok\": true"),
-		"Expected success: {}",
-		stdout
-	);
+	assert!(stdout.contains("\"ok\": true"), "Expected success: {}", stdout);
 }
 
 /// Test: HTML command with selector detection
@@ -224,9 +187,5 @@ fn html_with_selector_detection() {
 	// Let's use a more explicit selector
 	let (success, stdout, stderr) = run_pw(&["-f", "json", "page", "html", "-s", "article"]);
 	assert!(success, "HTML command failed: {}", stderr);
-	assert!(
-		stdout.contains("<p>Article content</p>"),
-		"Expected article HTML: {}",
-		stdout
-	);
+	assert!(stdout.contains("<p>Article content</p>"), "Expected article HTML: {}", stdout);
 }

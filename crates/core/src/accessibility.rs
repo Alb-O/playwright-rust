@@ -67,10 +67,7 @@ impl Accessibility {
 	/// [`Error::ProtocolError`]: pw_runtime::Error::ProtocolError
 	///
 	/// See: <https://playwright.dev/docs/api/class-accessibility#accessibility-snapshot>
-	pub async fn snapshot(
-		&self,
-		options: Option<AccessibilitySnapshotOptions>,
-	) -> Result<Option<AccessibilityNode>> {
+	pub async fn snapshot(&self, options: Option<AccessibilitySnapshotOptions>) -> Result<Option<AccessibilityNode>> {
 		let params = options
 			.map(|o| serde_json::to_value(&o).unwrap_or_default())
 			.unwrap_or_else(|| serde_json::json!({}));
@@ -81,11 +78,7 @@ impl Accessibility {
 			root_ax_node: Option<AccessibilityNode>,
 		}
 
-		let response: SnapshotResponse = self
-			.page
-			.channel()
-			.send("accessibilitySnapshot", params)
-			.await?;
+		let response: SnapshotResponse = self.page.channel().send("accessibilitySnapshot", params).await?;
 
 		Ok(response.root_ax_node)
 	}
