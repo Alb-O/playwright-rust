@@ -139,6 +139,33 @@ pp compose --preamble-file /tmp/navigator_prompt.txt src/main.rs "slice:src/pars
 '
 ```
 
+## method - completion handoff + next ticket
+
+use this when you finished an incremental ticket, want navigator review on specific files, and want the next ticket assigned immediately:
+
+```bash
+printf '%s\n' \
+  'Completed <ticket-id>: <one-line outcome>.' \
+  '' \
+  'Touched files:' \
+  '- <path/to/file1>' \
+  '- <path/to/file2>' \
+  '' \
+  'Checks summary:' \
+  '- <cmd 1>: <pass|fail>' \
+  '- <cmd 2>: <pass|fail>' \
+  '' \
+  'Including <key files> for review. Please assign next incremental ticket.' \
+  > /tmp/navigator_prompt.txt && \
+nu -I ~/.claude/skills/pw-pair-programming/scripts -c '
+use pp.nu *;
+pp brief --preamble-file /tmp/navigator_prompt.txt \
+  <path/to/review_file1> \
+  <path/to/review_file2> \
+  --wait
+'
+```
+
 ## gotchas
 
 - always write preamble messages to files instead of inline shell
