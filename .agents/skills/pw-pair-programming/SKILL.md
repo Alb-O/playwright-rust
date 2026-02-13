@@ -29,10 +29,7 @@ EOF
 
 nu -I ~/.claude/skills/pw-pair-programming/scripts -c '
 use pp.nu *;
-pp brief --preamble-file /tmp/navigator_prompt.txt \
-  src/main.rs \
-  "slice:src/parser.rs:45:67:parse_expr logic" \
-  --wait
+pp brief --preamble-file /tmp/navigator_prompt.txt src/main.rs "slice:src/parser.rs:45:67:parse_expr logic" --wait
 '
 ```
 
@@ -117,11 +114,7 @@ pp brief --preamble-file /tmp/navigator_prompt.txt src/main.rs src/lib.rs --wait
 ```bash
 nu -I ~/.claude/skills/pw-pair-programming/scripts -c '
 use pp.nu *;
-pp brief --preamble-file /tmp/navigator_prompt.txt \
-  src/config.rs \
-  "slice:src/parser.rs:45:67:parse_expr fn" \
-  "slice:src/handler.rs:120:135:error handling" \
-  --wait
+pp brief --preamble-file /tmp/navigator_prompt.txt src/config.rs "slice:src/parser.rs:45:67:parse_expr fn" "slice:src/handler.rs:120:135:error handling" --wait
 '
 ```
 
@@ -134,8 +127,7 @@ optional dry-run when you want to inspect payload before sending:
 ```bash
 nu -I ~/.claude/skills/pw-pair-programming/scripts -c '
 use pp.nu *;
-pp compose --preamble-file /tmp/navigator_prompt.txt src/main.rs "slice:src/parser.rs:45:67" \
-  | save -f /tmp/navigator_payload.txt
+pp compose --preamble-file /tmp/navigator_prompt.txt src/main.rs "slice:src/parser.rs:45:67" | save -f /tmp/navigator_payload.txt
 '
 ```
 
@@ -159,10 +151,7 @@ printf '%s\n' \
   > /tmp/navigator_prompt.txt && \
 nu -I ~/.claude/skills/pw-pair-programming/scripts -c '
 use pp.nu *;
-pp brief --preamble-file /tmp/navigator_prompt.txt \
-  <path/to/review_file1> \
-  <path/to/review_file2> \
-  --wait
+pp brief --preamble-file /tmp/navigator_prompt.txt <path/to/review_file1> <path/to/review_file2> --wait
 '
 ```
 
