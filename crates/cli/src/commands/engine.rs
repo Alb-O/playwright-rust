@@ -1,0 +1,290 @@
+use std::io::Write;
+use std::path::Path;
+
+use serde_json::{Value, json};
+use tokio::io::{AsyncBufReadExt, BufReader};
+
+use crate::cli::{BatchArgs, DaemonAction, ExecArgs, ProfileAction};
+use crate::commands::def::{ExecCtx, ExecMode};
+use crate::commands::registry::{command_name, lookup_command_exact, run_command};
+use crate::error::{PwError, Result};
+use crate::output::{CommandError, ErrorCode, OutputFormat};
+use crate::protocol::{CommandRequest, CommandResponse, EffectiveRuntime, RuntimeSpec, SCHEMA_VERSION, print_response};
+use crate::runtime::{RuntimeConfig, build_runtime};
+use crate::session::SessionManager;
+use crate::workspace::normalize_profile;
+
+pub async fn run_exec(args: ExecArgs, format: OutputFormat) -> Result<()> {
+	let request = parse_exec_request(&args)?;
+	let response = execute_request(request, Some(args.profile), ExecMode::Cli, args.artifacts_dir.as_deref()).await;
+	print_response(&response, format);
+	Ok(())
+}
+
+pub async fn run_batch(args: BatchArgs, format: OutputFormat) -> Result<()> {
+	let stdin = tokio::io::stdin();
+	let mut reader = BufReader::new(stdin);
+	let mut line = String::new();
+	let mut stdout = std::io::stdout();
+	let default_profile = args.profile;
+
+	loop {
+		line.clear();
+		match reader.read_line(&mut line).await {
+			Ok(0) => break,
+			Ok(_) => {}
+			Err(err) => {
+				tracing::error!(target = "pw.batch", error = %err, "stdin read failed");
+				break;
+			}
+		}
+
+		let line = line.trim();
+		if line.is_empty() {
+			continue;
+		}
+
+		let request: CommandRequest = match serde_json::from_str(line) {
+			Ok(value) => value,
+			Err(err) => {
+				let response = error_response(
+					None,
+					"unknown".to_string(),
+					CommandError {
+						code: ErrorCode::InvalidInput,
+						message: format!("Invalid request JSON: {err}"),
+						details: None,
+					},
+					None,
+				);
+				write_batch_response(&mut stdout, &response, format);
+				continue;
+			}
+		};
+
+		if request.op == "quit" || request.op == "exit" {
+			let response = CommandResponse {
+				schema_version: SCHEMA_VERSION,
+				request_id: request.request_id,
+				op: "quit".to_string(),
+				ok: true,
+				inputs: None,
+				data: Some(json!({ "quit": true })),
+				error: None,
+				duration_ms: None,
+				artifacts: Vec::new(),
+				diagnostics: Vec::new(),
+				context_delta: None,
+				effective_runtime: None,
+			};
+			write_batch_response(&mut stdout, &response, format);
+			break;
+		}
+
+		if request.op == "ping" {
+			let response = CommandResponse {
+				schema_version: SCHEMA_VERSION,
+				request_id: request.request_id,
+				op: "ping".to_string(),
+				ok: true,
+				inputs: None,
+				data: Some(json!({ "alive": true })),
+				error: None,
+				duration_ms: None,
+				artifacts: Vec::new(),
+				diagnostics: Vec::new(),
+				context_delta: None,
+				effective_runtime: None,
+			};
+			write_batch_response(&mut stdout, &response, format);
+			continue;
+		}
+
+		let response = execute_request(request, Some(default_profile.clone()), ExecMode::Batch, None).await;
+		write_batch_response(&mut stdout, &response, format);
+	}
+
+	Ok(())
+}
+
+pub async fn run_profile(action: ProfileAction, format: OutputFormat) -> Result<()> {
+	let request = request_from_profile_action(action);
+	let response = execute_request(request, Some("default".to_string()), ExecMode::Cli, None).await;
+	print_response(&response, format);
+	Ok(())
+}
+
+pub async fn run_daemon(action: DaemonAction, format: OutputFormat) -> Result<()> {
+	let request = request_from_daemon_action(action);
+	let response = execute_request(request, Some("default".to_string()), ExecMode::Cli, None).await;
+	print_response(&response, format);
+	Ok(())
+}
+
+fn parse_exec_request(args: &ExecArgs) -> Result<CommandRequest> {
+	if let Some(file) = &args.file {
+		let content = std::fs::read_to_string(file)?;
+		return serde_json::from_str::<CommandRequest>(&content).map_err(PwError::Json);
+	}
+
+	let op = args
+		.op
+		.clone()
+		.ok_or_else(|| PwError::Context("missing operation: use `pw exec <op>` or `--file`".to_string()))?;
+
+	let input = match &args.input {
+		Some(raw) => serde_json::from_str::<Value>(raw)?,
+		None => Value::Object(Default::default()),
+	};
+
+	Ok(CommandRequest {
+		schema_version: SCHEMA_VERSION,
+		request_id: None,
+		op,
+		input,
+		runtime: Some(RuntimeSpec {
+			profile: Some(args.profile.clone()),
+			overrides: None,
+		}),
+	})
+}
+
+fn write_batch_response(stdout: &mut std::io::Stdout, response: &CommandResponse, format: OutputFormat) {
+	match format {
+		OutputFormat::Ndjson => {
+			if let Ok(line) = serde_json::to_string(response) {
+				let _ = writeln!(stdout, "{line}");
+			}
+		}
+		_ => {
+			print_response(response, format);
+		}
+	}
+}
+
+async fn execute_request(request: CommandRequest, fallback_profile: Option<String>, mode: ExecMode, artifacts_dir: Option<&Path>) -> CommandResponse {
+	if request.schema_version != SCHEMA_VERSION {
+		return error_response(
+			request.request_id,
+			request.op,
+			CommandError {
+				code: ErrorCode::InvalidInput,
+				message: format!("unsupported schemaVersion {} (expected {})", request.schema_version, SCHEMA_VERSION),
+				details: None,
+			},
+			None,
+		);
+	}
+
+	let runtime = request.runtime.clone().unwrap_or_default();
+	let profile = normalize_profile(runtime.profile.as_deref().or(fallback_profile.as_deref()).unwrap_or("default"));
+	let overrides = runtime.overrides.unwrap_or_default();
+
+	let runtime_config = RuntimeConfig {
+		profile: profile.clone(),
+		overrides,
+	};
+
+	let crate::runtime::RuntimeContext { ctx, mut ctx_state, info } = match build_runtime(&runtime_config) {
+		Ok(runtime) => runtime,
+		Err(err) => {
+			return error_response(request.request_id, request.op, err.to_command_error(), None);
+		}
+	};
+
+	let effective_runtime = EffectiveRuntime {
+		profile: info.profile.clone(),
+		browser: Some(info.browser.to_string()),
+		cdp_endpoint: info.cdp_endpoint.clone(),
+		timeout_ms: info.timeout_ms,
+	};
+
+	let mut session = SessionManager::new(
+		&ctx,
+		ctx_state.session_descriptor_path(),
+		Some(ctx_state.profile_id()),
+		ctx_state.refresh_requested(),
+	);
+
+	let Some(cmd_id) = lookup_command_exact(request.op.as_str()) else {
+		let unknown_op = request.op.clone();
+		return error_response(
+			request.request_id,
+			unknown_op.clone(),
+			CommandError {
+				code: ErrorCode::InvalidInput,
+				message: format!("unknown operation: {unknown_op}"),
+				details: None,
+			},
+			Some(effective_runtime.clone()),
+		);
+	};
+
+	let has_cdp = ctx.cdp_endpoint().is_some();
+	let last_url = ctx_state.last_url().map(str::to_string);
+	let exec = ExecCtx {
+		mode,
+		ctx: &ctx,
+		ctx_state: &mut ctx_state,
+		session: &mut session,
+		format: OutputFormat::Json,
+		artifacts_dir,
+		last_url: last_url.as_deref(),
+	};
+
+	match run_command(cmd_id, request.input, has_cdp, exec).await {
+		Ok(outcome) => {
+			let op = outcome.command.to_string();
+			let request_id = request.request_id;
+			let delta = outcome.delta.clone();
+			delta.clone().apply(&mut ctx_state);
+			if let Err(err) = ctx_state.persist_if_dirty() {
+				return error_response(request_id, op, err.to_command_error(), Some(effective_runtime.clone()));
+			}
+
+			CommandResponse::success(request_id, op, outcome.inputs, outcome.data, delta, effective_runtime)
+		}
+		Err(err) => error_response(
+			request.request_id,
+			command_name(cmd_id).to_string(),
+			err.to_command_error(),
+			Some(effective_runtime),
+		),
+	}
+}
+
+fn request_from_daemon_action(action: DaemonAction) -> CommandRequest {
+	let (op, input) = match action {
+		DaemonAction::Start { foreground } => ("daemon.start".to_string(), json!({ "foreground": foreground })),
+		DaemonAction::Stop => ("daemon.stop".to_string(), json!({})),
+		DaemonAction::Status => ("daemon.status".to_string(), json!({})),
+	};
+	command_request(op, input)
+}
+
+fn request_from_profile_action(action: ProfileAction) -> CommandRequest {
+	let (op, input) = match action {
+		ProfileAction::List => ("profile.list".to_string(), json!({})),
+		ProfileAction::Show { name } => ("profile.show".to_string(), json!({ "name": name })),
+		ProfileAction::Set { name, file } => ("profile.set".to_string(), json!({ "name": name, "file": file })),
+		ProfileAction::Delete { name } => ("profile.delete".to_string(), json!({ "name": name })),
+	};
+	command_request(op, input)
+}
+
+fn command_request(op: String, input: Value) -> CommandRequest {
+	CommandRequest {
+		schema_version: SCHEMA_VERSION,
+		request_id: None,
+		op,
+		input,
+		runtime: Some(RuntimeSpec {
+			profile: Some("default".to_string()),
+			overrides: None,
+		}),
+	}
+}
+
+fn error_response(request_id: Option<String>, op: String, error: CommandError, effective_runtime: Option<EffectiveRuntime>) -> CommandResponse {
+	CommandResponse::error(request_id, op, error, effective_runtime)
+}

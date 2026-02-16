@@ -5,7 +5,7 @@ use clap::Args;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx, ExecMode};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx, ExecMode, Resolve};
 use crate::daemon::{self, Daemon};
 use crate::error::{PwError, Result};
 use crate::output::CommandInputs;
@@ -37,6 +37,14 @@ pub struct DaemonStartResolved {
 	pub foreground: bool,
 }
 
+impl Resolve for DaemonStartRaw {
+	type Output = DaemonStartResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(DaemonStartResolved { foreground: self.foreground })
+	}
+}
+
 pub struct DaemonStartCommand;
 
 impl CommandDef for DaemonStartCommand {
@@ -53,10 +61,6 @@ impl CommandDef for DaemonStartCommand {
 			));
 		}
 		Ok(())
-	}
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(DaemonStartResolved { foreground: raw.foreground })
 	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, _exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
@@ -186,6 +190,14 @@ pub struct DaemonStopRaw {}
 #[derive(Debug, Clone)]
 pub struct DaemonStopResolved;
 
+impl Resolve for DaemonStopRaw {
+	type Output = DaemonStopResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(DaemonStopResolved)
+	}
+}
+
 pub struct DaemonStopCommand;
 
 impl CommandDef for DaemonStopCommand {
@@ -194,10 +206,6 @@ impl CommandDef for DaemonStopCommand {
 	type Raw = DaemonStopRaw;
 	type Resolved = DaemonStopResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(_raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(DaemonStopResolved)
-	}
 
 	fn execute<'exec, 'ctx>(_args: &'exec Self::Resolved, _exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -234,6 +242,14 @@ pub struct DaemonStatusRaw {}
 #[derive(Debug, Clone)]
 pub struct DaemonStatusResolved;
 
+impl Resolve for DaemonStatusRaw {
+	type Output = DaemonStatusResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(DaemonStatusResolved)
+	}
+}
+
 pub struct DaemonStatusCommand;
 
 impl CommandDef for DaemonStatusCommand {
@@ -242,10 +258,6 @@ impl CommandDef for DaemonStatusCommand {
 	type Raw = DaemonStatusRaw;
 	type Resolved = DaemonStatusResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(_raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(DaemonStatusResolved)
-	}
 
 	fn execute<'exec, 'ctx>(_args: &'exec Self::Resolved, _exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta, standard_inputs};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx, Resolve};
 use crate::commands::flow::page::run_page_flow;
 use crate::error::{PwError, Result};
 use crate::output::EvalData;
@@ -50,6 +50,24 @@ pub struct EvalResolved {
 	pub expression: String,
 }
 
+impl Resolve for EvalRaw {
+	type Output = EvalResolved;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let target = resolve_target_from_url_pair(self.url, self.url_flag, env, TargetPolicy::AllowCurrentPage)?;
+
+		let expression = self
+			.file
+			.as_ref()
+			.and_then(|p| std::fs::read_to_string(p).ok())
+			.or(self.expression_flag)
+			.or(self.expression)
+			.ok_or_else(|| PwError::Context("expression is required (provide positionally, via --expr, or via --file)".into()))?;
+
+		Ok(EvalResolved { target, expression })
+	}
+}
+
 pub struct EvalCommand;
 
 impl CommandDef for EvalCommand {
@@ -58,20 +76,6 @@ impl CommandDef for EvalCommand {
 	type Raw = EvalRaw;
 	type Resolved = EvalResolved;
 	type Data = EvalData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = resolve_target_from_url_pair(raw.url, raw.url_flag, env, TargetPolicy::AllowCurrentPage)?;
-
-		let expression = raw
-			.file
-			.as_ref()
-			.and_then(|p| std::fs::read_to_string(p).ok())
-			.or(raw.expression_flag)
-			.or(raw.expression)
-			.ok_or_else(|| PwError::Context("expression is required (provide positionally, via --expr, or via --file)".into()))?;
-
-		Ok(EvalResolved { target, expression })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

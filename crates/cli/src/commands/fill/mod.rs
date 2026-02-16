@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta, standard_inputs};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx, Resolve};
 use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::output::FillData;
@@ -53,6 +53,18 @@ pub struct FillResolved {
 	pub text: String,
 }
 
+impl Resolve for FillRaw {
+	type Output = FillResolved;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let target = resolve_target_from_url_pair(self.url, None, env, TargetPolicy::AllowCurrentPage)?;
+		let selector = env.resolve_selector(self.selector, None)?;
+		let text = self.text.unwrap_or_default();
+
+		Ok(FillResolved { target, selector, text })
+	}
+}
+
 pub struct FillCommand;
 
 impl CommandDef for FillCommand {
@@ -61,14 +73,6 @@ impl CommandDef for FillCommand {
 	type Raw = FillRaw;
 	type Resolved = FillResolved;
 	type Data = FillData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = resolve_target_from_url_pair(raw.url, None, env, TargetPolicy::AllowCurrentPage)?;
-		let selector = env.resolve_selector(raw.selector, None)?;
-		let text = raw.text.unwrap_or_default();
-
-		Ok(FillResolved { target, selector, text })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

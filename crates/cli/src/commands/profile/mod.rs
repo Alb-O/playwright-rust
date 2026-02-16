@@ -5,7 +5,7 @@ use pw_rs::dirs;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx, Resolve};
 use crate::context_store::storage::StatePaths;
 use crate::context_store::types::{CliConfig, SCHEMA_VERSION};
 use crate::error::Result;
@@ -20,6 +20,14 @@ pub struct ProfileListRaw {}
 #[derive(Debug, Clone)]
 pub struct ProfileListResolved;
 
+impl Resolve for ProfileListRaw {
+	type Output = ProfileListResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(ProfileListResolved)
+	}
+}
+
 pub struct ProfileListCommand;
 
 impl CommandDef for ProfileListCommand {
@@ -28,10 +36,6 @@ impl CommandDef for ProfileListCommand {
 	type Raw = ProfileListRaw;
 	type Resolved = ProfileListResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(_raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(ProfileListResolved)
-	}
 
 	fn execute<'exec, 'ctx>(_args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -74,6 +78,16 @@ pub struct ProfileShowResolved {
 	pub name: String,
 }
 
+impl Resolve for ProfileShowRaw {
+	type Output = ProfileShowResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(ProfileShowResolved {
+			name: normalize_profile(&self.name),
+		})
+	}
+}
+
 pub struct ProfileShowCommand;
 
 impl CommandDef for ProfileShowCommand {
@@ -82,12 +96,6 @@ impl CommandDef for ProfileShowCommand {
 	type Raw = ProfileShowRaw;
 	type Resolved = ProfileShowResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(ProfileShowResolved {
-			name: normalize_profile(&raw.name),
-		})
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -130,6 +138,17 @@ pub struct ProfileSetResolved {
 	pub file: PathBuf,
 }
 
+impl Resolve for ProfileSetRaw {
+	type Output = ProfileSetResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(ProfileSetResolved {
+			name: normalize_profile(&self.name),
+			file: self.file,
+		})
+	}
+}
+
 pub struct ProfileSetCommand;
 
 impl CommandDef for ProfileSetCommand {
@@ -138,13 +157,6 @@ impl CommandDef for ProfileSetCommand {
 	type Raw = ProfileSetRaw;
 	type Resolved = ProfileSetResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(ProfileSetResolved {
-			name: normalize_profile(&raw.name),
-			file: raw.file,
-		})
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -194,6 +206,16 @@ pub struct ProfileDeleteResolved {
 	pub name: String,
 }
 
+impl Resolve for ProfileDeleteRaw {
+	type Output = ProfileDeleteResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(ProfileDeleteResolved {
+			name: normalize_profile(&self.name),
+		})
+	}
+}
+
 pub struct ProfileDeleteCommand;
 
 impl CommandDef for ProfileDeleteCommand {
@@ -202,12 +224,6 @@ impl CommandDef for ProfileDeleteCommand {
 	type Raw = ProfileDeleteRaw;
 	type Resolved = ProfileDeleteResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(ProfileDeleteResolved {
-			name: normalize_profile(&raw.name),
-		})
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

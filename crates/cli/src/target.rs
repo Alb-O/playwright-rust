@@ -233,32 +233,6 @@ impl<'a> ResolveEnv<'a> {
 	}
 }
 
-/// Trait for resolving raw command arguments into ready-to-execute arguments.
-///
-/// Each command defines a `*Raw` struct (from CLI/JSON) and a `*Resolved` struct
-/// (ready for execution). This trait bridges them with consistent resolution logic.
-///
-/// # Examples
-///
-/// ```ignore
-/// impl Resolve for HtmlRaw {
-///     type Output = HtmlResolved;
-///     
-///     fn resolve(self, env: &ResolveEnv<'_>) -> Result<HtmlResolved> {
-///         let target = env.resolve_target(self.url, TargetPolicy::AllowCurrentPage)?;
-///         let selector = env.resolve_selector(self.selector, Some("html"))?;
-///         Ok(HtmlResolved { target, selector })
-///     }
-/// }
-/// ```
-pub trait Resolve {
-	/// The resolved output type.
-	type Output;
-
-	/// Resolve raw arguments into ready-to-execute arguments.
-	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output>;
-}
-
 #[cfg(test)]
 mod tests {
 	use super::*;

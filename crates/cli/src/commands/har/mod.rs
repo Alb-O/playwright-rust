@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::cli::{CliHarContentPolicy, CliHarMode};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx, Resolve};
 use crate::context_store::types::HarDefaults;
 use crate::error::Result;
 use crate::output::CommandInputs;
@@ -31,6 +31,21 @@ pub struct HarSetResolved {
 	pub har: HarDefaults,
 }
 
+impl Resolve for HarSetRaw {
+	type Output = HarSetResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let har = HarDefaults {
+			path: self.file,
+			content_policy: self.content.into(),
+			mode: self.mode.into(),
+			omit_content: self.omit_content,
+			url_filter: self.url_filter,
+		};
+		Ok(HarSetResolved { har })
+	}
+}
+
 pub struct HarSetCommand;
 
 impl CommandDef for HarSetCommand {
@@ -39,17 +54,6 @@ impl CommandDef for HarSetCommand {
 	type Raw = HarSetRaw;
 	type Resolved = HarSetResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let har = HarDefaults {
-			path: raw.file,
-			content_policy: raw.content.into(),
-			mode: raw.mode.into(),
-			omit_content: raw.omit_content,
-			url_filter: raw.url_filter,
-		};
-		Ok(HarSetResolved { har })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -88,6 +92,14 @@ pub struct HarShowRaw {}
 #[derive(Debug, Clone)]
 pub struct HarShowResolved;
 
+impl Resolve for HarShowRaw {
+	type Output = HarShowResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(HarShowResolved)
+	}
+}
+
 pub struct HarShowCommand;
 
 impl CommandDef for HarShowCommand {
@@ -96,10 +108,6 @@ impl CommandDef for HarShowCommand {
 	type Raw = HarShowRaw;
 	type Resolved = HarShowResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(_raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(HarShowResolved)
-	}
 
 	fn execute<'exec, 'ctx>(_args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -128,6 +136,14 @@ pub struct HarClearRaw {}
 #[derive(Debug, Clone)]
 pub struct HarClearResolved;
 
+impl Resolve for HarClearRaw {
+	type Output = HarClearResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(HarClearResolved)
+	}
+}
+
 pub struct HarClearCommand;
 
 impl CommandDef for HarClearCommand {
@@ -136,10 +152,6 @@ impl CommandDef for HarClearCommand {
 	type Raw = HarClearRaw;
 	type Resolved = HarClearResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(_raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(HarClearResolved)
-	}
 
 	fn execute<'exec, 'ctx>(_args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::commands::contract::{resolve_target_and_selector, standard_delta, standard_inputs};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx, Resolve};
 use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::session_helpers::ArtifactsPolicy;
@@ -44,6 +44,15 @@ pub struct HtmlResolved {
 	pub selector: String,
 }
 
+impl Resolve for HtmlRaw {
+	type Output = HtmlResolved;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let (target, selector) = resolve_target_and_selector(self.url, self.selector, self.url_flag, self.selector_flag, env, Some("html"))?;
+		Ok(HtmlResolved { target, selector })
+	}
+}
+
 /// Output data for HTML command.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -62,12 +71,6 @@ impl CommandDef for HtmlCommand {
 	type Raw = HtmlRaw;
 	type Resolved = HtmlResolved;
 	type Data = HtmlData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let (target, selector) = resolve_target_and_selector(raw.url, raw.selector, raw.url_flag, raw.selector_flag, env, Some("html"))?;
-
-		Ok(HtmlResolved { target, selector })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

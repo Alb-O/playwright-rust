@@ -269,7 +269,7 @@ fn expand_command_graph(catalog: CatalogInput) -> Result<TokenStream> {
 						has_cdp,
 						canonical,
 					);
-					<Cmd as crate::commands::def::CommandDef>::resolve(raw, &env)?
+					<<Cmd as crate::commands::def::CommandDef>::Raw as crate::commands::def::Resolve>::resolve(raw, &env)?
 				};
 
 				let outcome = <Cmd as crate::commands::def::CommandDef>::execute(&resolved, exec).await?;

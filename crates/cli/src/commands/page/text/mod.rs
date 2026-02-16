@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::commands::contract::{resolve_target_and_selector, standard_delta, standard_inputs};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx, Resolve};
 use crate::commands::flow::page::run_page_flow;
 use crate::error::{PwError, Result};
 use crate::output::TextData;
@@ -43,6 +43,15 @@ pub struct TextResolved {
 	pub selector: String,
 }
 
+impl Resolve for TextRaw {
+	type Output = TextResolved;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let (target, selector) = resolve_target_and_selector(self.url, self.selector, self.url_flag, self.selector_flag, env, None)?;
+		Ok(TextResolved { target, selector })
+	}
+}
+
 pub struct TextCommand;
 
 impl CommandDef for TextCommand {
@@ -51,12 +60,6 @@ impl CommandDef for TextCommand {
 	type Raw = TextRaw;
 	type Resolved = TextResolved;
 	type Data = TextData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let (target, selector) = resolve_target_and_selector(raw.url, raw.selector, raw.url_flag, raw.selector_flag, env, None)?;
-
-		Ok(TextResolved { target, selector })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

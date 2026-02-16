@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta, standard_inputs};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx, Resolve};
 use crate::commands::flow::page::run_page_flow;
 use crate::error::{PwError, Result};
 use crate::output::CommandInputs;
@@ -58,6 +58,19 @@ pub struct WaitResolved {
 	pub condition: String,
 }
 
+impl Resolve for WaitRaw {
+	type Output = WaitResolved;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let target = resolve_target_from_url_pair(self.url, self.url_flag, env, TargetPolicy::AllowCurrentPage)?;
+		let condition = self
+			.condition
+			.ok_or_else(|| PwError::Context("No condition provided for wait command".into()))?;
+
+		Ok(WaitResolved { target, condition })
+	}
+}
+
 /// Output data for the wait command result.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -77,13 +90,6 @@ impl CommandDef for WaitCommand {
 	type Raw = WaitRaw;
 	type Resolved = WaitResolved;
 	type Data = WaitData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = resolve_target_from_url_pair(raw.url, raw.url_flag, env, TargetPolicy::AllowCurrentPage)?;
-		let condition = raw.condition.ok_or_else(|| PwError::Context("No condition provided for wait command".into()))?;
-
-		Ok(WaitResolved { target, condition })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

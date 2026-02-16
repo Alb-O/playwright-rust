@@ -16,6 +16,16 @@ use crate::output::{CommandInputs, OutputFormat};
 use crate::session::SessionManager;
 use crate::target::ResolveEnv;
 
+/// Resolves raw command arguments into validated execution arguments.
+///
+/// Command implementations should attach this to their `*Raw` types so the
+/// dispatch layer can use a uniform `Raw -> Resolved` pipeline.
+pub trait Resolve {
+	type Output;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output>;
+}
+
 /// Execution mode matters for I/O (interactive prompts) and for output formatting expectations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecMode {
@@ -104,7 +114,7 @@ pub trait CommandDef: 'static {
 	const NAME: &'static str;
 	const INTERACTIVE_ONLY: bool = false;
 
-	type Raw: DeserializeOwned;
+	type Raw: DeserializeOwned + Resolve<Output = Self::Resolved>;
 	type Resolved;
 	type Data: Serialize;
 
@@ -112,9 +122,6 @@ pub trait CommandDef: 'static {
 	fn validate_mode(_raw: &Self::Raw, _mode: ExecMode) -> Result<()> {
 		Ok(())
 	}
-
-	/// Resolve raw args into ready-to-execute args.
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved>;
 
 	/// Execute the command. **Must not print**. Wrapper prints.
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>

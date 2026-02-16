@@ -2,7 +2,7 @@ use clap::Args;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx, Resolve};
 use crate::error::Result;
 use crate::output::CommandInputs;
 use crate::target::ResolveEnv;
@@ -19,6 +19,14 @@ pub struct ProtectAddResolved {
 	pub pattern: String,
 }
 
+impl Resolve for ProtectAddRaw {
+	type Output = ProtectAddResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(ProtectAddResolved { pattern: self.pattern })
+	}
+}
+
 pub struct ProtectAddCommand;
 
 impl CommandDef for ProtectAddCommand {
@@ -27,10 +35,6 @@ impl CommandDef for ProtectAddCommand {
 	type Raw = ProtectAddRaw;
 	type Resolved = ProtectAddResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(ProtectAddResolved { pattern: raw.pattern })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -69,6 +73,14 @@ pub struct ProtectRemoveResolved {
 	pub pattern: String,
 }
 
+impl Resolve for ProtectRemoveRaw {
+	type Output = ProtectRemoveResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(ProtectRemoveResolved { pattern: self.pattern })
+	}
+}
+
 pub struct ProtectRemoveCommand;
 
 impl CommandDef for ProtectRemoveCommand {
@@ -77,10 +89,6 @@ impl CommandDef for ProtectRemoveCommand {
 	type Raw = ProtectRemoveRaw;
 	type Resolved = ProtectRemoveResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(ProtectRemoveResolved { pattern: raw.pattern })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -114,6 +122,14 @@ pub struct ProtectListRaw {}
 #[derive(Debug, Clone)]
 pub struct ProtectListResolved;
 
+impl Resolve for ProtectListRaw {
+	type Output = ProtectListResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(ProtectListResolved)
+	}
+}
+
 pub struct ProtectListCommand;
 
 impl CommandDef for ProtectListCommand {
@@ -122,10 +138,6 @@ impl CommandDef for ProtectListCommand {
 	type Raw = ProtectListRaw;
 	type Resolved = ProtectListResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(_raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(ProtectListResolved)
-	}
 
 	fn execute<'exec, 'ctx>(_args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

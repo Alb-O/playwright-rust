@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta_with_url, standard_inputs};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx, Resolve};
 use crate::commands::flow::page::run_page_flow;
 use crate::commands::page::snapshot::{EXTRACT_ELEMENTS_JS, EXTRACT_META_JS, EXTRACT_TEXT_JS, PageMeta, RawElement};
 use crate::error::Result;
@@ -36,6 +36,15 @@ pub struct NavigateResolved {
 	pub target: ResolvedTarget,
 }
 
+impl Resolve for NavigateRaw {
+	type Output = NavigateResolved;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let target = resolve_target_from_url_pair(self.url, self.url_flag, env, TargetPolicy::AllowCurrentPage)?;
+		Ok(NavigateResolved { target })
+	}
+}
+
 pub struct NavigateCommand;
 
 impl CommandDef for NavigateCommand {
@@ -44,11 +53,6 @@ impl CommandDef for NavigateCommand {
 	type Raw = NavigateRaw;
 	type Resolved = NavigateResolved;
 	type Data = SnapshotData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = resolve_target_from_url_pair(raw.url, raw.url_flag, env, TargetPolicy::AllowCurrentPage)?;
-		Ok(NavigateResolved { target })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::commands::contract::{resolve_target_and_selector, standard_delta_with_url, standard_inputs};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx, Resolve};
 use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::output::{ClickData, DownloadedFile};
@@ -51,6 +51,17 @@ pub struct ClickResolved {
 	pub wait_ms: u64,
 }
 
+impl Resolve for ClickRaw {
+	type Output = ClickResolved;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let (target, selector) = resolve_target_and_selector(self.url, self.selector, self.url_flag, self.selector_flag, env, Some("css=button"))?;
+		let wait_ms = self.wait_ms.unwrap_or(0);
+
+		Ok(ClickResolved { target, selector, wait_ms })
+	}
+}
+
 pub struct ClickCommand;
 
 impl CommandDef for ClickCommand {
@@ -59,13 +70,6 @@ impl CommandDef for ClickCommand {
 	type Raw = ClickRaw;
 	type Resolved = ClickResolved;
 	type Data = ClickData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let (target, selector) = resolve_target_and_selector(raw.url, raw.selector, raw.url_flag, raw.selector_flag, env, Some("css=button"))?;
-		let wait_ms = raw.wait_ms.unwrap_or(0);
-
-		Ok(ClickResolved { target, selector, wait_ms })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

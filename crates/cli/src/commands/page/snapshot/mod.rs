@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta_with_url, standard_inputs};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx, Resolve};
 use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::output::{InteractiveElement, SnapshotData};
@@ -88,6 +88,21 @@ pub struct SnapshotResolved {
 	pub max_text_length: usize,
 }
 
+impl Resolve for SnapshotRaw {
+	type Output = SnapshotResolved;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let target = resolve_target_from_url_pair(self.url, self.url_flag, env, TargetPolicy::AllowCurrentPage)?;
+
+		Ok(SnapshotResolved {
+			target,
+			text_only: self.text_only.unwrap_or(false),
+			full: self.full.unwrap_or(false),
+			max_text_length: self.max_text_length.unwrap_or(5000),
+		})
+	}
+}
+
 pub struct SnapshotCommand;
 
 impl CommandDef for SnapshotCommand {
@@ -96,17 +111,6 @@ impl CommandDef for SnapshotCommand {
 	type Raw = SnapshotRaw;
 	type Resolved = SnapshotResolved;
 	type Data = SnapshotData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = resolve_target_from_url_pair(raw.url, raw.url_flag, env, TargetPolicy::AllowCurrentPage)?;
-
-		Ok(SnapshotResolved {
-			target,
-			text_only: raw.text_only.unwrap_or(false),
-			full: raw.full.unwrap_or(false),
-			max_text_length: raw.max_text_length.unwrap_or(5000),
-		})
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

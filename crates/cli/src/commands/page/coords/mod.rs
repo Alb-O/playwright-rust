@@ -23,7 +23,7 @@ use tracing::info;
 
 use crate::browser::js;
 use crate::commands::contract::{resolve_target_and_explicit_selector, standard_delta, standard_inputs};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx, Resolve};
 use crate::commands::flow::page::run_page_flow;
 use crate::error::{PwError, Result};
 use crate::session_helpers::ArtifactsPolicy;
@@ -65,6 +65,15 @@ pub struct CoordsResolved {
 	pub selector: String,
 }
 
+impl Resolve for CoordsRaw {
+	type Output = CoordsResolved;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let (target, selector) = resolve_target_and_explicit_selector(self.url, self.url_flag, self.selector, self.selector_flag, env, None)?;
+		Ok(CoordsResolved { target, selector })
+	}
+}
+
 /// Alias for [`CoordsRaw`] used by the `coords-all` command.
 pub type CoordsAllRaw = CoordsRaw;
 
@@ -96,12 +105,6 @@ impl CommandDef for CoordsCommand {
 	type Raw = CoordsRaw;
 	type Resolved = CoordsResolved;
 	type Data = CoordsData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let (target, selector) = resolve_target_and_explicit_selector(raw.url, raw.url_flag, raw.selector, raw.selector_flag, env, None)?;
-
-		Ok(CoordsResolved { target, selector })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -150,12 +153,6 @@ impl CommandDef for CoordsAllCommand {
 	type Raw = CoordsAllRaw;
 	type Resolved = CoordsAllResolved;
 	type Data = CoordsAllData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let (target, selector) = resolve_target_and_explicit_selector(raw.url, raw.url_flag, raw.selector, raw.selector_flag, env, None)?;
-
-		Ok(CoordsAllResolved { target, selector })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

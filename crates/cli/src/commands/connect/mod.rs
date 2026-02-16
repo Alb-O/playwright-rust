@@ -9,7 +9,7 @@ use clap::Args;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx, Resolve};
 use crate::error::Result;
 use crate::output::CommandInputs;
 use crate::session::connect_service::ConnectService;
@@ -68,6 +68,22 @@ pub struct ConnectResolved {
 	pub user_data_dir: Option<PathBuf>,
 }
 
+impl Resolve for ConnectRaw {
+	type Output = ConnectResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(ConnectResolved {
+			endpoint: self.endpoint,
+			clear: self.clear,
+			launch: self.launch,
+			discover: self.discover,
+			kill: self.kill,
+			port: self.port,
+			user_data_dir: self.user_data_dir,
+		})
+	}
+}
+
 /// Command implementation for `connect`.
 pub struct ConnectCommand;
 
@@ -77,18 +93,6 @@ impl CommandDef for ConnectCommand {
 	type Raw = ConnectRaw;
 	type Resolved = ConnectResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(ConnectResolved {
-			endpoint: raw.endpoint,
-			clear: raw.clear,
-			launch: raw.launch,
-			discover: raw.discover,
-			kill: raw.kill,
-			port: raw.port,
-			user_data_dir: raw.user_data_dir,
-		})
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

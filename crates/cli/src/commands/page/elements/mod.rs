@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta, standard_inputs};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx, Resolve};
 use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::output::{ElementsData, InteractiveElement};
@@ -70,6 +70,20 @@ pub struct ElementsResolved {
 	pub timeout_ms: u64,
 }
 
+impl Resolve for ElementsRaw {
+	type Output = ElementsResolved;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let target = resolve_target_from_url_pair(self.url, self.url_flag, env, TargetPolicy::AllowCurrentPage)?;
+
+		Ok(ElementsResolved {
+			target,
+			wait: self.wait.unwrap_or(false),
+			timeout_ms: self.timeout_ms.unwrap_or(10000),
+		})
+	}
+}
+
 pub struct ElementsCommand;
 
 impl CommandDef for ElementsCommand {
@@ -78,16 +92,6 @@ impl CommandDef for ElementsCommand {
 	type Raw = ElementsRaw;
 	type Resolved = ElementsResolved;
 	type Data = ElementsData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = resolve_target_from_url_pair(raw.url, raw.url_flag, env, TargetPolicy::AllowCurrentPage)?;
-
-		Ok(ElementsResolved {
-			target,
-			wait: raw.wait.unwrap_or(false),
-			timeout_ms: raw.timeout_ms.unwrap_or(10000),
-		})
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

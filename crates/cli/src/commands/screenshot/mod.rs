@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta, standard_inputs};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx, Resolve};
 use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::output::ScreenshotData;
@@ -47,6 +47,18 @@ pub struct ScreenshotResolved {
 	pub full_page: bool,
 }
 
+impl Resolve for ScreenshotRaw {
+	type Output = ScreenshotResolved;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let target = resolve_target_from_url_pair(self.url, self.url_flag, env, TargetPolicy::AllowCurrentPage)?;
+		let output = self.output.unwrap_or_else(|| PathBuf::from("screenshot.png"));
+		let full_page = self.full_page.unwrap_or(false);
+
+		Ok(ScreenshotResolved { target, output, full_page })
+	}
+}
+
 pub struct ScreenshotCommand;
 
 impl CommandDef for ScreenshotCommand {
@@ -55,15 +67,6 @@ impl CommandDef for ScreenshotCommand {
 	type Raw = ScreenshotRaw;
 	type Resolved = ScreenshotResolved;
 	type Data = ScreenshotData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = resolve_target_from_url_pair(raw.url, raw.url_flag, env, TargetPolicy::AllowCurrentPage)?;
-
-		let output = raw.output.unwrap_or_else(|| PathBuf::from("screenshot.png"));
-		let full_page = raw.full_page.unwrap_or(false);
-
-		Ok(ScreenshotResolved { target, output, full_page })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

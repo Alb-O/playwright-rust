@@ -23,7 +23,7 @@ use tracing::info;
 
 use crate::cli::ReadOutputFormat;
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta, standard_inputs};
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx, Resolve};
 use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::readable::{ReadableContent, extract_readable};
@@ -69,6 +69,21 @@ pub struct ReadResolved {
 	pub include_metadata: bool,
 }
 
+impl Resolve for ReadRaw {
+	type Output = ReadResolved;
+
+	fn resolve(self, env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		let target = resolve_target_from_url_pair(self.url, self.url_flag, env, TargetPolicy::AllowCurrentPage)?;
+		let output_format = self.output_format.unwrap_or(ReadOutputFormat::Markdown);
+
+		Ok(ReadResolved {
+			target,
+			output_format,
+			include_metadata: self.metadata.unwrap_or(false),
+		})
+	}
+}
+
 pub struct ReadCommand;
 
 impl CommandDef for ReadCommand {
@@ -77,17 +92,6 @@ impl CommandDef for ReadCommand {
 	type Raw = ReadRaw;
 	type Resolved = ReadResolved;
 	type Data = ReadData;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		let target = resolve_target_from_url_pair(raw.url, raw.url_flag, env, TargetPolicy::AllowCurrentPage)?;
-		let output_format = raw.output_format.unwrap_or(ReadOutputFormat::Markdown);
-
-		Ok(ReadResolved {
-			target,
-			output_format,
-			include_metadata: raw.metadata.unwrap_or(false),
-		})
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

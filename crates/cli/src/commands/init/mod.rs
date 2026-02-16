@@ -25,7 +25,7 @@ use pw_rs::dirs;
 use serde::{Deserialize, Serialize};
 
 use crate::cli::InitTemplate;
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx, Resolve};
 use crate::error::{PwError, Result};
 use crate::output::CommandInputs;
 use crate::target::ResolveEnv;
@@ -65,6 +65,24 @@ pub struct InitResolved {
 	pub options: InitOptions,
 }
 
+impl Resolve for InitRaw {
+	type Output = InitResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(InitResolved {
+			options: InitOptions {
+				path: self.path,
+				template: self.template,
+				no_config: self.no_config,
+				no_example: self.no_example,
+				typescript: self.typescript,
+				force: self.force,
+				nix: self.nix,
+			},
+		})
+	}
+}
+
 pub struct InitCommand;
 
 impl CommandDef for InitCommand {
@@ -73,20 +91,6 @@ impl CommandDef for InitCommand {
 	type Raw = InitRaw;
 	type Resolved = InitResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(InitResolved {
-			options: InitOptions {
-				path: raw.path,
-				template: raw.template,
-				no_config: raw.no_config,
-				no_example: raw.no_example,
-				typescript: raw.typescript,
-				force: raw.force,
-				nix: raw.nix,
-			},
-		})
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, _exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

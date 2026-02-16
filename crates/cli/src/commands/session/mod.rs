@@ -3,7 +3,7 @@ use pw_rs::WaitUntil;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx, Resolve};
 use crate::error::{PwError, Result};
 use crate::output::{CommandInputs, SessionStartData};
 use crate::session::SessionRequest;
@@ -18,6 +18,14 @@ pub struct SessionStatusRaw {}
 #[derive(Debug, Clone)]
 pub struct SessionStatusResolved;
 
+impl Resolve for SessionStatusRaw {
+	type Output = SessionStatusResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(SessionStatusResolved)
+	}
+}
+
 pub struct SessionStatusCommand;
 
 impl CommandDef for SessionStatusCommand {
@@ -26,10 +34,6 @@ impl CommandDef for SessionStatusCommand {
 	type Raw = SessionStatusRaw;
 	type Resolved = SessionStatusResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(_raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(SessionStatusResolved)
-	}
 
 	fn execute<'exec, 'ctx>(_args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -54,6 +58,14 @@ pub struct SessionClearRaw {}
 #[derive(Debug, Clone)]
 pub struct SessionClearResolved;
 
+impl Resolve for SessionClearRaw {
+	type Output = SessionClearResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(SessionClearResolved)
+	}
+}
+
 pub struct SessionClearCommand;
 
 impl CommandDef for SessionClearCommand {
@@ -62,10 +74,6 @@ impl CommandDef for SessionClearCommand {
 	type Raw = SessionClearRaw;
 	type Resolved = SessionClearResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(_raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(SessionClearResolved)
-	}
 
 	fn execute<'exec, 'ctx>(_args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -95,6 +103,14 @@ pub struct SessionStartResolved {
 	pub headful: bool,
 }
 
+impl Resolve for SessionStartRaw {
+	type Output = SessionStartResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(SessionStartResolved { headful: self.headful })
+	}
+}
+
 pub struct SessionStartCommand;
 
 impl CommandDef for SessionStartCommand {
@@ -103,10 +119,6 @@ impl CommandDef for SessionStartCommand {
 	type Raw = SessionStartRaw;
 	type Resolved = SessionStartResolved;
 	type Data = SessionStartData;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(SessionStartResolved { headful: raw.headful })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -165,6 +177,14 @@ pub struct SessionStopRaw {}
 #[derive(Debug, Clone)]
 pub struct SessionStopResolved;
 
+impl Resolve for SessionStopRaw {
+	type Output = SessionStopResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(SessionStopResolved)
+	}
+}
+
 pub struct SessionStopCommand;
 
 impl CommandDef for SessionStopCommand {
@@ -173,10 +193,6 @@ impl CommandDef for SessionStopCommand {
 	type Raw = SessionStopRaw;
 	type Resolved = SessionStopResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(_raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(SessionStopResolved)
-	}
 
 	fn execute<'exec, 'ctx>(_args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

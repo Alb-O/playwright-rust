@@ -3,7 +3,7 @@ use pw_rs::WaitUntil;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx, Resolve};
 use crate::error::{PwError, Result};
 use crate::output::CommandInputs;
 use crate::session::SessionRequest;
@@ -26,6 +26,14 @@ pub struct TabsListRaw {}
 #[derive(Debug, Clone)]
 pub struct TabsListResolved;
 
+impl Resolve for TabsListRaw {
+	type Output = TabsListResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(TabsListResolved)
+	}
+}
+
 pub struct TabsListCommand;
 
 impl CommandDef for TabsListCommand {
@@ -34,10 +42,6 @@ impl CommandDef for TabsListCommand {
 	type Raw = TabsListRaw;
 	type Resolved = TabsListResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(_raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(TabsListResolved)
-	}
 
 	fn execute<'exec, 'ctx>(_args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -88,6 +92,14 @@ pub struct TabsSwitchResolved {
 	pub target: String,
 }
 
+impl Resolve for TabsSwitchRaw {
+	type Output = TabsSwitchResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(TabsSwitchResolved { target: self.target })
+	}
+}
+
 pub struct TabsSwitchCommand;
 
 impl CommandDef for TabsSwitchCommand {
@@ -96,10 +108,6 @@ impl CommandDef for TabsSwitchCommand {
 	type Raw = TabsSwitchRaw;
 	type Resolved = TabsSwitchResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(TabsSwitchResolved { target: raw.target })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -145,6 +153,14 @@ pub struct TabsCloseResolved {
 	pub target: String,
 }
 
+impl Resolve for TabsCloseRaw {
+	type Output = TabsCloseResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(TabsCloseResolved { target: self.target })
+	}
+}
+
 pub struct TabsCloseCommand;
 
 impl CommandDef for TabsCloseCommand {
@@ -153,10 +169,6 @@ impl CommandDef for TabsCloseCommand {
 	type Raw = TabsCloseRaw;
 	type Resolved = TabsCloseResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(TabsCloseResolved { target: raw.target })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -202,6 +214,14 @@ pub struct TabsNewResolved {
 	pub url: Option<String>,
 }
 
+impl Resolve for TabsNewRaw {
+	type Output = TabsNewResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(TabsNewResolved { url: self.url })
+	}
+}
+
 pub struct TabsNewCommand;
 
 impl CommandDef for TabsNewCommand {
@@ -210,10 +230,6 @@ impl CommandDef for TabsNewCommand {
 	type Raw = TabsNewRaw;
 	type Resolved = TabsNewResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(TabsNewResolved { url: raw.url })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where

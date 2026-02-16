@@ -17,12 +17,12 @@ use pw_rs::{StorageState, WaitUntil};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx, Resolve};
 use crate::context::CommandContext;
 use crate::error::{PwError, Result};
 use crate::output::CommandInputs;
 use crate::session::{SessionManager, SessionRequest};
-use crate::target::{Resolve, ResolveEnv, ResolvedTarget, Target, TargetPolicy};
+use crate::target::{ResolveEnv, ResolvedTarget, Target, TargetPolicy};
 
 #[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -73,10 +73,6 @@ impl CommandDef for LoginCommand {
 	type Raw = LoginRaw;
 	type Resolved = LoginResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		raw.resolve(env)
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -149,10 +145,6 @@ impl CommandDef for CookiesCommand {
 	type Resolved = CookiesResolved;
 	type Data = serde_json::Value;
 
-	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		raw.resolve(env)
-	}
-
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
@@ -189,6 +181,14 @@ pub struct ShowResolved {
 	pub file: PathBuf,
 }
 
+impl Resolve for ShowRaw {
+	type Output = ShowResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(ShowResolved { file: self.file })
+	}
+}
+
 #[derive(Debug, Clone)]
 pub struct ShowCommand;
 
@@ -198,10 +198,6 @@ impl CommandDef for ShowCommand {
 	type Raw = ShowRaw;
 	type Resolved = ShowResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(ShowResolved { file: raw.file })
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, _exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
@@ -246,6 +242,17 @@ pub struct ListenResolved {
 	pub port: u16,
 }
 
+impl Resolve for ListenRaw {
+	type Output = ListenResolved;
+
+	fn resolve(self, _env: &ResolveEnv<'_>) -> Result<Self::Output> {
+		Ok(ListenResolved {
+			host: self.host,
+			port: self.port,
+		})
+	}
+}
+
 #[derive(Debug, Clone)]
 pub struct ListenCommand;
 
@@ -256,13 +263,6 @@ impl CommandDef for ListenCommand {
 	type Raw = ListenRaw;
 	type Resolved = ListenResolved;
 	type Data = serde_json::Value;
-
-	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
-		Ok(ListenResolved {
-			host: raw.host,
-			port: raw.port,
-		})
-	}
 
 	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
