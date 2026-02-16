@@ -34,6 +34,7 @@ pub struct ContextState {
 	no_context: bool,
 	no_save: bool,
 	refresh: bool,
+	dirty: bool,
 }
 
 impl ContextState {
@@ -58,6 +59,7 @@ impl ContextState {
 			base_url_override,
 			no_context,
 			no_save,
+			dirty: false,
 		})
 	}
 
@@ -71,6 +73,7 @@ impl ContextState {
 			no_context: false,
 			no_save: false,
 			refresh: false,
+			dirty: false,
 		}
 	}
 
@@ -165,7 +168,10 @@ impl ContextState {
 		if self.no_save || self.no_context {
 			return;
 		}
-		self.state.config.defaults.cdp_endpoint = endpoint;
+		if self.state.config.defaults.cdp_endpoint != endpoint {
+			self.state.config.defaults.cdp_endpoint = endpoint;
+			self.dirty = true;
+		}
 	}
 
 	/// Returns protected URL patterns from config.
@@ -191,6 +197,9 @@ impl ContextState {
 		}
 		let changed = self.state.config.har.as_ref() != Some(&har);
 		self.state.config.har = Some(har);
+		if changed {
+			self.dirty = true;
+		}
 		changed
 	}
 
@@ -199,7 +208,11 @@ impl ContextState {
 		if self.no_save || self.no_context {
 			return false;
 		}
-		self.state.config.har.take().is_some()
+		let cleared = self.state.config.har.take().is_some();
+		if cleared {
+			self.dirty = true;
+		}
+		cleared
 	}
 
 	/// Builds effective runtime HAR config from persisted defaults.
@@ -232,6 +245,7 @@ impl ContextState {
 			return false;
 		}
 		self.state.config.protected_urls.push(pattern);
+		self.dirty = true;
 		true
 	}
 
@@ -243,7 +257,11 @@ impl ContextState {
 		let pattern_lower = pattern.to_lowercase();
 		let before_len = self.state.config.protected_urls.len();
 		self.state.config.protected_urls.retain(|p| p.to_lowercase() != pattern_lower);
-		self.state.config.protected_urls.len() < before_len
+		let removed = self.state.config.protected_urls.len() < before_len;
+		if removed {
+			self.dirty = true;
+		}
+		removed
 	}
 
 	pub fn resolve_output(&self, ctx: &CommandContext, provided: Option<PathBuf>) -> PathBuf {
@@ -265,16 +283,30 @@ impl ContextState {
 		if self.no_save || self.no_context {
 			return;
 		}
+		let mut changed = false;
 		if let Some(url) = delta.url {
-			self.state.cache.last_url = Some(url);
+			if self.state.cache.last_url.as_deref() != Some(url.as_str()) {
+				self.state.cache.last_url = Some(url);
+				changed = true;
+			}
 		}
 		if let Some(selector) = delta.selector {
-			self.state.cache.last_selector = Some(selector);
+			if self.state.cache.last_selector.as_deref() != Some(selector.as_str()) {
+				self.state.cache.last_selector = Some(selector);
+				changed = true;
+			}
 		}
 		if let Some(output) = delta.output {
-			self.state.cache.last_output = Some(output.to_string_lossy().to_string());
+			let output = output.to_string_lossy().to_string();
+			if self.state.cache.last_output.as_deref() != Some(output.as_str()) {
+				self.state.cache.last_output = Some(output);
+				changed = true;
+			}
 		}
-		self.state.cache.last_used_at = Some(now_ts());
+		if changed {
+			self.state.cache.last_used_at = Some(now_ts());
+			self.dirty = true;
+		}
 	}
 
 	/// Records context from a resolved target.
@@ -291,7 +323,17 @@ impl ContextState {
 		if self.no_save || self.no_context {
 			return Ok(());
 		}
-		self.state.save()
+		self.state.save()?;
+		self.dirty = false;
+		Ok(())
+	}
+
+	/// Persists state only when a command mutated profile-scoped data.
+	pub fn persist_if_dirty(&mut self) -> Result<()> {
+		if !self.dirty {
+			return Ok(());
+		}
+		self.persist()
 	}
 
 	/// Returns the effective base URL.
@@ -306,7 +348,13 @@ impl ContextState {
 
 	/// Returns mutable access to the loaded state.
 	pub fn state_mut(&mut self) -> &mut LoadedState {
+		self.dirty = true;
 		&mut self.state
+	}
+
+	#[cfg(test)]
+	pub(crate) fn is_dirty(&self) -> bool {
+		self.dirty
 	}
 }
 

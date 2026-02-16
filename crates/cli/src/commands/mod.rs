@@ -12,6 +12,7 @@ mod har;
 pub mod init;
 pub(crate) mod navigate;
 pub(crate) mod page;
+mod profile;
 mod protect;
 pub(crate) mod registry;
 pub(crate) mod screenshot;
@@ -26,11 +27,9 @@ use std::path::Path;
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
-use crate::cli::{BatchArgs, Cli, Commands, DaemonAction, ExecArgs, ProfileAction, ProfileArgs};
+use crate::cli::{BatchArgs, Cli, Commands, DaemonAction, ExecArgs, ProfileAction};
 use crate::commands::def::{ExecCtx, ExecMode};
 use crate::commands::registry::{command_name, lookup_command_exact, run_command};
-use crate::context_store::storage::StatePaths;
-use crate::context_store::types::CliConfig;
 use crate::error::{PwError, Result};
 use crate::output::{CommandError, ErrorCode, OutputFormat};
 use crate::protocol::{CommandRequest, CommandResponse, EffectiveRuntime, RuntimeSpec, SCHEMA_VERSION, print_response};
@@ -49,26 +48,12 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
 			run_batch(args, cli.format).await?;
 		}
 		Commands::Profile(args) => {
-			let response = run_profile_action(args)?;
+			let request = request_from_profile_action(args.action);
+			let response = execute_request(request, Some("default".to_string()), ExecMode::Cli, None).await;
 			print_response(&response, cli.format);
 		}
 		Commands::Daemon(args) => {
-			let (op, input) = match args.action {
-				DaemonAction::Start { foreground } => ("daemon.start".to_string(), json!({ "foreground": foreground })),
-				DaemonAction::Stop => ("daemon.stop".to_string(), json!({})),
-				DaemonAction::Status => ("daemon.status".to_string(), json!({})),
-			};
-
-			let request = CommandRequest {
-				schema_version: SCHEMA_VERSION,
-				request_id: None,
-				op,
-				input,
-				runtime: Some(RuntimeSpec {
-					profile: Some("default".to_string()),
-					overrides: None,
-				}),
-			};
+			let request = request_from_daemon_action(args.action);
 			let response = execute_request(request, Some("default".to_string()), ExecMode::Cli, None).await;
 			print_response(&response, cli.format);
 		}
@@ -280,7 +265,7 @@ async fn execute_request(request: CommandRequest, fallback_profile: Option<Strin
 			let request_id = request.request_id;
 			let delta = outcome.delta.clone();
 			delta.clone().apply(&mut ctx_state);
-			if let Err(err) = ctx_state.persist() {
+			if let Err(err) = ctx_state.persist_if_dirty() {
 				return error_response(request_id, op, err.to_command_error(), Some(effective_runtime.clone()));
 			}
 
@@ -295,112 +280,35 @@ async fn execute_request(request: CommandRequest, fallback_profile: Option<Strin
 	}
 }
 
-fn run_profile_action(args: ProfileArgs) -> Result<CommandResponse> {
-	let cwd = std::env::current_dir()?;
+fn request_from_daemon_action(action: DaemonAction) -> CommandRequest {
+	let (op, input) = match action {
+		DaemonAction::Start { foreground } => ("daemon.start".to_string(), json!({ "foreground": foreground })),
+		DaemonAction::Stop => ("daemon.stop".to_string(), json!({})),
+		DaemonAction::Status => ("daemon.status".to_string(), json!({})),
+	};
+	command_request(op, input)
+}
 
-	match args.action {
-		ProfileAction::List => {
-			let root = cwd.join("playwright").join(crate::workspace::STATE_VERSION_DIR).join("profiles");
-			let mut profiles = Vec::new();
-			if root.exists() {
-				for entry in std::fs::read_dir(root)? {
-					let entry = entry?;
-					if entry.file_type()?.is_dir() {
-						profiles.push(entry.file_name().to_string_lossy().to_string());
-					}
-				}
-			}
-			profiles.sort();
-			Ok(CommandResponse {
-				schema_version: SCHEMA_VERSION,
-				request_id: None,
-				op: "profile.list".to_string(),
-				ok: true,
-				inputs: None,
-				data: Some(json!({ "profiles": profiles })),
-				error: None,
-				duration_ms: None,
-				artifacts: Vec::new(),
-				diagnostics: Vec::new(),
-				context_delta: None,
-				effective_runtime: None,
-			})
-		}
-		ProfileAction::Show { name } => {
-			let profile = normalize_profile(&name);
-			let paths = StatePaths::new(&cwd, &profile);
-			let cfg = if paths.config.exists() {
-				let content = std::fs::read_to_string(paths.config)?;
-				serde_json::from_str::<CliConfig>(&content)?
-			} else {
-				CliConfig::new()
-			};
-			Ok(CommandResponse {
-				schema_version: SCHEMA_VERSION,
-				request_id: None,
-				op: "profile.show".to_string(),
-				ok: true,
-				inputs: None,
-				data: Some(serde_json::to_value(cfg)?),
-				error: None,
-				duration_ms: None,
-				artifacts: Vec::new(),
-				diagnostics: Vec::new(),
-				context_delta: None,
-				effective_runtime: None,
-			})
-		}
-		ProfileAction::Set { name, file } => {
-			let profile = normalize_profile(&name);
-			let paths = StatePaths::new(&cwd, &profile);
-			let content = std::fs::read_to_string(file)?;
-			let mut cfg = serde_json::from_str::<CliConfig>(&content)?;
-			if cfg.schema == 0 {
-				cfg.schema = crate::context_store::types::SCHEMA_VERSION;
-			}
-			if let Some(parent) = paths.config.parent() {
-				std::fs::create_dir_all(parent)?;
-			}
-			std::fs::write(paths.config, serde_json::to_string_pretty(&cfg)?)?;
-			Ok(CommandResponse {
-				schema_version: SCHEMA_VERSION,
-				request_id: None,
-				op: "profile.set".to_string(),
-				ok: true,
-				inputs: None,
-				data: Some(json!({ "profile": profile, "written": true })),
-				error: None,
-				duration_ms: None,
-				artifacts: Vec::new(),
-				diagnostics: Vec::new(),
-				context_delta: None,
-				effective_runtime: None,
-			})
-		}
-		ProfileAction::Delete { name } => {
-			let profile = normalize_profile(&name);
-			let paths = StatePaths::new(&cwd, &profile);
-			let removed = if paths.profile_dir.exists() {
-				std::fs::remove_dir_all(paths.profile_dir)?;
-				true
-			} else {
-				false
-			};
-			Ok(CommandResponse {
-				schema_version: SCHEMA_VERSION,
-				request_id: None,
-				op: "profile.delete".to_string(),
-				ok: true,
-				inputs: None,
-				data: Some(json!({ "profile": profile, "removed": removed })),
-				error: None,
-				duration_ms: None,
-				artifacts: Vec::new(),
-				diagnostics: Vec::new(),
-				context_delta: None,
-				effective_runtime: None,
-			})
-		}
+fn request_from_profile_action(action: ProfileAction) -> CommandRequest {
+	let (op, input) = match action {
+		ProfileAction::List => ("profile.list".to_string(), json!({})),
+		ProfileAction::Show { name } => ("profile.show".to_string(), json!({ "name": name })),
+		ProfileAction::Set { name, file } => ("profile.set".to_string(), json!({ "name": name, "file": file })),
+		ProfileAction::Delete { name } => ("profile.delete".to_string(), json!({ "name": name })),
+	};
+	command_request(op, input)
+}
+
+fn command_request(op: String, input: Value) -> CommandRequest {
+	CommandRequest {
+		schema_version: SCHEMA_VERSION,
+		request_id: None,
+		op,
+		input,
+		runtime: Some(RuntimeSpec {
+			profile: Some("default".to_string()),
+			overrides: None,
+		}),
 	}
 }
 

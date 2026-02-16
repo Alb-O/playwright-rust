@@ -179,6 +179,29 @@ fn apply_delta_updates_cache() {
 	assert_eq!(ctx_state.state().cache.last_selector, Some("#button".to_string()));
 	assert_eq!(ctx_state.state().cache.last_output, Some("screenshot.png".to_string()));
 	assert!(ctx_state.state().cache.last_used_at.is_some());
+	assert!(ctx_state.is_dirty());
+}
+
+#[test]
+fn apply_empty_delta_does_not_mark_state_dirty() {
+	let state = test_state();
+	let mut ctx_state = ContextState::test_new(state, "ws1".to_string(), "default".to_string());
+
+	ctx_state.apply_delta(crate::commands::def::ContextDelta::default());
+
+	assert!(ctx_state.state().cache.last_used_at.is_none());
+	assert!(!ctx_state.is_dirty());
+}
+
+#[test]
+fn setting_same_cdp_endpoint_does_not_mark_state_dirty() {
+	let mut state = test_state();
+	state.config.defaults.cdp_endpoint = Some("ws://endpoint".to_string());
+	let mut ctx_state = ContextState::test_new(state, "ws1".to_string(), "default".to_string());
+
+	ctx_state.set_cdp_endpoint(Some("ws://endpoint".to_string()));
+
+	assert!(!ctx_state.is_dirty());
 }
 
 #[test]

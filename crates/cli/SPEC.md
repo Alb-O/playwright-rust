@@ -17,7 +17,7 @@ Legacy `pw run` command-shape behavior is out of scope.
 
 * `pw exec [OP] [--input JSON | --file FILE] [--profile NAME] [--artifacts-dir DIR]`
 * `pw batch [--profile NAME]`
-* `pw profile <list|show|set|delete> ...`
+* `pw profile <list|show|set|delete> ...` (wrapper over canonical `profile.*` ops)
 * `pw daemon <start|stop|status>`
 
 `exec` runs one envelope.
@@ -143,6 +143,7 @@ Canonical examples:
 * `page.read`
 * `session.status`
 * `har.set`
+* `profile.show`
 
 ## Runtime Resolution
 
@@ -217,7 +218,23 @@ Notes:
 
 ## Profile Command Contract
 
-* `pw profile list`: lists profile directories under `.pw-cli-v4/profiles`
-* `pw profile show <name>`: returns profile config JSON
-* `pw profile set <name> --file <path>`: replaces profile config JSON
-* `pw profile delete <name>`: removes profile directory recursively
+Profile operations are available on both surfaces:
+
+CLI wrapper:
+* `pw profile list`
+* `pw profile show <name>`
+* `pw profile set <name> --file <path>`
+* `pw profile delete <name>`
+
+Canonical protocol ops:
+* `profile.list` with `{}` input
+* `profile.show` with `{ "name": "<name>" }`
+* `profile.set` with `{ "name": "<name>", "file": "<path>" }`
+* `profile.delete` with `{ "name": "<name>" }`
+
+Behavior:
+
+* `profile.list`: lists profile directories under `.pw-cli-v4/profiles`
+* `profile.show`: returns profile config JSON (defaults when missing)
+* `profile.set`: replaces profile config JSON (normalizes schema `0` to current persisted schema)
+* `profile.delete`: removes profile directory recursively

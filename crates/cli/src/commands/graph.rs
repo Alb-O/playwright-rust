@@ -81,6 +81,18 @@ command_graph! {
 		DaemonStatus => crate::commands::daemon::DaemonStatusCommand {
 			names: ["daemon.status"],
 		},
+		ProfileList => crate::commands::profile::ProfileListCommand {
+			names: ["profile.list"],
+		},
+		ProfileShow => crate::commands::profile::ProfileShowCommand {
+			names: ["profile.show"],
+		},
+		ProfileSet => crate::commands::profile::ProfileSetCommand {
+			names: ["profile.set"],
+		},
+		ProfileDelete => crate::commands::profile::ProfileDeleteCommand {
+			names: ["profile.delete"],
+		},
 		Connect => crate::commands::connect::ConnectCommand {
 			names: ["connect"],
 		},

@@ -10,7 +10,7 @@ The `pw` command is protocol-first:
 
 * `pw exec <op> --input '<json>'` for one-shot requests
 * `pw batch` for NDJSON request/response streaming
-* `pw profile ...` for runtime/config defaults
+* `pw profile ...` or `profile.*` ops for runtime/config defaults
 
 ```bash
 # Navigate and extract content
@@ -77,6 +77,12 @@ pw profile list
 pw profile show default
 pw profile set default --file profile.json
 pw profile delete throwaway
+
+# Protocol-first equivalents
+pw exec profile.list --input '{}'
+pw exec profile.show --input '{"name":"default"}'
+pw exec profile.set --input '{"name":"default","file":"profile.json"}'
+pw exec profile.delete --input '{"name":"throwaway"}'
 ```
 
 ## Library

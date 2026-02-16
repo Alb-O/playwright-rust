@@ -21,12 +21,14 @@ mod tests {
 		assert_eq!(lookup_command("connect"), Some(CommandId::Connect));
 		assert_eq!(lookup_command("session.status"), Some(CommandId::SessionStatus));
 		assert_eq!(lookup_command("har.show"), Some(CommandId::HarShow));
+		assert_eq!(lookup_command("profile.show"), Some(CommandId::ProfileShow));
 	}
 
 	#[test]
 	fn lookup_command_exact_matches_canonical_only() {
 		assert_eq!(lookup_command_exact("navigate"), Some(CommandId::Navigate));
 		assert_eq!(lookup_command_exact("page.text"), Some(CommandId::PageText));
+		assert_eq!(lookup_command_exact("profile.list"), Some(CommandId::ProfileList));
 	}
 
 	#[test]
@@ -44,6 +46,7 @@ mod tests {
 		assert_eq!(command_name(CommandId::Connect), "connect");
 		assert_eq!(command_name(CommandId::SessionStatus), "session.status");
 		assert_eq!(command_name(CommandId::HarShow), "har.show");
+		assert_eq!(command_name(CommandId::ProfileDelete), "profile.delete");
 	}
 
 	#[test]
