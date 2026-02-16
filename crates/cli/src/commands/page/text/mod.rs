@@ -7,10 +7,10 @@ use tracing::info;
 
 use crate::commands::contract::{resolve_target_and_selector, standard_delta, standard_inputs};
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
-use crate::commands::exec_flow::navigation_plan;
+use crate::commands::flow::page::run_page_flow;
 use crate::error::{PwError, Result};
 use crate::output::TextData;
-use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::session_helpers::ArtifactsPolicy;
 use crate::target::{ResolveEnv, ResolvedTarget};
 
 /// Raw inputs from CLI or batch JSON.
@@ -66,15 +66,12 @@ impl CommandDef for TextCommand {
 			let url_display = args.target.url_str().unwrap_or("<current page>");
 			info!(target = "pw", url = %url_display, selector = %args.selector, browser = %exec.ctx.browser, "get text");
 
-			let plan = navigation_plan(exec.ctx, exec.last_url, &args.target, WaitUntil::NetworkIdle);
-			let timeout_ms = plan.timeout_ms;
-			let target = plan.target;
 			let selector = args.selector.clone();
 
-			let data = with_session(&mut exec, plan.request, ArtifactsPolicy::Never, move |session| {
+			let data = run_page_flow(&mut exec, &args.target, WaitUntil::NetworkIdle, ArtifactsPolicy::Never, move |session, flow| {
 				let selector = selector.clone();
 				Box::pin(async move {
-					session.goto_target(&target, timeout_ms).await?;
+					session.goto_target(&flow.target, flow.timeout_ms).await?;
 
 					let locator = session.page().locator(&selector).await;
 					let count = locator.count().await?;

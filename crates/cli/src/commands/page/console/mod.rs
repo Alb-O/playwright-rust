@@ -20,9 +20,9 @@ use tracing::{info, warn};
 use crate::browser::js::console_capture_injection_js;
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta, standard_inputs};
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
-use crate::commands::exec_flow::navigation_plan;
+use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
-use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::session_helpers::ArtifactsPolicy;
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 use crate::types::ConsoleMessage;
 
@@ -93,18 +93,15 @@ impl CommandDef for ConsoleCommand {
 			let url_display = args.target.url_str().unwrap_or("<current page>");
 			info!(target = "pw", url = %url_display, timeout_ms = args.timeout_ms, browser = %exec.ctx.browser, "capture console");
 
-			let plan = navigation_plan(exec.ctx, exec.last_url, &args.target, WaitUntil::NetworkIdle);
-			let timeout_ms = plan.timeout_ms;
-			let target = plan.target;
 			let capture_timeout_ms = args.timeout_ms;
 
-			let data = with_session(&mut exec, plan.request, ArtifactsPolicy::Never, move |session| {
+			let data = run_page_flow(&mut exec, &args.target, WaitUntil::NetworkIdle, ArtifactsPolicy::Never, move |session, flow| {
 				Box::pin(async move {
 					if let Err(err) = session.page().evaluate(console_capture_injection_js()).await {
 						warn!(target = "pw.browser.console", error = %err, "failed to inject console capture");
 					}
 
-					session.goto_target(&target, timeout_ms).await?;
+					session.goto_target(&flow.target, flow.timeout_ms).await?;
 
 					tokio::time::sleep(Duration::from_millis(capture_timeout_ms)).await;
 

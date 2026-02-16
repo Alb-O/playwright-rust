@@ -9,10 +9,10 @@ use tracing::info;
 
 use crate::commands::contract::{resolve_target_and_selector, standard_delta_with_url, standard_inputs};
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
-use crate::commands::exec_flow::navigation_plan;
+use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::output::{ClickData, DownloadedFile};
-use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::session_helpers::ArtifactsPolicy;
 use crate::target::{ResolveEnv, ResolvedTarget};
 
 /// Raw inputs from CLI or batch JSON.
@@ -75,41 +75,43 @@ impl CommandDef for ClickCommand {
 			let url_display = args.target.url_str().unwrap_or("<current page>");
 			info!(target = "pw", url = %url_display, selector = %args.selector, browser = %exec.ctx.browser, "click element");
 
-			let plan = navigation_plan(exec.ctx, exec.last_url, &args.target, WaitUntil::NetworkIdle);
-			let timeout_ms = plan.timeout_ms;
-			let target = plan.target;
 			let selector = args.selector.clone();
 			let selector_for_outcome = selector.clone();
 			let wait_ms = args.wait_ms;
 
-			let (after_url, data) = with_session(&mut exec, plan.request, ArtifactsPolicy::OnError { command: "click" }, move |session| {
-				let selector = selector.clone();
-				Box::pin(async move {
-					session.goto_target(&target, timeout_ms).await?;
+			let (after_url, data) = run_page_flow(
+				&mut exec,
+				&args.target,
+				WaitUntil::NetworkIdle,
+				ArtifactsPolicy::OnError { command: "click" },
+				move |session, flow| {
+					let selector = selector.clone();
+					Box::pin(async move {
+						session.goto_target(&flow.target, flow.timeout_ms).await?;
 
-					let before_url = session
-						.page()
-						.evaluate_value("window.location.href")
-						.await
-						.unwrap_or_else(|_| session.page().url());
+						let before_url = session
+							.page()
+							.evaluate_value("window.location.href")
+							.await
+							.unwrap_or_else(|_| session.page().url());
 
-					let locator = session.page().locator(&selector).await;
-					let click_opts = ClickOptions::builder()
-						// We compute navigation ourselves via before/after URL checks.
-						// Disabling auto-wait avoids false 30s timeouts on non-navigating clicks.
-						.no_wait_after(true)
-						.timeout(timeout_ms.unwrap_or(pw_protocol::options::DEFAULT_TIMEOUT_MS as u64) as f64)
-						.build();
-					match locator.click(Some(click_opts)).await {
-						Ok(()) => {}
-						Err(err) => {
-							let msg = err.to_string();
-							if msg.to_lowercase().contains("timeout") {
-								// Playwright 1.57+ can intermittently hang on locator click
-								// for simple static elements. Fallback to a DOM click.
-								let selector_json = serde_json::to_string(&selector)?;
-								let expr = format!(
-									r#"(() => {{
+						let locator = session.page().locator(&selector).await;
+						let click_opts = ClickOptions::builder()
+							// We compute navigation ourselves via before/after URL checks.
+							// Disabling auto-wait avoids false 30s timeouts on non-navigating clicks.
+							.no_wait_after(true)
+							.timeout(flow.timeout_ms.unwrap_or(pw_protocol::options::DEFAULT_TIMEOUT_MS as u64) as f64)
+							.build();
+						match locator.click(Some(click_opts)).await {
+							Ok(()) => {}
+							Err(err) => {
+								let msg = err.to_string();
+								if msg.to_lowercase().contains("timeout") {
+									// Playwright 1.57+ can intermittently hang on locator click
+									// for simple static elements. Fallback to a DOM click.
+									let selector_json = serde_json::to_string(&selector)?;
+									let expr = format!(
+										r#"(() => {{
                                                 const el = document.querySelector({selector});
                                                 if (!el) {{
                                                     throw new Error("selector not found for click fallback");
@@ -117,48 +119,49 @@ impl CommandDef for ClickCommand {
                                                 el.click();
                                                 return true;
                                             }})()"#,
-									selector = selector_json
-								);
-								session.page().evaluate_value(&expr).await?;
-							} else {
-								return Err(err.into());
+										selector = selector_json
+									);
+									session.page().evaluate_value(&expr).await?;
+								} else {
+									return Err(err.into());
+								}
 							}
 						}
-					}
 
-					if wait_ms > 0 {
-						tokio::time::sleep(Duration::from_millis(wait_ms)).await;
-					}
+						if wait_ms > 0 {
+							tokio::time::sleep(Duration::from_millis(wait_ms)).await;
+						}
 
-					let after_url = session
-						.page()
-						.evaluate_value("window.location.href")
-						.await
-						.unwrap_or_else(|_| session.page().url());
+						let after_url = session
+							.page()
+							.evaluate_value("window.location.href")
+							.await
+							.unwrap_or_else(|_| session.page().url());
 
-					let navigated = before_url != after_url;
+						let navigated = before_url != after_url;
 
-					let downloads: Vec<DownloadedFile> = session
-						.downloads()
-						.into_iter()
-						.map(|d| DownloadedFile {
-							url: d.url,
-							suggested_filename: d.suggested_filename,
-							path: d.path,
-						})
-						.collect();
+						let downloads: Vec<DownloadedFile> = session
+							.downloads()
+							.into_iter()
+							.map(|d| DownloadedFile {
+								url: d.url,
+								suggested_filename: d.suggested_filename,
+								path: d.path,
+							})
+							.collect();
 
-					let data = ClickData {
-						before_url,
-						after_url: after_url.clone(),
-						navigated,
-						selector: selector.clone(),
-						downloads,
-					};
+						let data = ClickData {
+							before_url,
+							after_url: after_url.clone(),
+							navigated,
+							selector: selector.clone(),
+							downloads,
+						};
 
-					Ok((after_url, data))
-				})
-			})
+						Ok((after_url, data))
+					})
+				},
+			)
 			.await?;
 
 			let inputs = standard_inputs(&args.target, Some(&selector_for_outcome), None, None, None);

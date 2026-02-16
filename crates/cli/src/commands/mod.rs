@@ -8,6 +8,7 @@ pub(crate) mod def;
 pub(crate) mod dispatch;
 pub(crate) mod exec_flow;
 pub(crate) mod fill;
+pub(crate) mod flow;
 mod har;
 pub mod init;
 pub(crate) mod invocation;

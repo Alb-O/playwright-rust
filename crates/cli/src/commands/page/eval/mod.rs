@@ -9,10 +9,10 @@ use tracing::{debug, info};
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta, standard_inputs};
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
-use crate::commands::exec_flow::navigation_plan;
+use crate::commands::flow::page::run_page_flow;
 use crate::error::{PwError, Result};
 use crate::output::EvalData;
-use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::session_helpers::ArtifactsPolicy;
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
@@ -82,16 +82,13 @@ impl CommandDef for EvalCommand {
 			info!(target = "pw", url = %url_display, browser = %exec.ctx.browser, "eval js");
 			debug!(target = "pw", expression = %args.expression, "expression");
 
-			let plan = navigation_plan(exec.ctx, exec.last_url, &args.target, WaitUntil::NetworkIdle);
-			let timeout_ms = plan.timeout_ms;
-			let target = plan.target;
 			let expression = args.expression.clone();
 			let expression_for_inputs = truncate_expression(&expression);
 
-			let data = with_session(&mut exec, plan.request, ArtifactsPolicy::Never, move |session| {
+			let data = run_page_flow(&mut exec, &args.target, WaitUntil::NetworkIdle, ArtifactsPolicy::Never, move |session, flow| {
 				let expression = expression.clone();
 				Box::pin(async move {
-					session.goto_target(&target, timeout_ms).await?;
+					session.goto_target(&flow.target, flow.timeout_ms).await?;
 
 					let wrapped_expr = format!("JSON.stringify({})", expression);
 					let raw_result = session.page().evaluate_value(&wrapped_expr).await;

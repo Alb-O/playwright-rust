@@ -7,10 +7,11 @@ use tracing::info;
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta_with_url, standard_inputs};
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
-use crate::commands::exec_flow::navigation_plan;
+use crate::commands::flow::page::run_page_flow;
 use crate::commands::page::snapshot::{EXTRACT_ELEMENTS_JS, EXTRACT_META_JS, EXTRACT_TEXT_JS, PageMeta, RawElement};
 use crate::error::Result;
 use crate::output::{InteractiveElement, SnapshotData};
+use crate::session_helpers::ArtifactsPolicy;
 use crate::target::{ResolveEnv, ResolvedTarget, Target, TargetPolicy};
 
 const DEFAULT_MAX_TEXT_LENGTH: usize = 5000;
@@ -49,7 +50,7 @@ impl CommandDef for NavigateCommand {
 		Ok(NavigateResolved { target })
 	}
 
-	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, mut exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
 	where
 		'ctx: 'exec,
 	{
@@ -57,48 +58,50 @@ impl CommandDef for NavigateCommand {
 			let url_display = args.target.url_str().unwrap_or("<current page>");
 			info!(target = "pw", url = %url_display, browser = %exec.ctx.browser, "navigate");
 
-			let plan = navigation_plan(exec.ctx, exec.last_url, &args.target, WaitUntil::Load);
-			let session = exec.broker.session(plan.request).await?;
+			let (final_url, data) = run_page_flow(&mut exec, &args.target, WaitUntil::Load, ArtifactsPolicy::Never, move |session, flow| {
+				Box::pin(async move {
+					match &flow.target {
+						Target::Navigate(url) => {
+							session.goto_if_needed(url.as_str(), flow.timeout_ms).await?;
+						}
+						Target::CurrentPage => {}
+					}
 
-			match &plan.target {
-				Target::Navigate(url) => {
-					session.goto_if_needed(url.as_str(), exec.ctx.timeout_ms()).await?;
-				}
-				Target::CurrentPage => {}
-			}
+					session.page().bring_to_front().await?;
 
-			session.page().bring_to_front().await?;
+					let meta_js = format!("JSON.stringify({})", EXTRACT_META_JS);
+					let meta: PageMeta = serde_json::from_str(&session.page().evaluate_value(&meta_js).await?)?;
 
-			let meta_js = format!("JSON.stringify({})", EXTRACT_META_JS);
-			let meta: PageMeta = serde_json::from_str(&session.page().evaluate_value(&meta_js).await?)?;
+					let text_js = format!("JSON.stringify({}({}, {}))", EXTRACT_TEXT_JS, DEFAULT_MAX_TEXT_LENGTH, false);
+					let text: String = serde_json::from_str(&session.page().evaluate_value(&text_js).await?)?;
 
-			let text_js = format!("JSON.stringify({}({}, {}))", EXTRACT_TEXT_JS, DEFAULT_MAX_TEXT_LENGTH, false);
-			let text: String = serde_json::from_str(&session.page().evaluate_value(&text_js).await?)?;
+					let elements_js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
+					let raw_elements: Vec<RawElement> = serde_json::from_str(&session.page().evaluate_value(&elements_js).await?)?;
 
-			let elements_js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
-			let raw_elements: Vec<RawElement> = serde_json::from_str(&session.page().evaluate_value(&elements_js).await?)?;
+					let elements: Vec<InteractiveElement> = raw_elements.into_iter().map(Into::into).collect();
+					let element_count = elements.len();
 
-			let elements: Vec<InteractiveElement> = raw_elements.into_iter().map(Into::into).collect();
-			let element_count = elements.len();
+					let data = SnapshotData {
+						url: meta.url.clone(),
+						title: meta.title,
+						viewport_width: meta.viewport_width,
+						viewport_height: meta.viewport_height,
+						text,
+						elements,
+						element_count,
+					};
 
-			let data = SnapshotData {
-				url: meta.url.clone(),
-				title: meta.title,
-				viewport_width: meta.viewport_width,
-				viewport_height: meta.viewport_height,
-				text,
-				elements,
-				element_count,
-			};
+					Ok((meta.url, data))
+				})
+			})
+			.await?;
 
 			let inputs = standard_inputs(&args.target, None, None, None, None);
-
-			session.close().await?;
 
 			Ok(CommandOutcome {
 				inputs,
 				data,
-				delta: standard_delta_with_url(Some(meta.url), None, None),
+				delta: standard_delta_with_url(Some(final_url), None, None),
 			})
 		})
 	}

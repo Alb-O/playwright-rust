@@ -22,7 +22,7 @@ use tracing::info;
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta, standard_inputs};
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
-use crate::commands::exec_flow::navigation_plan;
+use crate::commands::flow::page::run_page_flow;
 use crate::error::{PwError, Result};
 use crate::output::CommandInputs;
 use crate::session_broker::SessionHandle;
@@ -93,15 +93,12 @@ impl CommandDef for WaitCommand {
 			let url_display = args.target.url_str().unwrap_or("<current page>");
 			info!(target = "pw", url = %url_display, condition = %args.condition, browser = %exec.ctx.browser, "wait");
 
-			let plan = navigation_plan(exec.ctx, exec.last_url, &args.target, WaitUntil::NetworkIdle);
-			let timeout_ms = plan.timeout_ms;
-			let target = plan.target;
 			let condition = args.condition.clone();
 
-			let data = crate::session_helpers::with_session(&mut exec, plan.request, ArtifactsPolicy::Never, move |session| {
+			let data = run_page_flow(&mut exec, &args.target, WaitUntil::NetworkIdle, ArtifactsPolicy::Never, move |session, flow| {
 				let condition = condition.clone();
 				Box::pin(async move {
-					session.goto_target(&target, timeout_ms).await?;
+					session.goto_target(&flow.target, flow.timeout_ms).await?;
 
 					if let Ok(ms) = condition.parse::<u64>() {
 						tokio::time::sleep(Duration::from_millis(ms)).await;

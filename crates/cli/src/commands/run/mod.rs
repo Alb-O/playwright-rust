@@ -138,8 +138,8 @@ pub struct BatchRequest {
 /// # Wire Format
 ///
 /// ```json
-/// {"id":"1","ok":true,"command":"navigate","data":{"url":"https://example.com"},"schemaVersion":2}
-/// {"id":"2","ok":false,"command":"click","error":{"code":"ELEMENT_NOT_FOUND","message":"..."},"schemaVersion":2}
+/// {"id":"1","ok":true,"command":"navigate","data":{"url":"https://example.com"},"schemaVersion":3}
+/// {"id":"2","ok":false,"command":"click","error":{"code":"ELEMENT_NOT_FOUND","message":"..."},"schemaVersion":3}
 /// ```
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -276,10 +276,7 @@ pub async fn execute<'ctx>(ctx: &'ctx CommandContext, ctx_state: &mut ContextSta
 	let mut reader = BufReader::new(stdin);
 	let mut stdout = std::io::stdout();
 	let mut line = String::new();
-	let schema_version = match format {
-		OutputFormat::JsonV1 | OutputFormat::NdjsonV1 => 1,
-		_ => SCHEMA_VERSION,
-	};
+	let schema_version = SCHEMA_VERSION;
 
 	loop {
 		line.clear();

@@ -18,8 +18,10 @@ fn result_builder_success() {
 
 	assert!(result.ok);
 	assert_eq!(result.command, "navigate");
+	assert_eq!(result.schema_version, Some(3));
 	assert!(result.data.is_some());
 	assert!(result.error.is_none());
+	assert!(result.duration_ms.is_some());
 }
 
 #[test]
@@ -35,7 +37,7 @@ fn result_builder_error() {
 	assert!(!result.ok);
 	assert!(result.data.is_none());
 	assert!(result.error.is_some());
-	assert_eq!(result.error.as_ref().unwrap().code, ErrorCode::NavigationFailed);
+	assert_eq!(result.error.as_ref().expect("error should be set").code, ErrorCode::NavigationFailed);
 }
 
 #[test]
@@ -46,10 +48,11 @@ fn error_code_display() {
 
 #[test]
 fn output_format_parse() {
-	assert_eq!("json".parse::<OutputFormat>().unwrap(), OutputFormat::Json);
-	assert_eq!("json-v1".parse::<OutputFormat>().unwrap(), OutputFormat::JsonV1);
-	assert_eq!("ndjson-v1".parse::<OutputFormat>().unwrap(), OutputFormat::NdjsonV1);
-	assert_eq!("text".parse::<OutputFormat>().unwrap(), OutputFormat::Text);
+	assert_eq!("json".parse::<OutputFormat>().expect("json format should parse"), OutputFormat::Json);
+	assert_eq!("ndjson".parse::<OutputFormat>().expect("ndjson format should parse"), OutputFormat::Ndjson);
+	assert_eq!("text".parse::<OutputFormat>().expect("text format should parse"), OutputFormat::Text);
+	assert!("json-v1".parse::<OutputFormat>().is_err());
+	assert!("ndjson-v1".parse::<OutputFormat>().is_err());
 	assert!("invalid".parse::<OutputFormat>().is_err());
 }
 
@@ -65,28 +68,13 @@ fn serialize_command_result() {
 		})
 		.build();
 
-	let json = serde_json::to_string(&result).unwrap();
+	let json = serde_json::to_string(&result).expect("command result should serialize");
 	assert!(json.contains("\"ok\":true"));
 	assert!(json.contains("\"navigated\":true"));
-	assert!(json.contains("\"schemaVersion\":2"));
-	assert!(json.contains("\"meta\""));
-}
-
-#[test]
-fn v1_output_reference_uses_schema_1_without_meta() {
-	let result: CommandResult<ClickData> = ResultBuilder::new("click")
-		.data(ClickData {
-			before_url: "https://example.com".into(),
-			after_url: "https://example.com/page".into(),
-			navigated: true,
-			selector: "a.link".into(),
-			downloads: Vec::new(),
-		})
-		.build();
-
-	let value = serde_json::to_value(as_v1_ref(&result)).unwrap();
-	assert_eq!(value.get("schemaVersion"), Some(&serde_json::Value::from(1)));
-	assert!(value.get("meta").is_none());
+	assert!(json.contains("\"schemaVersion\":3"));
+	assert!(json.contains("\"durationMs\""));
+	assert!(!json.contains("\"meta\""));
+	assert!(!json.contains("\"timings\""));
 }
 
 #[test]

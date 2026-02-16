@@ -9,10 +9,10 @@ use tracing::info;
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta, standard_inputs};
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
-use crate::commands::exec_flow::navigation_plan;
+use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::output::ScreenshotData;
-use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::session_helpers::ArtifactsPolicy;
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON.
@@ -86,16 +86,13 @@ impl CommandDef for ScreenshotCommand {
 				}
 			}
 
-			let plan = navigation_plan(exec.ctx, exec.last_url, &args.target, WaitUntil::NetworkIdle);
-			let timeout_ms = plan.timeout_ms;
-			let target = plan.target;
 			let output = args.output.clone();
 			let full_page = args.full_page;
 
-			with_session(&mut exec, plan.request, ArtifactsPolicy::Never, move |session| {
+			run_page_flow(&mut exec, &args.target, WaitUntil::NetworkIdle, ArtifactsPolicy::Never, move |session, flow| {
 				let output = output.clone();
 				Box::pin(async move {
-					session.goto_target(&target, timeout_ms).await?;
+					session.goto_target(&flow.target, flow.timeout_ms).await?;
 
 					let screenshot_opts = ScreenshotOptions {
 						full_page: Some(full_page),

@@ -32,11 +32,11 @@ use tracing::info;
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta_with_url, standard_inputs};
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
-use crate::commands::exec_flow::navigation_plan;
+use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::output::{InteractiveElement, SnapshotData};
 use crate::session_broker::SessionHandle;
-use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::session_helpers::ArtifactsPolicy;
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON before resolution.
@@ -116,41 +116,44 @@ impl CommandDef for SnapshotCommand {
 			let url_display = args.target.url_str().unwrap_or("<current page>");
 			info!(target = "pw", url = %url_display, text_only = %args.text_only, full = %args.full, browser = %exec.ctx.browser, "snapshot");
 
-			let plan = navigation_plan(exec.ctx, exec.last_url, &args.target, WaitUntil::NetworkIdle);
-			let timeout_ms = plan.timeout_ms;
-			let target = plan.target;
 			let text_only = args.text_only;
 			let full = args.full;
 			let max_text_length = args.max_text_length;
 
-			let (final_url, data) = with_session(&mut exec, plan.request, ArtifactsPolicy::OnError { command: "snapshot" }, move |session| {
-				Box::pin(async move {
-					session.goto_target(&target, timeout_ms).await?;
+			let (final_url, data) = run_page_flow(
+				&mut exec,
+				&args.target,
+				WaitUntil::NetworkIdle,
+				ArtifactsPolicy::OnError { command: "snapshot" },
+				move |session, flow| {
+					Box::pin(async move {
+						session.goto_target(&flow.target, flow.timeout_ms).await?;
 
-					let meta_js = format!("JSON.stringify({})", EXTRACT_META_JS);
-					let meta: PageMeta = serde_json::from_str(&session.page().evaluate_value(&meta_js).await?)?;
+						let meta_js = format!("JSON.stringify({})", EXTRACT_META_JS);
+						let meta: PageMeta = serde_json::from_str(&session.page().evaluate_value(&meta_js).await?)?;
 
-					let text_js = format!("JSON.stringify({}({}, {}))", EXTRACT_TEXT_JS, max_text_length, full);
-					let text: String = serde_json::from_str(&session.page().evaluate_value(&text_js).await?)?;
+						let text_js = format!("JSON.stringify({}({}, {}))", EXTRACT_TEXT_JS, max_text_length, full);
+						let text: String = serde_json::from_str(&session.page().evaluate_value(&text_js).await?)?;
 
-					let elements = extract_elements_if_needed(session, text_only).await?;
-					let element_count = elements.len();
+						let elements = extract_elements_if_needed(session, text_only).await?;
+						let element_count = elements.len();
 
-					let final_url = meta.url.clone();
+						let final_url = meta.url.clone();
 
-					let data = SnapshotData {
-						url: meta.url,
-						title: meta.title,
-						viewport_width: meta.viewport_width,
-						viewport_height: meta.viewport_height,
-						text,
-						elements,
-						element_count,
-					};
+						let data = SnapshotData {
+							url: meta.url,
+							title: meta.title,
+							viewport_width: meta.viewport_width,
+							viewport_height: meta.viewport_height,
+							text,
+							elements,
+							element_count,
+						};
 
-					Ok((final_url, data))
-				})
-			})
+						Ok((final_url, data))
+					})
+				},
+			)
 			.await?;
 
 			let inputs = standard_inputs(&args.target, None, None, None, None);

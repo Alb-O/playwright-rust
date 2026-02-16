@@ -16,10 +16,10 @@ use tracing::info;
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta, standard_inputs};
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
-use crate::commands::exec_flow::navigation_plan;
+use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::output::FillData;
-use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::session_helpers::ArtifactsPolicy;
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON before resolution.
@@ -78,24 +78,27 @@ impl CommandDef for FillCommand {
 			let url_display = args.target.url_str().unwrap_or("<current page>");
 			info!(target = "pw", url = %url_display, selector = %args.selector, "fill");
 
-			let plan = navigation_plan(exec.ctx, exec.last_url, &args.target, WaitUntil::Load);
-			let timeout_ms = plan.timeout_ms;
-			let target = plan.target;
 			let selector = args.selector.clone();
 			let text = args.text.clone();
 
-			let data = with_session(&mut exec, plan.request, ArtifactsPolicy::OnError { command: "fill" }, move |session| {
-				let selector = selector.clone();
-				let text = text.clone();
-				Box::pin(async move {
-					session.goto_target(&target, timeout_ms).await?;
+			let data = run_page_flow(
+				&mut exec,
+				&args.target,
+				WaitUntil::Load,
+				ArtifactsPolicy::OnError { command: "fill" },
+				move |session, flow| {
+					let selector = selector.clone();
+					let text = text.clone();
+					Box::pin(async move {
+						session.goto_target(&flow.target, flow.timeout_ms).await?;
 
-					let locator = session.page().locator(&selector).await;
-					locator.fill(&text, None).await?;
+						let locator = session.page().locator(&selector).await;
+						locator.fill(&text, None).await?;
 
-					Ok(FillData { selector, text })
-				})
-			})
+						Ok(FillData { selector, text })
+					})
+				},
+			)
 			.await?;
 
 			let inputs = standard_inputs(&args.target, Some(&args.selector), None, None, None);

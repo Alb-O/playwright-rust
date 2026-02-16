@@ -24,11 +24,11 @@ use tracing::info;
 
 use crate::commands::contract::{resolve_target_from_url_pair, standard_delta, standard_inputs};
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
-use crate::commands::exec_flow::navigation_plan;
+use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::output::{ElementsData, InteractiveElement};
 use crate::session_broker::SessionHandle;
-use crate::session_helpers::{ArtifactsPolicy, with_session};
+use crate::session_helpers::ArtifactsPolicy;
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 
 /// Raw inputs from CLI or batch JSON before resolution.
@@ -97,50 +97,53 @@ impl CommandDef for ElementsCommand {
 			let url_display = args.target.url_str().unwrap_or("<current page>");
 			info!(target = "pw", url = %url_display, wait = %args.wait, timeout_ms = %args.timeout_ms, browser = %exec.ctx.browser, "list elements");
 
-			let plan = navigation_plan(exec.ctx, exec.last_url, &args.target, WaitUntil::NetworkIdle);
-			let timeout_ms = plan.timeout_ms;
-			let target = plan.target;
 			let wait = args.wait;
 			let poll_timeout_ms = args.timeout_ms;
 
-			let data = with_session(&mut exec, plan.request, ArtifactsPolicy::OnError { command: "elements" }, move |session| {
-				Box::pin(async move {
-					session.goto_target(&target, timeout_ms).await?;
+			let data = run_page_flow(
+				&mut exec,
+				&args.target,
+				WaitUntil::NetworkIdle,
+				ArtifactsPolicy::OnError { command: "elements" },
+				move |session, flow| {
+					Box::pin(async move {
+						session.goto_target(&flow.target, flow.timeout_ms).await?;
 
-					let js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
+						let js = format!("JSON.stringify({})", EXTRACT_ELEMENTS_JS);
 
-					let raw_elements: Vec<RawElement> = if wait {
-						poll_for_elements(session, &js, poll_timeout_ms).await?
-					} else {
-						let raw_result = session.page().evaluate_value(&js).await?;
-						serde_json::from_str(&raw_result)?
-					};
+						let raw_elements: Vec<RawElement> = if wait {
+							poll_for_elements(session, &js, poll_timeout_ms).await?
+						} else {
+							let raw_result = session.page().evaluate_value(&js).await?;
+							serde_json::from_str(&raw_result)?
+						};
 
-					let elements: Vec<InteractiveElement> = raw_elements
-						.into_iter()
-						.map(|e| InteractiveElement {
-							tag: e.kind,
-							selector: e.selector,
-							text: if e.label.is_empty() || e.label == "(unlabeled)" {
-								None
-							} else {
-								Some(e.label)
-							},
-							href: None,
-							name: e.extra,
-							id: None,
-							x: e.x,
-							y: e.y,
-							width: e.width,
-							height: e.height,
-						})
-						.collect();
+						let elements: Vec<InteractiveElement> = raw_elements
+							.into_iter()
+							.map(|e| InteractiveElement {
+								tag: e.kind,
+								selector: e.selector,
+								text: if e.label.is_empty() || e.label == "(unlabeled)" {
+									None
+								} else {
+									Some(e.label)
+								},
+								href: None,
+								name: e.extra,
+								id: None,
+								x: e.x,
+								y: e.y,
+								width: e.width,
+								height: e.height,
+							})
+							.collect();
 
-					let count = elements.len();
+						let count = elements.len();
 
-					Ok(ElementsData { elements, count })
-				})
-			})
+						Ok(ElementsData { elements, count })
+					})
+				},
+			)
 			.await?;
 
 			let inputs = standard_inputs(&args.target, None, None, None, None);

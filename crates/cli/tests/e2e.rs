@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Helper to get the pw binary path
 fn pw_binary() -> PathBuf {
@@ -16,19 +17,18 @@ fn pw_binary() -> PathBuf {
 	path
 }
 
-fn workspace_root() -> PathBuf {
-	std::env::temp_dir().join("pw-cli-e2e")
-}
+static WORKSPACE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
-fn clear_context_store() {
-	let _ = std::fs::remove_dir_all(workspace_root());
+fn unique_workspace() -> PathBuf {
+	let run_id = WORKSPACE_COUNTER.fetch_add(1, Ordering::Relaxed);
+	std::env::temp_dir().join("pw-cli-e2e").join(format!("run-{run_id}"))
 }
 
 /// Helper to run pw command and capture output (JSON format by default)
 fn run_pw(args: &[&str]) -> (bool, String, String) {
-	clear_context_store();
-	let workspace = workspace_root();
+	let workspace = unique_workspace();
 	let workspace_str = workspace.to_string_lossy().to_string();
+	let _ = std::fs::create_dir_all(&workspace);
 
 	// Use JSON format for tests since assertions expect JSON structure
 	let mut all_args = vec!["--no-project", "--workspace", &workspace_str, "--namespace", "default", "-f", "json"];
@@ -86,6 +86,8 @@ fn text_simple() {
 	// JSON envelope contains the text
 	assert!(stdout.contains("Hello World"), "Expected 'Hello World' in output");
 	assert!(stdout.contains("\"ok\": true"), "Expected success in JSON");
+	assert!(stdout.contains("\"schemaVersion\": 3"), "Expected schemaVersion=3 in JSON");
+	assert!(stdout.contains("\"durationMs\":"), "Expected durationMs in JSON");
 	assert!(stdout.contains("\"matchCount\": 1"), "Expected matchCount in output");
 }
 
@@ -183,6 +185,8 @@ fn navigate_returns_json() {
 
 	assert!(success, "Command failed: {}", stderr);
 	assert!(stdout.contains("\"ok\": true"), "Expected ok in JSON");
+	assert!(stdout.contains("\"schemaVersion\": 3"), "Expected schemaVersion=3 in JSON");
+	assert!(stdout.contains("\"durationMs\":"), "Expected durationMs in JSON");
 	assert!(stdout.contains("\"url\""), "Expected url in JSON");
 	assert!(stdout.contains("\"title\""), "Expected title in JSON");
 	assert!(stdout.contains("Nav Test"), "Expected title value in JSON");
