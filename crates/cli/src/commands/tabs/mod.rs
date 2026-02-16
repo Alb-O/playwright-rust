@@ -28,7 +28,7 @@ pub struct TabsListResolved;
 pub struct TabsListCommand;
 
 impl CommandDef for TabsListCommand {
-	const NAME: &'static str = "tabs list";
+	const NAME: &'static str = "tabs.list";
 
 	type Raw = TabsListRaw;
 	type Resolved = TabsListResolved;
@@ -89,7 +89,7 @@ pub struct TabsSwitchResolved {
 pub struct TabsSwitchCommand;
 
 impl CommandDef for TabsSwitchCommand {
-	const NAME: &'static str = "tabs switch";
+	const NAME: &'static str = "tabs.switch";
 
 	type Raw = TabsSwitchRaw;
 	type Resolved = TabsSwitchResolved;
@@ -145,7 +145,7 @@ pub struct TabsCloseResolved {
 pub struct TabsCloseCommand;
 
 impl CommandDef for TabsCloseCommand {
-	const NAME: &'static str = "tabs close";
+	const NAME: &'static str = "tabs.close";
 
 	type Raw = TabsCloseRaw;
 	type Resolved = TabsCloseResolved;
@@ -201,7 +201,7 @@ pub struct TabsNewResolved {
 pub struct TabsNewCommand;
 
 impl CommandDef for TabsNewCommand {
-	const NAME: &'static str = "tabs new";
+	const NAME: &'static str = "tabs.new";
 
 	type Raw = TabsNewRaw;
 	type Resolved = TabsNewResolved;

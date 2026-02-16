@@ -20,7 +20,7 @@ pub struct ProtectAddResolved {
 pub struct ProtectAddCommand;
 
 impl CommandDef for ProtectAddCommand {
-	const NAME: &'static str = "protect add";
+	const NAME: &'static str = "protect.add";
 
 	type Raw = ProtectAddRaw;
 	type Resolved = ProtectAddResolved;
@@ -69,7 +69,7 @@ pub struct ProtectRemoveResolved {
 pub struct ProtectRemoveCommand;
 
 impl CommandDef for ProtectRemoveCommand {
-	const NAME: &'static str = "protect remove";
+	const NAME: &'static str = "protect.remove";
 
 	type Raw = ProtectRemoveRaw;
 	type Resolved = ProtectRemoveResolved;
@@ -114,7 +114,7 @@ pub struct ProtectListResolved;
 pub struct ProtectListCommand;
 
 impl CommandDef for ProtectListCommand {
-	const NAME: &'static str = "protect list";
+	const NAME: &'static str = "protect.list";
 
 	type Raw = ProtectListRaw;
 	type Resolved = ProtectListResolved;

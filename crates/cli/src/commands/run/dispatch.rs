@@ -2,7 +2,7 @@
 
 use super::{BatchRequest, BatchResponse};
 use crate::commands::def::{ExecCtx, ExecMode};
-use crate::commands::registry::{lookup_command, run_command};
+use crate::commands::registry::{command_name, lookup_command, run_command};
 use crate::context::CommandContext;
 use crate::context_store::ContextState;
 use crate::output::OutputFormat;
@@ -40,11 +40,11 @@ pub async fn execute_batch_command<'ctx>(
 	match run_command(cmd_id, request.args.clone(), has_cdp, exec).await {
 		Ok(out) => {
 			out.delta.apply(ctx_state);
-			BatchResponse::success(id, cmd_str, out.data).with_inputs(out.inputs)
+			BatchResponse::success(id, out.command, out.data).with_inputs(out.inputs)
 		}
 		Err(e) => {
 			let err = e.to_command_error();
-			BatchResponse::error(id, cmd_str, &err.code.to_string(), &err.message)
+			BatchResponse::error(id, command_name(cmd_id), &err.code.to_string(), &err.message)
 		}
 	}
 }

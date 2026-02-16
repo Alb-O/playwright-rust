@@ -52,7 +52,7 @@ pub struct EvalResolved {
 pub struct EvalCommand;
 
 impl CommandDef for EvalCommand {
-	const NAME: &'static str = "eval";
+	const NAME: &'static str = "page.eval";
 
 	type Raw = EvalRaw;
 	type Resolved = EvalResolved;

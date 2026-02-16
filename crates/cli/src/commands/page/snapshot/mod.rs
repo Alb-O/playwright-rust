@@ -89,7 +89,7 @@ pub struct SnapshotResolved {
 pub struct SnapshotCommand;
 
 impl CommandDef for SnapshotCommand {
-	const NAME: &'static str = "snapshot";
+	const NAME: &'static str = "page.snapshot";
 
 	type Raw = SnapshotRaw;
 	type Resolved = SnapshotResolved;

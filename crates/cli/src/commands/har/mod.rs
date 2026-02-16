@@ -28,7 +28,7 @@ pub struct HarSetResolved {
 pub struct HarSetCommand;
 
 impl CommandDef for HarSetCommand {
-	const NAME: &'static str = "har set";
+	const NAME: &'static str = "har.set";
 
 	type Raw = HarSetRaw;
 	type Resolved = HarSetResolved;
@@ -85,7 +85,7 @@ pub struct HarShowResolved;
 pub struct HarShowCommand;
 
 impl CommandDef for HarShowCommand {
-	const NAME: &'static str = "har show";
+	const NAME: &'static str = "har.show";
 
 	type Raw = HarShowRaw;
 	type Resolved = HarShowResolved;
@@ -125,7 +125,7 @@ pub struct HarClearResolved;
 pub struct HarClearCommand;
 
 impl CommandDef for HarClearCommand {
-	const NAME: &'static str = "har clear";
+	const NAME: &'static str = "har.clear";
 
 	type Raw = HarClearRaw;
 	type Resolved = HarClearResolved;

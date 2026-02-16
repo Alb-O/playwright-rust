@@ -1585,6 +1585,7 @@ dependencies = [
  "jsonrpsee",
  "pw-protocol",
  "pw-rs",
+ "pw-runtime",
  "regex-lite",
  "reqwest",
  "serde",

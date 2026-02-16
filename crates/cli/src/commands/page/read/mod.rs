@@ -72,7 +72,7 @@ pub struct ReadResolved {
 pub struct ReadCommand;
 
 impl CommandDef for ReadCommand {
-	const NAME: &'static str = "read";
+	const NAME: &'static str = "page.read";
 
 	type Raw = ReadRaw;
 	type Resolved = ReadResolved;

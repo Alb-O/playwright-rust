@@ -91,7 +91,7 @@ pub struct CoordsAllData {
 pub struct CoordsCommand;
 
 impl CommandDef for CoordsCommand {
-	const NAME: &'static str = "coords";
+	const NAME: &'static str = "page.coords";
 
 	type Raw = CoordsRaw;
 	type Resolved = CoordsResolved;
@@ -160,7 +160,7 @@ impl CommandDef for CoordsCommand {
 pub struct CoordsAllCommand;
 
 impl CommandDef for CoordsAllCommand {
-	const NAME: &'static str = "coords-all";
+	const NAME: &'static str = "page.coords-all";
 
 	type Raw = CoordsAllRaw;
 	type Resolved = CoordsAllResolved;

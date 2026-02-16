@@ -71,7 +71,7 @@ pub struct ElementsResolved {
 pub struct ElementsCommand;
 
 impl CommandDef for ElementsCommand {
-	const NAME: &'static str = "elements";
+	const NAME: &'static str = "page.elements";
 
 	type Raw = ElementsRaw;
 	type Resolved = ElementsResolved;

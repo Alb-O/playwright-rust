@@ -63,7 +63,7 @@ impl Resolve for LoginRaw {
 pub struct LoginCommand;
 
 impl CommandDef for LoginCommand {
-	const NAME: &'static str = "auth login";
+	const NAME: &'static str = "auth.login";
 	const INTERACTIVE_ONLY: bool = true;
 
 	type Raw = LoginRaw;
@@ -137,7 +137,7 @@ impl Resolve for CookiesRaw {
 pub struct CookiesCommand;
 
 impl CommandDef for CookiesCommand {
-	const NAME: &'static str = "auth cookies";
+	const NAME: &'static str = "auth.cookies";
 
 	type Raw = CookiesRaw;
 	type Resolved = CookiesResolved;
@@ -186,7 +186,7 @@ pub struct ShowResolved {
 pub struct ShowCommand;
 
 impl CommandDef for ShowCommand {
-	const NAME: &'static str = "auth show";
+	const NAME: &'static str = "auth.show";
 
 	type Raw = ShowRaw;
 	type Resolved = ShowResolved;
@@ -241,7 +241,7 @@ pub struct ListenResolved {
 pub struct ListenCommand;
 
 impl CommandDef for ListenCommand {
-	const NAME: &'static str = "auth listen";
+	const NAME: &'static str = "auth.listen";
 	const INTERACTIVE_ONLY: bool = true;
 
 	type Raw = ListenRaw;

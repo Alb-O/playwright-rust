@@ -73,7 +73,7 @@ fn batch_rejects_auth_login_as_interactive() {
 	clear_context_store();
 
 	let (success, stdout, stderr) = run_pw_batch(&[
-		r#"{"id":"1","command":"auth.login","args":{"url":"https://example.com"}}"#,
+		r#"{"id":"1","command":"auth-login","args":{"url":"https://example.com"}}"#,
 		r#"{"id":"2","command":"quit","args":{}}"#,
 	]);
 
@@ -86,4 +86,20 @@ fn batch_rejects_auth_login_as_interactive() {
 	assert_eq!(first["ok"], false);
 	assert_eq!(first["command"], "auth.login");
 	assert_eq!(first["error"]["code"], "UNSUPPORTED_MODE");
+}
+
+#[test]
+fn batch_alias_response_uses_canonical_command_name() {
+	clear_context_store();
+
+	let (success, stdout, stderr) = run_pw_batch(&[r#"{"id":"1","command":"har-show","args":{}}"#, r#"{"id":"2","command":"quit","args":{}}"#]);
+
+	assert!(success, "batch run failed: {stderr}");
+	let lines = parse_ndjson(&stdout);
+	assert!(lines.len() >= 2, "expected at least two response lines, got: {stdout}");
+
+	let first = &lines[0];
+	assert_eq!(first["id"], "1");
+	assert_eq!(first["ok"], true);
+	assert_eq!(first["command"], "har.show");
 }

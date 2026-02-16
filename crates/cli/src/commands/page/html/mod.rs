@@ -58,7 +58,7 @@ pub struct HtmlData {
 pub struct HtmlCommand;
 
 impl CommandDef for HtmlCommand {
-	const NAME: &'static str = "html";
+	const NAME: &'static str = "page.html";
 
 	type Raw = HtmlRaw;
 	type Resolved = HtmlResolved;

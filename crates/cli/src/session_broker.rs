@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use pw_rs::{StorageState, WaitUntil};
+use pw_runtime::pid_is_alive;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -16,9 +17,16 @@ use crate::types::BrowserKind;
 use crate::workspace::ensure_state_gitignore_for;
 
 const DRIVER_HASH: &str = env!("CARGO_PKG_VERSION");
+const SESSION_DESCRIPTOR_SCHEMA_VERSION: u32 = 1;
+
+fn session_descriptor_schema_version() -> u32 {
+	SESSION_DESCRIPTOR_SCHEMA_VERSION
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SessionDescriptor {
+	#[serde(default = "session_descriptor_schema_version")]
+	pub(crate) schema_version: u32,
 	pub(crate) pid: u32,
 	pub(crate) browser: BrowserKind,
 	pub(crate) headless: bool,
@@ -39,7 +47,20 @@ impl SessionDescriptor {
 			Err(err) => return Err(PwError::Io(err)),
 		};
 
-		let parsed: Self = serde_json::from_str(&content)?;
+		let value: serde_json::Value = serde_json::from_str(&content)?;
+		let schema_version = value.get("schema_version").and_then(|v| v.as_u64()).unwrap_or(0);
+		if schema_version == 0 {
+			debug!(target = "pw.session", path = %path.display(), "removing v0 session descriptor without schema_version");
+			let _ = fs::remove_file(path);
+			return Ok(None);
+		}
+		if schema_version != SESSION_DESCRIPTOR_SCHEMA_VERSION as u64 {
+			return Err(PwError::Context(format!(
+				"unsupported session descriptor schema_version {schema_version} (expected {SESSION_DESCRIPTOR_SCHEMA_VERSION})"
+			)));
+		}
+
+		let parsed: Self = serde_json::from_value(value)?;
 		Ok(Some(parsed))
 	}
 
@@ -48,7 +69,9 @@ impl SessionDescriptor {
 		if let Some(parent) = path.parent() {
 			fs::create_dir_all(parent)?;
 		}
-		let content = serde_json::to_string_pretty(self)?;
+		let mut normalized = self.clone();
+		normalized.schema_version = SESSION_DESCRIPTOR_SCHEMA_VERSION;
+		let content = serde_json::to_string_pretty(&normalized)?;
 		fs::write(path, content)?;
 		Ok(())
 	}
@@ -90,60 +113,6 @@ impl SessionDescriptor {
 
 fn now_ts() -> u64 {
 	std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
-}
-
-fn pid_is_alive(pid: u32) -> bool {
-	#[cfg(unix)]
-	{
-		if pid == 0 {
-			return false;
-		}
-
-		if PathBuf::from("/proc").join(pid.to_string()).exists() {
-			return true;
-		}
-
-		std::process::Command::new("kill")
-			.arg("-0")
-			.arg(pid.to_string())
-			.status()
-			.map(|status| status.success())
-			.unwrap_or(pid == std::process::id())
-	}
-
-	#[cfg(windows)]
-	{
-		let filter = format!("PID eq {pid}");
-		if let Ok(output) = std::process::Command::new("tasklist").args(["/FI", &filter, "/FO", "CSV", "/NH"]).output() {
-			if output.status.success() {
-				let stdout = String::from_utf8_lossy(&output.stdout);
-				return tasklist_has_pid(stdout.as_ref(), pid);
-			}
-		}
-
-		return pid == std::process::id();
-	}
-
-	#[cfg(not(any(unix, windows)))]
-	{
-		pid == std::process::id()
-	}
-}
-
-#[cfg(any(test, windows))]
-fn tasklist_has_pid(output: &str, pid: u32) -> bool {
-	let pid_str = pid.to_string();
-	output.lines().any(|line| {
-		let line = line.trim();
-		if !line.starts_with('"') {
-			return false;
-		}
-
-		line.trim_matches('"')
-			.split("\",\"")
-			.nth(1)
-			.is_some_and(|field| field.trim() == pid_str.as_str())
-	})
 }
 
 /// Request for a browser session; future reuse/daemon logic will live here.
@@ -403,6 +372,7 @@ impl<'a> SessionBroker<'a> {
 			// Prefer CDP endpoint if available, otherwise use ws_endpoint
 			if cdp.is_some() || ws.is_some() {
 				let descriptor = SessionDescriptor {
+					schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
 					pid: std::process::id(),
 					browser: request.browser,
 					headless: request.headless,
@@ -579,6 +549,7 @@ mod tests {
 		let path = dir.path().join("session.json");
 
 		let desc = SessionDescriptor {
+			schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
 			pid: std::process::id(),
 			browser: BrowserKind::Chromium,
 			headless: true,
@@ -626,6 +597,7 @@ mod tests {
 			.join("session.json");
 
 		let desc = SessionDescriptor {
+			schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
 			pid: std::process::id(),
 			browser: BrowserKind::Chromium,
 			headless: true,
@@ -647,6 +619,7 @@ mod tests {
 	#[test]
 	fn descriptor_mismatch_when_endpoint_differs() {
 		let desc = SessionDescriptor {
+			schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
 			pid: std::process::id(),
 			browser: BrowserKind::Chromium,
 			headless: true,
@@ -681,6 +654,7 @@ mod tests {
 	#[test]
 	fn descriptor_invalidated_by_driver_hash_change() {
 		let desc = SessionDescriptor {
+			schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
 			pid: std::process::id(),
 			browser: BrowserKind::Chromium,
 			headless: true,
@@ -729,27 +703,54 @@ mod tests {
 	}
 
 	#[test]
-	fn tasklist_has_pid_matches_csv_line() {
-		let output = "\"chrome.exe\",\"1234\",\"Console\",\"1\",\"250,000 K\"\r\n";
-		assert!(tasklist_has_pid(output, 1234));
-		assert!(!tasklist_has_pid(output, 9999));
+	fn descriptor_without_schema_version_is_removed() {
+		let dir = tempdir().unwrap();
+		let path = dir.path().join("session.json");
+		let descriptor = SessionDescriptor {
+			schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
+			pid: std::process::id(),
+			browser: BrowserKind::Chromium,
+			headless: true,
+			cdp_endpoint: Some("ws://localhost:1234".into()),
+			ws_endpoint: Some("ws://localhost:1234".into()),
+			workspace_id: Some("ws".into()),
+			namespace: Some("default".into()),
+			session_key: Some("ws:default:chromium:headless".into()),
+			driver_hash: Some(DRIVER_HASH.to_string()),
+			created_at: 123,
+		};
+		let mut value = serde_json::to_value(descriptor).unwrap();
+		value.as_object_mut().unwrap().remove("schema_version");
+		std::fs::write(&path, serde_json::to_string(&value).unwrap()).unwrap();
+
+		let loaded = SessionDescriptor::load(&path).unwrap();
+		assert!(loaded.is_none());
+		assert!(!path.exists());
 	}
 
 	#[test]
-	fn tasklist_has_pid_ignores_non_csv_lines() {
-		let output = "INFO: No tasks are running which match the specified criteria.\r\n";
-		assert!(!tasklist_has_pid(output, 1234));
-	}
+	fn descriptor_with_unknown_schema_version_errors() {
+		let dir = tempdir().unwrap();
+		let path = dir.path().join("session.json");
+		let descriptor = SessionDescriptor {
+			schema_version: 99,
+			pid: std::process::id(),
+			browser: BrowserKind::Chromium,
+			headless: true,
+			cdp_endpoint: Some("ws://localhost:1234".into()),
+			ws_endpoint: Some("ws://localhost:1234".into()),
+			workspace_id: Some("ws".into()),
+			namespace: Some("default".into()),
+			session_key: Some("ws:default:chromium:headless".into()),
+			driver_hash: Some(DRIVER_HASH.to_string()),
+			created_at: 123,
+		};
+		std::fs::write(&path, serde_json::to_string(&descriptor).unwrap()).unwrap();
 
-	#[cfg(unix)]
-	#[test]
-	fn pid_is_alive_accepts_current_process_on_unix() {
-		assert!(pid_is_alive(std::process::id()));
-	}
-
-	#[cfg(unix)]
-	#[test]
-	fn pid_zero_is_never_alive() {
-		assert!(!pid_is_alive(0));
+		let err = SessionDescriptor::load(&path).unwrap_err();
+		assert!(
+			err.to_string().contains("unsupported session descriptor schema_version"),
+			"unexpected error: {err}"
+		);
 	}
 }

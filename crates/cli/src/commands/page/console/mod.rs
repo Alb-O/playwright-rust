@@ -70,7 +70,7 @@ pub struct ConsoleData {
 pub struct ConsoleCommand;
 
 impl CommandDef for ConsoleCommand {
-	const NAME: &'static str = "console";
+	const NAME: &'static str = "page.console";
 
 	type Raw = ConsoleRaw;
 	type Resolved = ConsoleResolved;

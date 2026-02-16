@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::net::TcpListener as StdTcpListener;
 use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow};
@@ -7,6 +6,7 @@ use jsonrpsee::core::{RpcResult, async_trait};
 use jsonrpsee::server::ServerBuilder;
 use jsonrpsee::types::error::ErrorObjectOwned;
 use pw_rs::{LaunchOptions, Playwright};
+use pw_runtime::port_available;
 use serde_json::json;
 use tokio::sync::{Mutex, oneshot, watch};
 use tracing::{debug, info, warn};
@@ -330,10 +330,6 @@ async fn shutdown_daemon_state(state: &Arc<Mutex<DaemonState>>) {
 
 fn rpc_error(code: &str, rpc_code: i32, err: anyhow::Error) -> ErrorObjectOwned {
 	ErrorObjectOwned::owned(rpc_code, err.to_string(), Some(json!({ "code": code })))
-}
-
-fn port_available(port: u16) -> bool {
-	StdTcpListener::bind(("127.0.0.1", port)).is_ok()
 }
 
 fn now_ts() -> u64 {

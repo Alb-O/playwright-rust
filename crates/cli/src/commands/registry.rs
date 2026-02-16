@@ -183,9 +183,9 @@ mod tests {
 	fn command_name_returns_primary() {
 		assert_eq!(command_name(CommandId::Navigate), "navigate");
 		assert_eq!(command_name(CommandId::Screenshot), "screenshot");
-		assert_eq!(command_name(CommandId::PageText), "text");
+		assert_eq!(command_name(CommandId::PageText), "page.text");
 		assert_eq!(command_name(CommandId::Connect), "connect");
-		assert_eq!(command_name(CommandId::SessionStatus), "session status");
-		assert_eq!(command_name(CommandId::HarShow), "har show");
+		assert_eq!(command_name(CommandId::SessionStatus), "session.status");
+		assert_eq!(command_name(CommandId::HarShow), "har.show");
 	}
 }

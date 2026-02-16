@@ -21,7 +21,7 @@ use serde_json::Value;
 /// # Protocol Flow
 ///
 /// When `initialize()` is called:
-	/// 1. Sends `initialize` message (currently with `sdkLanguage: "python"`)
+/// 1. Sends `initialize` message (currently with `sdkLanguage: "python"`)
 /// 2. Server creates BrowserType objects (sends `__create__` messages)
 /// 3. Server creates Playwright object (sends `__create__` message)
 /// 4. Server responds with Playwright GUID: `{ "playwright": { "guid": "..." } }`

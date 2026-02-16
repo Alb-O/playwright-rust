@@ -23,7 +23,7 @@ pub struct SessionStatusResolved;
 pub struct SessionStatusCommand;
 
 impl CommandDef for SessionStatusCommand {
-	const NAME: &'static str = "session status";
+	const NAME: &'static str = "session.status";
 
 	type Raw = SessionStatusRaw;
 	type Resolved = SessionStatusResolved;
@@ -45,6 +45,7 @@ impl CommandDef for SessionStatusCommand {
 						json!({
 							"active": true,
 							"path": path,
+							"schema_version": desc.schema_version,
 							"browser": desc.browser,
 							"headless": desc.headless,
 							"cdp_endpoint": desc.cdp_endpoint,
@@ -88,7 +89,7 @@ pub struct SessionClearResolved;
 pub struct SessionClearCommand;
 
 impl CommandDef for SessionClearCommand {
-	const NAME: &'static str = "session clear";
+	const NAME: &'static str = "session.clear";
 
 	type Raw = SessionClearRaw;
 	type Resolved = SessionClearResolved;
@@ -150,7 +151,7 @@ pub struct SessionStartResolved {
 pub struct SessionStartCommand;
 
 impl CommandDef for SessionStartCommand {
-	const NAME: &'static str = "session start";
+	const NAME: &'static str = "session.start";
 
 	type Raw = SessionStartRaw;
 	type Resolved = SessionStartResolved;
@@ -220,7 +221,7 @@ pub struct SessionStopResolved;
 pub struct SessionStopCommand;
 
 impl CommandDef for SessionStopCommand {
-	const NAME: &'static str = "session stop";
+	const NAME: &'static str = "session.stop";
 
 	type Raw = SessionStopRaw;
 	type Resolved = SessionStopResolved;

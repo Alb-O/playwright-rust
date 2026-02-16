@@ -38,7 +38,7 @@ pub struct DaemonStartResolved {
 pub struct DaemonStartCommand;
 
 impl CommandDef for DaemonStartCommand {
-	const NAME: &'static str = "daemon start";
+	const NAME: &'static str = "daemon.start";
 
 	type Raw = DaemonStartRaw;
 	type Resolved = DaemonStartResolved;
@@ -47,7 +47,7 @@ impl CommandDef for DaemonStartCommand {
 	fn validate_mode(raw: &Self::Raw, mode: ExecMode) -> Result<()> {
 		if mode == ExecMode::Batch && raw.foreground {
 			return Err(PwError::UnsupportedMode(
-				"command 'daemon start' with --foreground is not available in batch/ndjson mode".to_string(),
+				"command 'daemon.start' with --foreground is not available in batch/ndjson mode".to_string(),
 			));
 		}
 		Ok(())
@@ -187,7 +187,7 @@ pub struct DaemonStopResolved;
 pub struct DaemonStopCommand;
 
 impl CommandDef for DaemonStopCommand {
-	const NAME: &'static str = "daemon stop";
+	const NAME: &'static str = "daemon.stop";
 
 	type Raw = DaemonStopRaw;
 	type Resolved = DaemonStopResolved;
@@ -235,7 +235,7 @@ pub struct DaemonStatusResolved;
 pub struct DaemonStatusCommand;
 
 impl CommandDef for DaemonStatusCommand {
-	const NAME: &'static str = "daemon status";
+	const NAME: &'static str = "daemon.status";
 
 	type Raw = DaemonStatusRaw;
 	type Resolved = DaemonStatusResolved;

@@ -7,6 +7,7 @@ pub(crate) mod dispatch;
 pub(crate) mod fill;
 mod har;
 pub mod init;
+pub(crate) mod invocation;
 pub(crate) mod navigate;
 pub(crate) mod page;
 mod protect;
@@ -76,10 +77,10 @@ async fn dispatch_command<'ctx>(
 		cmd => cmd,
 	};
 
-	if let Some((id, args)) = command.into_registry_args() {
-		return dispatch::dispatch_registry_command(id, args, ExecMode::Cli, ctx, ctx_state, broker, format, artifacts_dir).await;
+	let name = format!("{command:?}");
+	if let Some(invoke) = invocation::from_cli_command(command)? {
+		return dispatch::dispatch_registry_command(invoke.id, invoke.args, ExecMode::Cli, ctx, ctx_state, broker, format, artifacts_dir).await;
 	}
 
-	let name = format!("{command:?}");
 	Err(PwError::Context(format!("command is not registered for unified dispatch: {name}")))
 }

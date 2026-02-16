@@ -238,30 +238,34 @@ fn parse_har_clear_command() {
 }
 
 #[test]
-fn into_registry_args_maps_connect() {
+fn invocation_maps_connect() {
 	let args = vec!["pw", "connect", "--launch", "--port", "9555"];
 	let cli = Cli::try_parse_from(args).unwrap();
-	let (id, json) = cli.command.into_registry_args().expect("connect should map");
-	assert_eq!(id, crate::commands::registry::CommandId::Connect);
-	assert_eq!(json["launch"], serde_json::Value::Bool(true));
-	assert_eq!(json["port"], serde_json::Value::Number(9555u64.into()));
+	let invoke = crate::commands::invocation::from_cli_command(cli.command).unwrap().expect("connect should map");
+	assert_eq!(invoke.id, crate::commands::registry::CommandId::Connect);
+	assert_eq!(invoke.args["launch"], serde_json::Value::Bool(true));
+	assert_eq!(invoke.args["port"], serde_json::Value::Number(9555u64.into()));
 }
 
 #[test]
-fn into_registry_args_maps_auth_login() {
+fn invocation_maps_auth_login() {
 	let args = vec!["pw", "auth", "login", "https://example.com", "--timeout", "30"];
 	let cli = Cli::try_parse_from(args).unwrap();
-	let (id, json) = cli.command.into_registry_args().expect("auth login should map");
-	assert_eq!(id, crate::commands::registry::CommandId::AuthLogin);
-	assert_eq!(json["url"], serde_json::Value::String("https://example.com".to_string()));
-	assert_eq!(json["timeoutSecs"], serde_json::Value::Number(30u64.into()));
+	let invoke = crate::commands::invocation::from_cli_command(cli.command)
+		.unwrap()
+		.expect("auth login should map");
+	assert_eq!(invoke.id, crate::commands::registry::CommandId::AuthLogin);
+	assert_eq!(invoke.args["url"], serde_json::Value::String("https://example.com".to_string()));
+	assert_eq!(invoke.args["timeoutSecs"], serde_json::Value::Number(30u64.into()));
 }
 
 #[test]
-fn into_registry_args_maps_session_start() {
+fn invocation_maps_session_start() {
 	let args = vec!["pw", "session", "start", "--headful"];
 	let cli = Cli::try_parse_from(args).unwrap();
-	let (id, json) = cli.command.into_registry_args().expect("session start should map");
-	assert_eq!(id, crate::commands::registry::CommandId::SessionStart);
-	assert_eq!(json["headful"], serde_json::Value::Bool(true));
+	let invoke = crate::commands::invocation::from_cli_command(cli.command)
+		.unwrap()
+		.expect("session start should map");
+	assert_eq!(invoke.id, crate::commands::registry::CommandId::SessionStart);
+	assert_eq!(invoke.args["headful"], serde_json::Value::Bool(true));
 }

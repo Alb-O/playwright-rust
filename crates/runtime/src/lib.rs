@@ -41,6 +41,7 @@ pub mod connection;
 pub mod driver;
 pub mod error;
 pub mod playwright_server;
+pub mod process;
 pub mod transport;
 
 // Re-export key types at crate root
@@ -50,6 +51,7 @@ pub use connection::{AsyncChannelOwnerResult, Connection, ConnectionLike, Event,
 pub use driver::{TestRunnerPaths, get_driver_executable, get_test_runner_paths};
 pub use error::{Error, Result};
 pub use playwright_server::PlaywrightServer;
+pub use process::{pid_is_alive, port_available};
 pub use transport::{
 	PipeTransport, PipeTransportReceiver, PipeTransportSender, Transport, TransportParts, TransportReceiver, WebSocketTransport, WebSocketTransportReceiver,
 	WebSocketTransportSender,

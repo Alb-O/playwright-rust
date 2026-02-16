@@ -46,7 +46,7 @@ pub struct TextResolved {
 pub struct TextCommand;
 
 impl CommandDef for TextCommand {
-	const NAME: &'static str = "text";
+	const NAME: &'static str = "page.text";
 
 	type Raw = TextRaw;
 	type Resolved = TextResolved;
