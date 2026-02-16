@@ -51,9 +51,9 @@ macro_rules! command_registry {
 		/// Run a command by `CommandId`, returning a type-erased outcome.
 		///
 		/// This function is the *only* place that:
-		/// - deserializes `Raw`
-		/// - calls `resolve(...)`
-		/// - awaits `execute(...)`
+		/// * deserializes `Raw`
+		/// * calls `resolve(...)`
+		/// * awaits `execute(...)`
 		pub async fn run_command(
 			id: CommandId,
 			args: serde_json::Value,

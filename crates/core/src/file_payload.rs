@@ -1,8 +1,9 @@
-// FilePayload protocol type
-//
-// Represents a file to be uploaded with explicit name, MIME type, and buffer.
-//
-// See: https://playwright.dev/docs/api/class-locator#locator-set-input-files
+//! File upload payload type.
+//!
+//! [`FilePayload`] provides explicit filename, MIME type, and binary data for
+//! advanced `set_input_files` workflows.
+//!
+//! Use this when raw bytes are provided directly rather than filesystem paths.
 
 /// FilePayload represents a file for advanced file uploads.
 ///

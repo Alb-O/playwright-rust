@@ -1,6 +1,9 @@
-// Click options and related types
-//
-// Provides configuration for click and dblclick actions, matching Playwright's API.
+//! Click-related protocol option types.
+//!
+//! This module contains shared enums and structs for click actions, including
+//! mouse buttons, keyboard modifiers, and coordinate positions.
+//!
+//! These types are reused across click and general action-option builders.
 
 use serde::Serialize;
 

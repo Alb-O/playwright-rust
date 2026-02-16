@@ -1,10 +1,10 @@
-// Copyright 2024 Paul Adamson
-// Licensed under the Apache License, Version 2.0
-//
-// Download protocol object
-//
-// Represents a file download triggered by the page.
-// Downloads are dispatched via page.on('download') events.
+//! Download abstraction built on the Artifact protocol object.
+//!
+//! [`Download`] combines event metadata (URL and suggested filename) with
+//! low-level artifact operations for save/delete/failure queries.
+//!
+//! Downloads originate from page download events and are scoped to context
+//! lifetime.
 
 use std::path::PathBuf;
 use std::sync::Arc;

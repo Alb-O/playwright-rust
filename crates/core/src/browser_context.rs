@@ -1,8 +1,10 @@
-// BrowserContext protocol object
-//
-// Represents an isolated browser context (session) within a browser instance.
-// Multiple contexts can exist in a single browser, each with its own cookies,
-// cache, and local storage.
+//! Browser context protocol object and related option types.
+//!
+//! Browser contexts isolate cookies, storage, permissions, and routing within a
+//! single browser instance.
+//!
+//! This module also defines HAR routing options, viewport/geolocation structs,
+//! and storage state helpers used when creating or managing contexts.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -177,8 +179,8 @@ impl BrowserContext {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Context has been closed
-	/// - Communication with browser process fails
+	/// * Context has been closed
+	/// * Communication with browser process fails
 	///
 	/// See: <https://playwright.dev/docs/api/class-browsercontext#browser-context-new-page>
 	pub async fn new_page(&self) -> Result<Page> {
@@ -216,8 +218,8 @@ impl BrowserContext {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Context has already been closed
-	/// - Communication with browser process fails
+	/// * Context has already been closed
+	/// * Communication with browser process fails
 	///
 	/// See: <https://playwright.dev/docs/api/class-browsercontext#browser-context-close>
 	pub async fn close(&self) -> Result<()> {
@@ -252,9 +254,9 @@ impl BrowserContext {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Context has been closed
-	/// - Cookie specification is invalid (missing both domain and url)
-	/// - Communication with browser process fails
+	/// * Context has been closed
+	/// * Cookie specification is invalid (missing both domain and url)
+	/// * Communication with browser process fails
 	///
 	/// See: <https://playwright.dev/docs/api/class-browsercontext#browser-context-add-cookies>
 	pub async fn add_cookies(&self, cookies: Vec<Cookie>) -> Result<()> {
@@ -283,8 +285,8 @@ impl BrowserContext {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Context has been closed
-	/// - Communication with browser process fails
+	/// * Context has been closed
+	/// * Communication with browser process fails
 	///
 	/// See: <https://playwright.dev/docs/api/class-browsercontext#browser-context-cookies>
 	pub async fn cookies(&self, urls: Option<Vec<&str>>) -> Result<Vec<Cookie>> {
@@ -333,8 +335,8 @@ impl BrowserContext {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Context has been closed
-	/// - Communication with browser process fails
+	/// * Context has been closed
+	/// * Communication with browser process fails
 	///
 	/// See: <https://playwright.dev/docs/api/class-browsercontext#browser-context-clear-cookies>
 	pub async fn clear_cookies(&self, options: Option<ClearCookiesOptions>) -> Result<()> {
@@ -376,9 +378,9 @@ impl BrowserContext {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Context has been closed
-	/// - Communication with browser process fails
-	/// - File write fails (if path is specified)
+	/// * Context has been closed
+	/// * Communication with browser process fails
+	/// * File write fails (if path is specified)
 	///
 	/// See: <https://playwright.dev/docs/api/class-browsercontext#browser-context-storage-state>
 	pub async fn storage_state(&self, options: Option<StorageStateOptions>) -> Result<StorageState> {

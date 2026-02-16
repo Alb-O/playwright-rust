@@ -6,11 +6,11 @@ use clap::builder::styling::AnsiColor;
 /// Returns clap Styles configured to match cargo's help output colors.
 ///
 /// Styling breakdown:
-/// - Headers (like "Usage:", "Arguments:", "Options:"): Green + Bold
-/// - Usage text: Green + Bold
-/// - Literals (actual command text): Cyan
-/// - Placeholders (like <FILE>, <NUM>): Cyan
-/// - Valid values: Cyan
+/// * Headers (like "Usage:", "Arguments:", "Options:"): Green + Bold
+/// * Usage text: Green + Bold
+/// * Literals (actual command text): Cyan
+/// * Placeholders (like <FILE>, <NUM>): Cyan
+/// * Valid values: Cyan
 pub fn cli_styles() -> Styles {
 	Styles::styled()
 		.header(AnsiColor::Green.on_default().bold())

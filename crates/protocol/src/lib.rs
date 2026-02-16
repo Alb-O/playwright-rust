@@ -7,11 +7,11 @@
 //! # Design Philosophy
 //!
 //! Types in this crate are:
-//! - **Pure data**: No behavior beyond serialization/deserialization
-//! - **1:1 with protocol**: Match Playwright's protocol.yml schema
-//! - **Stable**: Changes only when the wire protocol changes
+//! * Pure data: No behavior beyond serialization/deserialization
+//! * 1:1 with protocol: Match Playwright's protocol.yml schema
+//! * Stable: Changes only when the wire protocol changes
 //!
-//! Higher-level ergonomic APIs are built on top of these types in `pw-api`.
+//! Higher-level ergonomic APIs are built on top of these types in `pw-rs`.
 
 pub mod auth_exchange;
 pub mod cookie;

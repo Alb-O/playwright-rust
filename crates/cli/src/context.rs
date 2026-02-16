@@ -36,9 +36,9 @@ impl HarConfig {
 /// Configuration for request blocking via [`Page::route`].
 ///
 /// Patterns use glob syntax matching against full URLs:
-/// - `**/*.png` - block all PNG images
-/// - `*://ads.*/**` - block ad domains
-/// - `*://google-analytics.com/**` - block analytics
+/// * `**/*.png` - block all PNG images
+/// * `*://ads.*/**` - block ad domains
+/// * `*://google-analytics.com/**` - block analytics
 ///
 /// [`Page::route`]: pw_rs::Page::route
 #[derive(Debug, Clone, Default)]

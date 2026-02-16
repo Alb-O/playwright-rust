@@ -1,16 +1,10 @@
-// Copyright 2024 Paul Adamson
-// Licensed under the Apache License, Version 2.0
-//
-// Object Factory - Creates protocol objects from type names
-//
-// Architecture Reference:
-// - Python: playwright-python/playwright/_impl/_connection.py (_create_remote_object)
-// - Java: playwright-java/.../impl/Connection.java (createRemoteObject)
-// - JavaScript: playwright/.../client/connection.ts (_createRemoteObject)
-//
-// The object factory maps protocol type names (strings) to Rust constructors.
-// When the server sends a `__create__` message, the factory instantiates
-// the appropriate Rust object based on the type name.
+//! Protocol object factory.
+//!
+//! This module maps Playwright `__create__` events to concrete Rust channel
+//! owner types and enforces parent/child invariants for object construction.
+//!
+//! Unknown protocol types are handled defensively to keep the connection loop
+//! forward-compatible.
 
 use std::sync::Arc;
 

@@ -1,9 +1,10 @@
-// Route protocol object
-//
-// Represents a route handler for network interception.
-// Routes are created when page.route() matches a request.
-//
-// See: https://playwright.dev/docs/api/class-route
+//! Route protocol object for network interception.
+//!
+//! [`Route`] exposes abort/continue/fulfill control over intercepted requests
+//! and ties each route back to its originating [`crate::Request`].
+//!
+//! The module also defines typed option builders for continuation and fulfill
+//! payloads.
 
 use std::sync::Arc;
 
@@ -70,15 +71,15 @@ impl Route {
 	/// * `error_code` - Optional error code (default: "failed")
 	///
 	/// Available error codes:
-	/// - "aborted" - User-initiated cancellation
-	/// - "accessdenied" - Permission denied
-	/// - "addressunreachable" - Host unreachable
-	/// - "blockedbyclient" - Client blocked request
-	/// - "connectionaborted", "connectionclosed", "connectionfailed", "connectionrefused", "connectionreset"
-	/// - "internetdisconnected"
-	/// - "namenotresolved"
-	/// - "timedout"
-	/// - "failed" - Generic error (default)
+	/// * "aborted" - User-initiated cancellation
+	/// * "accessdenied" - Permission denied
+	/// * "addressunreachable" - Host unreachable
+	/// * "blockedbyclient" - Client blocked request
+	/// * "connectionaborted", "connectionclosed", "connectionfailed", "connectionrefused", "connectionreset"
+	/// * "internetdisconnected"
+	/// * "namenotresolved"
+	/// * "timedout"
+	/// * "failed" - Generic error (default)
 	///
 	/// See: <https://playwright.dev/docs/api/class-route#route-abort>
 	pub async fn abort(&self, error_code: Option<&str>) -> Result<()> {
@@ -146,16 +147,16 @@ impl Route {
 	/// but the response body is not transmitted to the browser JavaScript layer. This applies
 	/// to ALL request types (main document, fetch, XHR, etc.), not just document navigation.
 	///
-	/// **Investigation Findings:**
-	/// - The protocol message is correctly formatted and accepted by the Playwright server
-	/// - The body bytes are present in the fulfill() call
-	/// - The Playwright server creates a Response object
-	/// - But the body content does not reach the browser's fetch/network API
+	/// Investigation findings:
+	/// * The protocol message is correctly formatted and accepted by the Playwright server
+	/// * The body bytes are present in the fulfill() call
+	/// * The Playwright server creates a Response object
+	/// * But the body content does not reach the browser's fetch/network API
 	///
 	/// This appears to be a limitation or bug in the Playwright server implementation.
-	/// Tested with versions 1.49.0 and 1.56.1 (latest as of 2025-11-10).
+	/// Tested with versions 1.49.0 and 1.56.1.
 	///
-	/// TODO: Periodically test with newer Playwright versions for fix.
+	/// Revalidate behavior when upgrading Playwright versions.
 	/// Workaround: Mock responses at the HTTP server level rather than using network interception,
 	/// or wait for a newer Playwright version that supports response body fulfillment.
 	///

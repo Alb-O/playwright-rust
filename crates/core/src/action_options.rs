@@ -1,6 +1,10 @@
-// Action options for various Locator methods
-//
-// Provides configuration for fill, press, check, hover, and select actions.
+//! Action option types for frame/page/locator interactions.
+//!
+//! This module defines strongly typed option structs used by input and element
+//! actions, then serializes them into Playwright protocol JSON payloads.
+//!
+//! The types here keep defaults aligned with Playwright behavior, including the
+//! required timeout field for newer server versions.
 
 use super::click::{KeyboardModifier, Position};
 

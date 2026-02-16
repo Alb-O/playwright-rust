@@ -30,11 +30,11 @@ use crate::{Playwright, Root};
 /// # Errors
 ///
 /// Returns error if:
-/// - Initialize message fails to send
-/// - Server returns protocol error
-/// - Response is missing Playwright GUID
-/// - Playwright object not found in registry
-/// - Timeout after 30 seconds
+/// * Initialize message fails to send
+/// * Server returns protocol error
+/// * Response is missing Playwright GUID
+/// * Playwright object not found in registry
+/// * Timeout after 30 seconds
 pub async fn initialize_playwright(connection: &Arc<Connection>) -> Result<Arc<dyn ChannelOwner>> {
 	// Set the object factory before running
 	connection.set_factory(Arc::new(DefaultObjectFactory))?;

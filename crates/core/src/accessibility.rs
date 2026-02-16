@@ -1,6 +1,3 @@
-// Copyright 2024 Paul Adamson
-// Licensed under the Apache License, Version 2.0
-
 //! Accessibility tree inspection API.
 //!
 //! The Accessibility API allows capturing a snapshot of the page's accessibility tree,

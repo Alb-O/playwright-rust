@@ -1,6 +1,3 @@
-// Copyright 2024 Paul Adamson
-// Licensed under the Apache License, Version 2.0
-
 //! Video recording API for capturing page sessions.
 //!
 //! Videos are recorded when [`BrowserContextOptions::record_video_dir`] is set.

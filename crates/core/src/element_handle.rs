@@ -1,7 +1,9 @@
-// ElementHandle protocol object
-//
-// Represents a DOM element in the page. Supports element-specific operations like screenshots.
-// ElementHandles are created via query_selector methods and are protocol objects with GUIDs.
+//! ElementHandle protocol object.
+//!
+//! [`ElementHandle`] represents a concrete DOM node reference returned from
+//! selector queries and supports element-scoped operations.
+//!
+//! This module currently focuses on screenshot capture and protocol plumbing.
 
 use std::sync::Arc;
 

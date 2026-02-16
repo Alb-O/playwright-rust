@@ -6,9 +6,9 @@
 //!
 //! # Output Formats
 //!
-//! - **markdown** (default): Clean markdown suitable for LLMs
-//! - **text**: Plain text with whitespace normalized
-//! - **html**: Cleaned HTML with only content elements
+//! * markdown (default): Clean markdown suitable for LLMs
+//! * text: Plain text with whitespace normalized
+//! * html: Cleaned HTML with only content elements
 //!
 //! # Example
 //!

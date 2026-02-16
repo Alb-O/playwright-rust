@@ -1,6 +1,9 @@
-// Screenshot types and options
-//
-// Provides configuration for page and element screenshots, matching Playwright's API.
+//! Screenshot option and geometry data types.
+//!
+//! This module defines image format enums and clip/option structs shared by
+//! page and element screenshot APIs.
+//!
+//! Serialization matches Playwright's expected wire representation.
 
 use serde::Serialize;
 

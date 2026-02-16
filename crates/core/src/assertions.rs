@@ -1,8 +1,9 @@
-// Assertions - Auto-retry assertions for testing
-//
-// Provides expect() API with auto-retry logic matching Playwright's assertions.
-//
-// See: https://playwright.dev/docs/test-assertions
+//! Auto-retrying locator assertions (`expect` API).
+//!
+//! This module implements Playwright-style assertions for [`crate::Locator`],
+//! with configurable timeout and polling behavior.
+//!
+//! Assertions repeatedly evaluate conditions until they pass or timing expires.
 
 use std::time::Duration;
 

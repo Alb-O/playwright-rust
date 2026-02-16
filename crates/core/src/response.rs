@@ -1,8 +1,9 @@
-// Response protocol object
-//
-// Represents an HTTP response from navigation operations.
-// Response objects are created by the server when Frame.goto() or similar navigation
-// methods complete successfully.
+//! Response protocol object.
+//!
+//! [`ResponseObject`] represents network responses linked to requests and
+//! returned by navigation/reload flows.
+//!
+//! The struct is primarily a channel-owner wrapper for protocol identity.
 
 use std::sync::Arc;
 

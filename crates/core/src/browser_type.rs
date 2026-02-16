@@ -1,11 +1,9 @@
-// Copyright 2024 Paul Adamson
-// Licensed under the Apache License, Version 2.0
-//
-// BrowserType - Represents a browser type (Chromium, Firefox, WebKit)
-//
-// Reference:
-// - Python: playwright-python/playwright/_impl/_browser_type.py
-// - Protocol: protocol.yml (BrowserType interface)
+//! Browser engine entry points and launch/connect options.
+//!
+//! [`BrowserType`] models Chromium, Firefox, and WebKit factories exposed by
+//! [`crate::Playwright`], including launch and CDP connection workflows.
+//!
+//! The module also defines return types for server and CDP connection paths.
 
 use std::sync::Arc;
 
@@ -21,9 +19,9 @@ use crate::{Browser, BrowserContext, LaunchOptions};
 /// BrowserType represents a browser engine (Chromium, Firefox, or WebKit).
 ///
 /// Each Playwright instance provides three BrowserType objects accessible via:
-/// - `playwright.chromium()`
-/// - `playwright.firefox()`
-/// - `playwright.webkit()`
+/// * `playwright.chromium()`
+/// * `playwright.firefox()`
+/// * `playwright.webkit()`
 ///
 /// # Example
 ///
@@ -113,9 +111,9 @@ impl BrowserType {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Browser executable not found
-	/// - Launch timeout (default 30s)
-	/// - Browser process fails to start
+	/// * Browser executable not found
+	/// * Launch timeout (default 30s)
+	/// * Browser process fails to start
 	///
 	/// See: <https://playwright.dev/docs/api/class-browsertype#browser-type-launch>
 	pub async fn launch(&self) -> Result<Browser> {
@@ -131,10 +129,10 @@ impl BrowserType {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Browser executable not found
-	/// - Launch timeout
-	/// - Invalid options
-	/// - Browser process fails to start
+	/// * Browser executable not found
+	/// * Launch timeout
+	/// * Invalid options
+	/// * Browser process fails to start
 	///
 	/// See: <https://playwright.dev/docs/api/class-browsertype#browser-type-launch>
 	pub async fn launch_with_options(&self, options: LaunchOptions) -> Result<Browser> {

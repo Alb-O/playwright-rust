@@ -29,9 +29,9 @@ pub struct WorkspaceScope {
 impl WorkspaceScope {
 	/// Resolve workspace root + namespace from CLI values.
 	///
-	/// - `workspace`: explicit workspace path, or `"auto"` for detection.
-	/// - `namespace`: optional namespace; defaults to [`DEFAULT_NAMESPACE`].
-	/// - `no_project`: when true, skip playwright project-root detection.
+	/// * `workspace`: explicit workspace path, or `"auto"` for detection.
+	/// * `namespace`: optional namespace; defaults to [`DEFAULT_NAMESPACE`].
+	/// * `no_project`: when true, skip playwright project-root detection.
 	pub fn resolve(workspace: Option<&str>, namespace: Option<&str>, no_project: bool) -> Result<Self> {
 		let namespace = normalize_namespace(namespace.unwrap_or(DEFAULT_NAMESPACE));
 		let root = resolve_workspace_root(workspace, no_project)?;

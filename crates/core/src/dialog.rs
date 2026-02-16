@@ -1,10 +1,10 @@
-// Copyright 2024 Paul Adamson
-// Licensed under the Apache License, Version 2.0
-//
-// Dialog protocol object
-//
-// Represents a browser dialog (alert, confirm, prompt, or beforeunload)
-// dispatched via page.on('dialog') events.
+//! Dialog protocol object.
+//!
+//! [`Dialog`] models JavaScript dialogs emitted by pages (`alert`, `confirm`,
+//! `prompt`, and `beforeunload`) and provides accept/dismiss operations.
+//!
+//! Dialog instances are created from protocol events and handled via page or
+//! context event subscriptions.
 
 use std::sync::Arc;
 
@@ -40,10 +40,10 @@ impl Dialog {
 	/// Returns the dialog's type.
 	///
 	/// Returns one of:
-	/// - "alert" - Simple notification dialog
-	/// - "confirm" - Yes/No confirmation dialog
-	/// - "prompt" - Text input dialog
-	/// - "beforeunload" - Page unload confirmation dialog
+	/// * "alert" - Simple notification dialog
+	/// * "confirm" - Yes/No confirmation dialog
+	/// * "prompt" - Text input dialog
+	/// * "beforeunload" - Page unload confirmation dialog
 	///
 	/// See: <https://playwright.dev/docs/api/class-dialog#dialog-type>
 	pub fn type_(&self) -> &str {
@@ -79,8 +79,8 @@ impl Dialog {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Dialog has already been accepted or dismissed
-	/// - Communication with browser process fails
+	/// * Dialog has already been accepted or dismissed
+	/// * Communication with browser process fails
 	///
 	/// See: <https://playwright.dev/docs/api/class-dialog#dialog-accept>
 	pub async fn accept(&self, prompt_text: Option<&str>) -> Result<()> {
@@ -103,8 +103,8 @@ impl Dialog {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Dialog has already been accepted or dismissed
-	/// - Communication with browser process fails
+	/// * Dialog has already been accepted or dismissed
+	/// * Communication with browser process fails
 	///
 	/// See: <https://playwright.dev/docs/api/class-dialog#dialog-dismiss>
 	pub async fn dismiss(&self) -> Result<()> {

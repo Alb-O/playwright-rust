@@ -3,16 +3,16 @@
 //! This crate provides the low-level runtime infrastructure for communicating
 //! with the Playwright Node.js server:
 //!
-//! - **Driver management**: Locating and launching the Playwright driver
-//! - **Transport**: Bidirectional communication over stdio pipes or WebSocket
-//! - **Connection**: JSON-RPC request/response correlation and event dispatch
-//! - **Object registry**: Managing protocol objects by GUID
+//! * Driver management: Locating and launching the Playwright driver
+//! * Transport: Bidirectional communication over stdio pipes or WebSocket
+//! * Connection: JSON-RPC request/response correlation and event dispatch
+//! * Object registry: Managing protocol objects by GUID
 //!
 //! # Architecture
 //!
 //! ```text
 //! ┌─────────────┐
-//! │   pw-api    │  Protocol objects (Browser, Page, etc.)
+//! │   pw-rs     │  Protocol objects (Browser, Page, etc.)
 //! └──────┬──────┘
 //!        │ implements ObjectFactory
 //! ┌──────▼──────┐
@@ -33,7 +33,7 @@
 //!
 //! The `Connection` uses an `ObjectFactory` trait to create protocol objects
 //! without depending on their concrete types. This allows pw-runtime to be
-//! independent of pw-api, breaking the circular dependency.
+//! independent of `pw-rs`, breaking the circular dependency.
 
 pub mod channel;
 pub mod channel_owner;

@@ -4,9 +4,9 @@
 //! spawning actual browsers.
 //!
 //! The testing infrastructure follows trait-based dependency injection:
-//! - [`PageLike`]: Abstracts page operations (click, text, screenshot, eval)
-//! - [`SessionLike`]: Abstracts session lifecycle (goto, page access, close)
-//! - [`LocatorLike`]: Abstracts locator operations (click, text_content, count)
+//! * [`PageLike`]: Abstracts page operations (click, text, screenshot, eval)
+//! * [`SessionLike`]: Abstracts session lifecycle (goto, page access, close)
+//! * [`LocatorLike`]: Abstracts locator operations (click, text_content, count)
 //!
 //! # Example
 //!

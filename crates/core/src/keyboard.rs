@@ -1,6 +1,10 @@
-// Keyboard - Low-level keyboard control
-//
-// See: https://playwright.dev/docs/api/class-keyboard
+//! Keyboard input facade.
+//!
+//! [`Keyboard`] provides low-level key event primitives (`down`, `up`, `press`,
+//! `type`) backed by page protocol calls.
+//!
+//! It mirrors Playwright keyboard semantics while keeping call sites strongly
+//! typed in Rust.
 
 use pw_runtime::Result;
 

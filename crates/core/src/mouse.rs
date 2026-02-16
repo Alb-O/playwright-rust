@@ -1,6 +1,9 @@
-// Mouse - Low-level mouse control
-//
-// See: https://playwright.dev/docs/api/class-mouse
+//! Mouse input facade.
+//!
+//! [`Mouse`] exposes low-level pointer primitives (`move`, `down`, `up`,
+//! `click`, `dblclick`, `wheel`) through page protocol commands.
+//!
+//! Coordinates are CSS pixels relative to the viewport origin.
 
 use pw_runtime::Result;
 

@@ -17,8 +17,8 @@ use crate::workspace::WorkspaceScope;
 /// Bundled runtime context for executing CLI commands.
 ///
 /// Contains the state needed to execute any command:
-/// - [`CommandContext`]: Browser configuration and CDP settings
-/// - [`ContextState`]: URL/selector caching and persistence
+/// * [`CommandContext`]: Browser configuration and CDP settings
+/// * [`ContextState`]: URL/selector caching and persistence
 ///
 /// The [`SessionBroker`](crate::session_broker::SessionBroker) is created separately
 /// since it borrows from `CommandContext`.

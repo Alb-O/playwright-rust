@@ -120,10 +120,6 @@ impl CommandDef for TextCommand {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Garbage Filtering
-// ---------------------------------------------------------------------------
-
 /// Heuristically detect if a line looks like minified JavaScript or garbage
 fn is_garbage_line(line: &str) -> bool {
 	let trimmed = line.trim();

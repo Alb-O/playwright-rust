@@ -202,10 +202,6 @@ fn is_absolute(url: &str) -> bool {
 		|| url.starts_with("data:")
 }
 
-// ---------------------------------------------------------------------------
-// Argument Resolution Framework
-// ---------------------------------------------------------------------------
-
 use crate::context_store::ContextState;
 
 /// Environment for resolving raw command arguments.

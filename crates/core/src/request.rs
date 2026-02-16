@@ -1,7 +1,9 @@
-// Request protocol object
-//
-// Represents an HTTP request. Created during navigation operations.
-// In Playwright's architecture, navigation creates a Request which receives a Response.
+//! Request protocol object.
+//!
+//! [`Request`] models outgoing network requests observed by Playwright and is
+//! used by routing and response relationships.
+//!
+//! Instances are created from server events and stored in the object registry.
 
 use std::sync::Arc;
 

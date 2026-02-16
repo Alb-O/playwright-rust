@@ -109,10 +109,10 @@ pub struct BatchRequest {
 /// A batch response written to stdout as NDJSON.
 ///
 /// Each response corresponds to a single [`BatchRequest`] and includes:
-/// - The echoed request `id` for correlation
-/// - Success/failure status via `ok`
-/// - Command-specific `data` on success
-/// - Structured [`BatchError`] on failure
+/// * The echoed request `id` for correlation
+/// * Success/failure status via `ok`
+/// * Command-specific `data` on success
+/// * Structured [`BatchError`] on failure
 ///
 /// # Wire Format
 ///
@@ -224,8 +224,8 @@ impl BatchResponse {
 ///
 /// # Special Commands
 ///
-/// - `ping` - Returns success immediately (health check)
-/// - `quit` / `exit` - Exits the batch loop gracefully
+/// * `ping` - Returns success immediately (health check)
+/// * `quit` / `exit` - Exits the batch loop gracefully
 ///
 /// # Errors
 ///

@@ -1,21 +1,18 @@
-// Copyright 2024 Paul Adamson
-// Licensed under the Apache License, Version 2.0
-
 //! Event system infrastructure for Playwright protocol objects.
 //!
 //! Provides abstractions for handling events emitted by browser pages and contexts:
 //!
-//! - [`EventBus`] - Internal dispatcher combining broadcast channels with predicate-based waiters
-//! - [`EventStream`] - Ergonomic wrapper around [`broadcast::Receiver`] with lag handling
-//! - [`EventWaiter`] - One-shot event capture with timeout support
-//! - [`ConsoleSubscription`] - RAII handle for callback-style event handlers
+//! * [`EventBus`] - Internal dispatcher combining broadcast channels with predicate-based waiters
+//! * [`EventStream`] - Ergonomic wrapper around [`broadcast::Receiver`] with lag handling
+//! * [`EventWaiter`] - One-shot event capture with timeout support
+//! * [`ConsoleSubscription`] - RAII handle for callback-style event handlers
 //!
 //! # Design
 //!
 //! The event system supports two consumption patterns:
 //!
-//! 1. **Streams**: Subscribe via [`EventBus::subscribe`] and poll for events
-//! 2. **Callbacks**: Register via `on_*` methods which spawn background tasks
+//! 1. Streams: Subscribe via [`EventBus::subscribe`] and poll for events
+//! 2. Callbacks: Register via `on_*` methods which spawn background tasks
 //!
 //! Both patterns use [`ConsoleSubscription`] for lifetime management - dropping
 //! the subscription cancels the handler.
@@ -87,8 +84,8 @@ struct WaiterEntry<E> {
 ///
 /// Provides two delivery mechanisms:
 ///
-/// 1. **Broadcast**: All subscribers receive events via [`subscribe`](Self::subscribe)
-/// 2. **Waiters**: One-shot receivers with predicates via [`register_waiter`](Self::register_waiter)
+/// 1. Broadcast: All subscribers receive events via [`subscribe`](Self::subscribe)
+/// 2. Waiters: One-shot receivers with predicates via [`register_waiter`](Self::register_waiter)
 ///
 /// Waiters are checked first during [`emit`](Self::emit), ensuring guaranteed delivery
 /// for `wait_for_*` patterns even when broadcast receivers are lagging.
@@ -249,8 +246,8 @@ impl<E: Clone + Send + 'static> EventStream<E> {
 /// Created by [`EventBus::register_waiter`] and completes when a matching event
 /// is emitted. Supports two consumption patterns:
 ///
-/// - **With timeout**: Call [`wait()`](Self::wait) for timeout support
-/// - **Without timeout**: Use `.await` directly (implements [`Future`])
+/// * With timeout: Call [`wait()`](Self::wait) for timeout support
+/// * Without timeout: Use `.await` directly (implements [`Future`])
 ///
 /// # Example
 ///
@@ -274,8 +271,8 @@ impl<E: Send + 'static> EventWaiter<E> {
 	///
 	/// # Errors
 	///
-	/// - [`Error::Timeout`] if no matching event arrives within the timeout
-	/// - [`Error::ChannelClosed`] if the event source is dropped
+	/// * [`Error::Timeout`] if no matching event arrives within the timeout
+	/// * [`Error::ChannelClosed`] if the event source is dropped
 	///
 	/// [`Error::Timeout`]: pw_runtime::Error::Timeout
 	/// [`Error::ChannelClosed`]: pw_runtime::Error::ChannelClosed

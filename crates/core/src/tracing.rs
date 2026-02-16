@@ -1,6 +1,3 @@
-// Copyright 2024 Paul Adamson
-// Licensed under the Apache License, Version 2.0
-
 //! Playwright tracing API for recording browser sessions.
 //!
 //! Tracing captures a trace of browser operations that can be viewed in the
@@ -88,8 +85,8 @@ impl Tracing {
 	///
 	/// # Errors
 	///
-	/// - [`Error::ProtocolError`] if tracing is already active
-	/// - [`Error::ProtocolError`] if the context has been closed
+	/// * [`Error::ProtocolError`] if tracing is already active
+	/// * [`Error::ProtocolError`] if the context has been closed
 	///
 	/// [`Error::ProtocolError`]: pw_runtime::Error::ProtocolError
 	///
@@ -110,7 +107,7 @@ impl Tracing {
 	///
 	/// # Errors
 	///
-	/// - [`Error::ProtocolError`] if no trace is currently active
+	/// * [`Error::ProtocolError`] if no trace is currently active
 	///
 	/// [`Error::ProtocolError`]: pw_runtime::Error::ProtocolError
 	///
@@ -145,8 +142,8 @@ impl Tracing {
 	///
 	/// # Errors
 	///
-	/// - [`Error::ProtocolError`] if no trace is currently active
-	/// - [`Error::IoError`] if the trace file cannot be written
+	/// * [`Error::ProtocolError`] if no trace is currently active
+	/// * [`Error::IoError`] if the trace file cannot be written
 	///
 	/// [`Error::ProtocolError`]: pw_runtime::Error::ProtocolError
 	/// [`Error::IoError`]: pw_runtime::Error::IoError
@@ -164,7 +161,7 @@ impl Tracing {
 	///
 	/// # Errors
 	///
-	/// - [`Error::ProtocolError`] if no chunk is currently active
+	/// * [`Error::ProtocolError`] if no chunk is currently active
 	///
 	/// [`Error::ProtocolError`]: pw_runtime::Error::ProtocolError
 	///

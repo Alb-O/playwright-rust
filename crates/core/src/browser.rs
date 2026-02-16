@@ -1,6 +1,10 @@
-// Browser protocol object
-//
-// Represents a browser instance created by BrowserType.launch()
+//! Browser protocol object.
+//!
+//! [`Browser`] represents a launched browser process and provides context/page
+//! creation plus lifecycle operations (`close`, connection state tracking).
+//!
+//! Instances are created by [`crate::BrowserType::launch`] and backed by a
+//! runtime channel owner.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -112,9 +116,9 @@ impl Browser {
 	/// Returns true if the browser is connected.
 	///
 	/// The browser is connected when it is launched and becomes disconnected when:
-	/// - `browser.close()` is called
-	/// - The browser process crashes
-	/// - The browser is closed by the user
+	/// * `browser.close()` is called
+	/// * The browser process crashes
+	/// * The browser is closed by the user
 	///
 	/// See: <https://playwright.dev/docs/api/class-browser#browser-is-connected>
 	pub fn is_connected(&self) -> bool {
@@ -137,8 +141,8 @@ impl Browser {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Browser has been closed
-	/// - Communication with browser process fails
+	/// * Browser has been closed
+	/// * Communication with browser process fails
 	///
 	/// See: <https://playwright.dev/docs/api/class-browser#browser-new-context>
 	pub async fn new_context(&self) -> Result<BrowserContext> {
@@ -180,9 +184,9 @@ impl Browser {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Browser has been closed
-	/// - Communication with browser process fails
-	/// - Invalid options provided
+	/// * Browser has been closed
+	/// * Communication with browser process fails
+	/// * Invalid options provided
 	///
 	/// See: <https://playwright.dev/docs/api/class-browser#browser-new-context>
 	pub async fn new_context_with_options(&self, options: crate::BrowserContextOptions) -> Result<BrowserContext> {
@@ -227,8 +231,8 @@ impl Browser {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Browser has been closed
-	/// - Communication with browser process fails
+	/// * Browser has been closed
+	/// * Communication with browser process fails
 	///
 	/// See: <https://playwright.dev/docs/api/class-browser#browser-new-page>
 	pub async fn new_page(&self) -> Result<Page> {
@@ -245,8 +249,8 @@ impl Browser {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Browser has already been closed
-	/// - Communication with browser process fails
+	/// * Browser has already been closed
+	/// * Communication with browser process fails
 	///
 	/// See: <https://playwright.dev/docs/api/class-browser#browser-close>
 	pub async fn close(&self) -> Result<()> {

@@ -1,7 +1,10 @@
-// Frame protocol object
-//
-// Represents a frame within a page. Pages have a main frame, and can have child frames (iframes).
-// Navigation and DOM operations happen on frames, not directly on pages.
+//! Frame protocol object.
+//!
+//! Frames are the execution and interaction units under a page: navigation,
+//! selectors, input actions, and evaluation are delegated here.
+//!
+//! [`crate::Page`] owns the main frame and forwards many high-level methods to
+//! this module.
 
 use std::sync::Arc;
 
@@ -1016,8 +1019,8 @@ impl Frame {
 	/// # Errors
 	///
 	/// Returns [`Error::ProtocolError`] if:
-	/// - JavaScript evaluation fails
-	/// - Result cannot be deserialized to type `T`
+	/// * JavaScript evaluation fails
+	/// * Result cannot be deserialized to type `T`
 	pub(crate) async fn frame_evaluate_expression_typed<T: DeserializeOwned>(&self, expression: &str) -> Result<T> {
 		let json_value = self.frame_evaluate_expression_json(expression).await?;
 
@@ -1136,8 +1139,8 @@ impl ChannelOwner for Frame {
 	}
 
 	fn on_event(&self, _method: &str, _params: Value) {
-		// TODO: Handle frame events in future phases
-		// Events: loadstate, navigated, etc.
+		// Frame-specific event handling is intentionally deferred until dedicated
+		// subscriptions are exposed on the public API.
 	}
 
 	fn was_collected(&self) -> bool {

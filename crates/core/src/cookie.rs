@@ -1,10 +1,9 @@
-// Cookie and StorageState types for session/authentication management
-//
-// This module provides types for managing cookies and browser storage state,
-// enabling authentication persistence across browser sessions.
-//
-// See: https://playwright.dev/docs/api/class-browsercontext#browser-context-cookies
-// See: https://playwright.dev/docs/api/class-browsercontext#browser-context-storage-state
+//! Cookie and storage-state protocol data models.
+//!
+//! The types in this module map to Playwright cookie/storage payloads used by
+//! browser context APIs for persistence and session restoration.
+//!
+//! Serialization is aligned with Playwright's camelCase wire format.
 
 use serde::{Deserialize, Serialize};
 

@@ -83,10 +83,10 @@ fn main() {
 ///
 /// The detection strategy:
 /// 1. Try CARGO_WORKSPACE_DIR (available in Rust 1.73+) - gets the dependent project's workspace
-///    - First check if playwright/ directory exists, use playwright/drivers
-///    - Otherwise use drivers/ at workspace root
+///    * First check if playwright/ directory exists, use playwright/drivers
+///    * Otherwise use drivers/ at workspace root
 /// 2. Walk up directory tree looking for Cargo.toml with [workspace]
-///    - Same playwright/ preference logic
+///    * Same playwright/ preference logic
 /// 3. Fallback to platform-specific cache directory (like playwright-python)
 fn get_drivers_dir() -> PathBuf {
 	// Strategy 1: Use CARGO_WORKSPACE_DIR if available (Rust 1.73+)

@@ -10,10 +10,10 @@
 //!
 //! # Main Types
 //!
-//! - [`ExtensionMessage`] - Messages from browser extension to CLI
-//! - [`ServerMessage`] - Messages from CLI to browser extension
-//! - [`DomainCookies`] - Cookies grouped by domain
-//! - [`ExtensionCookie`] - Chrome cookie format with conversion to Playwright
+//! * [`ExtensionMessage`] - Messages from browser extension to CLI
+//! * [`ServerMessage`] - Messages from CLI to browser extension
+//! * [`DomainCookies`] - Cookies grouped by domain
+//! * [`ExtensionCookie`] - Chrome cookie format with conversion to Playwright
 
 use serde::{Deserialize, Serialize};
 
@@ -129,9 +129,9 @@ impl ExtensionCookie {
 	/// Converts Chrome cookie format to Playwright [`Cookie`] format.
 	///
 	/// Handles the differences between Chrome and Playwright cookie representations:
-	/// - Maps `expirationDate` to `expires` (using `-1.0` for session cookies)
-	/// - Converts `sameSite` string to [`SameSite`] enum
-	/// - Wraps required fields in [`Option`] as Playwright expects
+	/// * Maps `expirationDate` to `expires` (using `-1.0` for session cookies)
+	/// * Converts `sameSite` string to [`SameSite`] enum
+	/// * Wraps required fields in [`Option`] as Playwright expects
 	pub fn to_playwright_cookie(&self) -> Cookie {
 		Cookie {
 			name: self.name.clone(),

@@ -1,7 +1,9 @@
-// Windows CI Browser Launch Fix - Alternative Approach
-//
-// This module provides Windows-specific workarounds for browser launch hanging in CI.
-// If the browser flags approach doesn't work, this provides more aggressive fixes.
+//! Windows CI helpers for browser startup stability.
+//!
+//! These utilities provide optional process cleanup, launch flags, and
+//! environment preparation used by Windows-specific test workflows.
+//!
+//! They are supplementary helpers, not the primary cross-platform launch path.
 
 use std::process::Command;
 

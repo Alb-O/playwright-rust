@@ -6,8 +6,8 @@
 //!
 //! # Commands
 //!
-//! - `coords`: Get coordinates of the first matching element
-//! - `coords-all`: Get coordinates of all matching elements with indices
+//! * `coords`: Get coordinates of the first matching element
+//! * `coords-all`: Get coordinates of all matching elements with indices
 //!
 //! # Example
 //!

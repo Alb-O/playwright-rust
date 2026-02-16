@@ -3,10 +3,10 @@
 //! This WASM module handles communication between the popup UI and the
 //! `pw auth listen` server. It manages:
 //!
-//! - WebSocket connection to the CLI's auth listener
-//! - Authentication via one-time token
-//! - Fetching cookies from Chrome's cookies API
-//! - Sending cookies to the CLI for storage
+//! * WebSocket connection to the CLI's auth listener
+//! * Authentication via one-time token
+//! * Fetching cookies from Chrome's cookies API
+//! * Sending cookies to the CLI for storage
 //!
 //! # Message Flow
 //!

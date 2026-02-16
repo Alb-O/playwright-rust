@@ -1,12 +1,9 @@
-// Copyright 2024 Paul Adamson
-// Licensed under the Apache License, Version 2.0
-//
-// Root - Internal object for sending initialize message
-//
-// Reference:
-// - Python: playwright-python/playwright/_impl/_connection.py (RootChannelOwner)
-// - Java: playwright-java/.../impl/Connection.java (Root inner class)
-// - .NET: playwright-dotnet/src/Playwright/Transport/Connection.cs (InitializePlaywrightAsync)
+//! Initialization root channel owner.
+//!
+//! [`Root`] is an internal bootstrap object used only to send the initial
+//! `initialize` message and obtain the Playwright GUID.
+//!
+//! It exists for connection setup and is discarded after initialization.
 
 use std::sync::Arc;
 
@@ -24,7 +21,7 @@ use serde_json::Value;
 /// # Protocol Flow
 ///
 /// When `initialize()` is called:
-/// 1. Sends `initialize` message with `sdkLanguage: "rust"`
+	/// 1. Sends `initialize` message (currently with `sdkLanguage: "python"`)
 /// 2. Server creates BrowserType objects (sends `__create__` messages)
 /// 3. Server creates Playwright object (sends `__create__` message)
 /// 4. Server responds with Playwright GUID: `{ "playwright": { "guid": "..." } }`
@@ -60,8 +57,8 @@ use serde_json::Value;
 /// ```
 ///
 /// See:
-/// - Python: <https://github.com/microsoft/playwright-python/blob/main/playwright/_impl/_connection.py>
-/// - Java: <https://github.com/microsoft/playwright-java>
+/// * Python: <https://github.com/microsoft/playwright-python/blob/main/playwright/_impl/_connection.py>
+/// * Java: <https://github.com/microsoft/playwright-java>
 pub struct Root {
 	/// Base ChannelOwner implementation
 	base: ChannelOwnerImpl,
@@ -104,16 +101,15 @@ impl Root {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Message send fails
-	/// - Server returns protocol error
-	/// - Connection is closed
+	/// * Message send fails
+	/// * Server returns protocol error
+	/// * Connection is closed
 	pub async fn initialize(&self) -> Result<Value> {
 		self.channel()
 			.send(
 				"initialize",
 				serde_json::json!({
-					// TODO: Use "rust" once upstream Playwright accepts it
-					// Current issue: Playwright v1.49.0 protocol validator only accepts:
+					// Playwright's protocol validator currently accepts only:
 					// (javascript|python|java|csharp)
 					//
 					// Using "python" because:
@@ -122,7 +118,6 @@ impl Root {
 					// - Does NOT affect core protocol functionality
 					// - Python error messages are appropriate ("playwright install")
 					//
-					// Plan: Contribute to microsoft/playwright to add 'rust' to Language enum
 					// See: packages/playwright-core/src/utils/isomorphic/locatorGenerators.ts
 					"sdkLanguage": "python"
 				}),

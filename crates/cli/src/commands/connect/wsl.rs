@@ -66,7 +66,7 @@ fn windows_path_to_wsl_mount(path: &str) -> Option<PathBuf> {
 fn wsl_mount_path_to_windows(path: &Path) -> Option<String> {
 	let path = path.to_str()?;
 	let mut parts = path.split('/');
-	if parts.next()? != "" || parts.next()? != "mnt" {
+	if !parts.next()?.is_empty() || parts.next()? != "mnt" {
 		return None;
 	}
 	let drive = parts.next()?;

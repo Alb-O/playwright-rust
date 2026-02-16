@@ -6,15 +6,15 @@
 //!
 //! # Main Types
 //!
-//! - [`SnapshotRaw`] - Unresolved inputs from CLI or batch JSON
-//! - [`SnapshotResolved`] - Validated inputs ready for execution
-//! - [`SnapshotData`](crate::output::SnapshotData) - Command output structure
+//! * [`SnapshotRaw`] - Unresolved inputs from CLI or batch JSON
+//! * [`SnapshotResolved`] - Validated inputs ready for execution
+//! * [`SnapshotData`](crate::output::SnapshotData) - Command output structure
 //!
 //! # Output Contents
 //!
-//! - Page metadata (URL, title, viewport dimensions)
-//! - Interactive elements (buttons, links, inputs) with stable CSS selectors
-//! - Visible text content (configurable length limit)
+//! * Page metadata (URL, title, viewport dimensions)
+//! * Interactive elements (buttons, links, inputs) with stable CSS selectors
+//! * Visible text content (configurable length limit)
 //!
 //! # Example
 //!

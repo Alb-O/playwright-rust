@@ -1,10 +1,10 @@
 //! ChannelOwner - Base trait for all Playwright protocol objects.
 //!
 //! All Playwright objects (Browser, Page, etc.) implement ChannelOwner to:
-//! - Represent remote objects on the server via GUID
-//! - Participate in parent-child lifecycle management
-//! - Handle protocol events
-//! - Communicate via Channel proxy
+//! * Represent remote objects on the server via GUID
+//! * Participate in parent-child lifecycle management
+//! * Handle protocol events
+//! * Communicate via Channel proxy
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};

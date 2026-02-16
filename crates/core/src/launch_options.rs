@@ -1,7 +1,10 @@
-// Launch options for BrowserType::launch()
-//
-// This module provides options for launching browsers, matching the Playwright API exactly.
-// See: https://playwright.dev/docs/api/class-browsertype#browser-type-launch
+//! Browser launch options and normalization helpers.
+//!
+//! [`LaunchOptions`] mirrors Playwright launch configuration and serializes to
+//! protocol-compatible JSON.
+//!
+//! The module includes helpers for default handling, argument normalization,
+//! and compatibility adjustments across launch modes.
 
 use std::collections::HashMap;
 

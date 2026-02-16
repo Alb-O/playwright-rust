@@ -1,10 +1,10 @@
-// Copyright 2024 Paul Adamson
-// Licensed under the Apache License, Version 2.0
-//
-// Artifact protocol object
-//
-// Artifacts represent downloaded files. The Artifact is wrapped by
-// the Download class which adds URL and filename from event params.
+//! Internal Artifact protocol object.
+//!
+//! Artifact represents server-side downloadable content and exposes low-level
+//! file operations (`save_as`, `delete`, `failure`, `path_after_finished`).
+//!
+//! End users usually work with [`crate::Download`], which wraps Artifact with
+//! event metadata like URL and suggested filename.
 
 use std::sync::Arc;
 

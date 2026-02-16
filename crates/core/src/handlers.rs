@@ -29,8 +29,8 @@ pub type HandlerFn<E> = Arc<dyn Fn(E) -> HandlerFuture + Send + Sync>;
 
 /// Event handler entry with optional metadata `M`.
 ///
-/// - `E`: event type ([`Route`], [`Download`], [`Dialog`])
-/// - `M`: metadata (e.g., [`RouteMeta`] for compiled matchers)
+/// * `E`: event type ([`Route`], [`Download`], [`Dialog`])
+/// * `M`: metadata (e.g., [`RouteMeta`] for compiled matchers)
 ///
 /// [`Route`]: crate::Route
 /// [`Download`]: crate::Download

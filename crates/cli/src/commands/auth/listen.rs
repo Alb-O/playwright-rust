@@ -32,8 +32,8 @@ use crate::error::{PwError, Result};
 /// # Errors
 ///
 /// Returns an error if:
-/// - The server cannot bind to the specified address
-/// - The home directory cannot be determined (when no project context)
+/// * The server cannot bind to the specified address
+/// * The home directory cannot be determined (when no project context)
 pub async fn listen(host: &str, port: u16, ctx: &CommandContext) -> Result<()> {
 	let token = generate_token();
 

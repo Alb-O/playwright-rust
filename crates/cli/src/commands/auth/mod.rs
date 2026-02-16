@@ -2,10 +2,10 @@
 //!
 //! Provides commands for managing browser authentication state:
 //!
-//! - [`login`] - Interactive browser login with session capture
-//! - [`cookies`] - Display cookies for a URL
-//! - [`show`] - Inspect a saved auth file
-//! - [`listen`] - Receive cookies from browser extension
+//! * [`login`] - Interactive browser login with session capture
+//! * [`cookies`] - Display cookies for a URL
+//! * [`show`] - Inspect a saved auth file
+//! * [`listen`] - Receive cookies from browser extension
 
 mod listen;
 
@@ -118,9 +118,9 @@ impl Resolve for CookiesRaw {
 /// # Errors
 ///
 /// Returns an error if:
-/// - Browser launch fails
-/// - Navigation fails
-/// - File I/O fails when saving the auth state
+/// * Browser launch fails
+/// * Navigation fails
+/// * File I/O fails when saving the auth state
 pub async fn login_resolved(args: &LoginResolved, ctx: &CommandContext, broker: &mut SessionBroker<'_>, last_url: Option<&str>) -> Result<()> {
 	let url_display = args.target.url_str().unwrap_or("<current page>");
 	info!(target = "pw", url = %url_display, path = %args.output.display(), browser = %ctx.browser, "starting interactive login");

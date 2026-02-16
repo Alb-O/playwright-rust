@@ -6,10 +6,10 @@
 //!
 //! # Extracted Element Types
 //!
-//! - Buttons (including `role="button"`)
-//! - Links (`<a href="...">`)
-//! - Text inputs, textareas, selects
-//! - Checkboxes and radio buttons
+//! * Buttons (including `role="button"`)
+//! * Links (`<a href="...">`)
+//! * Text inputs, textareas, selects
+//! * Checkboxes and radio buttons
 //!
 //! # Example
 //!

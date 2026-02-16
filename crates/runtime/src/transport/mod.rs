@@ -1,8 +1,3 @@
-// Playwright transport layer
-//
-// Handles bidirectional communication with Playwright server via stdio pipes.
-// Follows the same architecture as playwright-python's PipeTransport.
-
 #[cfg(test)]
 mod tests;
 
@@ -79,9 +74,9 @@ pub struct TransportParts {
 /// Pipe-based transport for communicating with Playwright server
 ///
 /// This implementation matches playwright-python's PipeTransport:
-/// - Messages are framed with 4-byte little-endian length prefix
-/// - Reads happen in a background task
-/// - Received messages are sent via mpsc channel
+/// * Messages are framed with 4-byte little-endian length prefix
+/// * Reads happen in a background task
+/// * Received messages are sent via mpsc channel
 ///
 /// # Architecture
 ///
@@ -304,9 +299,9 @@ where
 	/// Matches playwright-python's chunked reading strategy.
 	///
 	/// The loop will run until:
-	/// - An error occurs
-	/// - The stdout stream is closed
-	/// - The message channel is dropped
+	/// * An error occurs
+	/// * The stdout stream is closed
+	/// * The message channel is dropped
 	///
 	/// # Errors
 	///

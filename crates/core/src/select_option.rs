@@ -1,6 +1,9 @@
-// Select option variants for dropdown selection
-//
-// Provides different ways to select options: by value, label, or index.
+//! Select-option discriminator type.
+//!
+//! [`SelectOption`] captures the three Playwright selection strategies: by
+//! value, visible label, or zero-based index.
+//!
+//! The module provides conversion helpers into protocol JSON payloads.
 
 /// Select option variant
 ///
@@ -36,9 +39,9 @@ impl SelectOption {
 	/// Convert SelectOption to JSON format for protocol
 	///
 	/// The JSON format matches Playwright's protocol:
-	/// - Value: `{"value": "..."}`
-	/// - Label: `{"label": "..."}`
-	/// - Index: `{"index": 0}`
+	/// * Value: `{"value": "..."}`
+	/// * Label: `{"label": "..."}`
+	/// * Index: `{"index": 0}`
 	pub(crate) fn to_json(&self) -> serde_json::Value {
 		match self {
 			SelectOption::Value(v) => serde_json::json!({"value": v}),

@@ -2,10 +2,10 @@
 //!
 //! This module implements the request/response correlation layer on top of the transport.
 //! It handles:
-//! - Generating unique request IDs
-//! - Correlating responses with pending requests
-//! - Distinguishing events from responses
-//! - Dispatching events to protocol objects
+//! * Generating unique request IDs
+//! * Correlating responses with pending requests
+//! * Distinguishing events from responses
+//! * Dispatching events to protocol objects
 //!
 //! # Message Flow
 //!
@@ -74,8 +74,8 @@ pub type AsyncChannelOwnerResult<'a> = Pin<Box<dyn Future<Output = Result<Arc<dy
 /// Factory trait for creating protocol objects.
 ///
 /// This trait decouples the Connection from specific protocol object types,
-/// allowing pw-runtime to be independent of pw-api. The factory is implemented
-/// in pw-api and passed to Connection during initialization.
+/// allowing pw-runtime to be independent of `pw-rs`. The factory is implemented
+/// in `pw-rs` and passed to Connection during initialization.
 pub trait ObjectFactory: Send + Sync {
 	/// Create a protocol object from a `__create__` message.
 	///

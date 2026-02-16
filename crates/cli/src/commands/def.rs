@@ -94,9 +94,9 @@ pub type BoxFut<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 /// Standardized command interface.
 ///
 /// Each command implements this trait with:
-/// - [`Raw`](Self::Raw): CLI/JSON input before resolution
-/// - [`Resolved`](Self::Resolved): Validated inputs ready for execution
-/// - [`Data`](Self::Data): Command-specific output payload
+/// * [`Raw`](Self::Raw): CLI/JSON input before resolution
+/// * [`Resolved`](Self::Resolved): Validated inputs ready for execution
+/// * [`Data`](Self::Data): Command-specific output payload
 pub trait CommandDef: 'static {
 	const NAME: &'static str;
 	const INTERACTIVE_ONLY: bool = false;

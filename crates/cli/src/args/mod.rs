@@ -122,9 +122,9 @@ const HTML_TAGS: &[&str] = &[
 /// Returns true if the string looks like a CSS selector rather than a URL.
 ///
 /// A string is considered a selector if:
-/// - It contains CSS selector characters (`.`, `#`, `>`, `~`, `+`, `:`, `[`, `]`, `*`)
-/// - OR it exactly matches a common HTML tag name (case-insensitive)
-/// - AND it does not look like a URL (no `://`, doesn't start with known URL schemes)
+/// * It contains CSS selector characters (`.`, `#`, `>`, `~`, `+`, `:`, `[`, `]`, `*`)
+/// * OR it exactly matches a common HTML tag name (case-insensitive)
+/// * AND it does not look like a URL (no `://`, doesn't start with known URL schemes)
 ///
 /// # Examples
 ///
@@ -182,8 +182,8 @@ pub fn looks_like_selector(s: &str) -> bool {
 /// Returns true if the string looks like a URL.
 ///
 /// A string is considered a URL if:
-/// - It starts with a known URL scheme (http://, https://, ws://, wss://, file://)
-/// - OR it contains `://` (indicating some other scheme)
+/// * It starts with a known URL scheme (http://, https://, ws://, wss://, file://)
+/// * OR it contains `://` (indicating some other scheme)
 fn looks_like_url(s: &str) -> bool {
 	let lower = s.to_lowercase();
 
@@ -210,9 +210,9 @@ pub struct ResolvedArgs {
 /// Resolves URL and selector from positional arguments and explicit flags.
 ///
 /// Smart detection reduces the need for explicit `-s` flags:
-/// - Explicit `--url` and `--selector` flags take precedence
-/// - Positional arguments that look like CSS selectors are treated as selectors
-/// - Other positional arguments are treated as URLs
+/// * Explicit `--url` and `--selector` flags take precedence
+/// * Positional arguments that look like CSS selectors are treated as selectors
+/// * Other positional arguments are treated as URLs
 pub fn resolve_url_and_selector(positional: Option<String>, url_flag: Option<String>, selector_flag: Option<String>) -> ResolvedArgs {
 	if url_flag.is_some() || selector_flag.is_some() {
 		return ResolvedArgs {

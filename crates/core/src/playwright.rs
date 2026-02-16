@@ -1,11 +1,9 @@
-// Copyright 2024 Paul Adamson
-// Licensed under the Apache License, Version 2.0
-//
-// Playwright - Root protocol object
-//
-// Reference:
-// - Python: playwright-python/playwright/_impl/_playwright.py
-// - Protocol: protocol.yml (Playwright interface)
+//! Playwright root protocol object and runtime lifecycle.
+//!
+//! [`Playwright`] is the main entry point that launches the driver, initializes
+//! the protocol connection, and exposes browser-type handles.
+//!
+//! The module also owns graceful and fallback shutdown behavior.
 
 use std::sync::Arc;
 
@@ -67,9 +65,9 @@ pub struct Playwright {
 	/// Playwright server process (for clean shutdown)
 	///
 	/// Stored as `Option<PlaywrightServer>` wrapped in Arc<Mutex<>> to allow:
-	/// - Sharing across clones (Arc)
-	/// - Taking ownership during shutdown (Option::take)
-	/// - Interior mutability (Mutex)
+	/// * Sharing across clones (Arc)
+	/// * Taking ownership during shutdown (Option::take)
+	/// * Interior mutability (Mutex)
 	server: Arc<Mutex<Option<PlaywrightServer>>>,
 	/// Whether to keep the launched server running when Playwright is dropped
 	keep_server_running: bool,
@@ -89,10 +87,10 @@ impl Playwright {
 	/// # Errors
 	///
 	/// Returns error if:
-	/// - Playwright server is not found or fails to launch
-	/// - Connection to server fails
-	/// - Protocol initialization fails
-	/// - Server doesn't respond within timeout (30s)
+	/// * Playwright server is not found or fails to launch
+	/// * Connection to server fails
+	/// * Protocol initialization fails
+	/// * Server doesn't respond within timeout (30s)
 	pub async fn launch() -> Result<Self> {
 		use pw_runtime::connection::Connection;
 		use pw_runtime::{PipeTransport, PlaywrightServer};

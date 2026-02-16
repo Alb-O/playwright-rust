@@ -1,19 +1,9 @@
-// Locator - Lazy element selector with auto-waiting
-//
-// Locators are the central piece of Playwright's auto-waiting and retry-ability.
-// They represent a way to find element(s) on the page at any given moment.
-//
-// Key characteristics:
-// - Lazy: Don't execute until an action is performed
-// - Retryable: Auto-wait for elements to match actionability checks
-// - Chainable: Can create sub-locators via first(), last(), nth(), locator()
-//
-// Architecture:
-// - Locator is NOT a ChannelOwner - it's a lightweight wrapper
-// - Stores selector string and reference to Frame
-// - Delegates all operations to Frame with strict=true
-//
-// See: https://playwright.dev/docs/api/class-locator
+//! Lazy locator abstraction with auto-waiting behavior.
+//!
+//! [`Locator`] stores selector intent and defers DOM resolution until an action
+//! or query runs, enabling retryability and actionability checks.
+//!
+//! Most element interaction APIs in this crate are built on locator semantics.
 
 use std::sync::Arc;
 

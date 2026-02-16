@@ -1,8 +1,8 @@
 //! Persistent namespace-scoped context storage for CLI state across invocations.
 //!
 //! State categories:
-//! - [`CliConfig`]: durable settings (base URL, browser defaults, protected URLs)
-//! - [`CliCache`]: ephemeral command cache (last URL, selector, output)
+//! * [`CliConfig`]: durable settings (base URL, browser defaults, protected URLs)
+//! * [`CliCache`]: ephemeral command cache (last URL, selector, output)
 
 use std::path::{Path, PathBuf};
 

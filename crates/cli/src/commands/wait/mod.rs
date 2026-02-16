@@ -1,9 +1,9 @@
 //! Wait command for various conditions.
 //!
 //! Waits for a specified condition before continuing. Supports:
-//! - **Timeout**: numeric milliseconds (e.g., `"1000"`)
-//! - **Load state**: `"load"`, `"domcontentloaded"`, `"networkidle"`
-//! - **Selector**: CSS selector to wait for element presence
+//! * Timeout: numeric milliseconds (e.g., `"1000"`)
+//! * Load state: `"load"`, `"domcontentloaded"`, `"networkidle"`
+//! * Selector: CSS selector to wait for element presence
 //!
 //! # Examples
 //!
