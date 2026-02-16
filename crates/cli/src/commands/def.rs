@@ -32,6 +32,9 @@ pub struct ExecCtx<'exec, 'ctx> {
 	/// Immutable CLI/global context (browser, CDP endpoint, timeouts, etc.).
 	pub ctx: &'ctx CommandContext,
 
+	/// Mutable context state for namespace-scoped persistence and defaults.
+	pub ctx_state: &'exec mut ContextState,
+
 	/// Session factory + session tracking.
 	pub broker: &'exec mut SessionBroker<'ctx>,
 
@@ -104,6 +107,11 @@ pub trait CommandDef: 'static {
 	type Raw: DeserializeOwned;
 	type Resolved;
 	type Data: Serialize;
+
+	/// Validate execution mode and raw args before resolution.
+	fn validate_mode(_raw: &Self::Raw, _mode: ExecMode) -> Result<()> {
+		Ok(())
+	}
 
 	/// Resolve raw args into ready-to-execute args.
 	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved>;

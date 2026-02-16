@@ -47,6 +47,9 @@ pub enum PwError {
 	#[error("context resolution failed: {0}")]
 	Context(String),
 
+	#[error("unsupported mode: {0}")]
+	UnsupportedMode(String),
+
 	#[error(transparent)]
 	Io(#[from] std::io::Error),
 
@@ -162,6 +165,7 @@ impl PwError {
 				Some(serde_json::json!({ "timeout_ms": ms, "condition": condition })),
 			),
 			PwError::Context(msg) => (ErrorCode::InvalidInput, msg.clone(), None),
+			PwError::UnsupportedMode(msg) => (ErrorCode::UnsupportedMode, msg.clone(), None),
 			PwError::Io(err) => (ErrorCode::IoError, err.to_string(), None),
 			PwError::Json(err) => (ErrorCode::InternalError, format!("JSON error: {err}"), None),
 			PwError::Playwright(err) => {

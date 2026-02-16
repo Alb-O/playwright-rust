@@ -10,7 +10,8 @@ use crate::styles::cli_styles;
 use crate::types::BrowserKind;
 
 /// HAR content policy (CLI wrapper for pw_rs::HarContentPolicy)
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum CliHarContentPolicy {
 	/// Include content inline (base64)
 	Embed,
@@ -32,7 +33,8 @@ impl From<CliHarContentPolicy> for pw_rs::HarContentPolicy {
 }
 
 /// HAR recording mode (CLI wrapper for pw_rs::HarMode)
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum CliHarMode {
 	/// Store all content
 	#[default]
@@ -304,7 +306,8 @@ pub enum Commands {
 }
 
 /// Project template type for init command
-#[derive(Clone, Debug, ValueEnum, Default)]
+#[derive(Clone, Debug, ValueEnum, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum InitTemplate {
 	/// Full structure: tests/, scripts/, results/, reports/, screenshots/
 	#[default]
@@ -508,6 +511,52 @@ impl Commands {
 			Commands::Fill(args) => (Id::Fill, serde_json::to_value(args).ok()?),
 			Commands::Wait(args) => (Id::Wait, serde_json::to_value(args).ok()?),
 			Commands::Page(action) => return action.into_registry_args(),
+			Commands::Auth { action } => return action.into_registry_args(),
+			Commands::Session { action } => return action.into_registry_args(),
+			Commands::Daemon { action } => return action.into_registry_args(),
+			Commands::Connect {
+				endpoint,
+				clear,
+				launch,
+				discover,
+				kill,
+				port,
+				user_data_dir,
+			} => (
+				Id::Connect,
+				serde_json::json!({
+					"endpoint": endpoint,
+					"clear": clear,
+					"launch": launch,
+					"discover": discover,
+					"kill": kill,
+					"port": port,
+					"userDataDir": user_data_dir,
+				}),
+			),
+			Commands::Tabs(action) => return action.into_registry_args(),
+			Commands::Protect(action) => return action.into_registry_args(),
+			Commands::Har { action } => return action.into_registry_args(),
+			Commands::Init {
+				path,
+				template,
+				no_config,
+				no_example,
+				typescript,
+				force,
+				nix,
+			} => (
+				Id::Init,
+				serde_json::json!({
+					"path": path,
+					"template": template,
+					"noConfig": no_config,
+					"noExample": no_example,
+					"typescript": typescript,
+					"force": force,
+					"nix": nix,
+				}),
+			),
 			_ => return None,
 		})
 	}
@@ -530,6 +579,155 @@ impl PageAction {
 			PageAction::Read(args) => (Id::PageRead, serde_json::to_value(args).ok()?),
 			PageAction::Elements(args) => (Id::PageElements, serde_json::to_value(args).ok()?),
 			PageAction::Snapshot(args) => (Id::PageSnapshot, serde_json::to_value(args).ok()?),
+		})
+	}
+}
+
+impl AuthAction {
+	pub fn into_registry_args(&self) -> Option<(crate::commands::registry::CommandId, serde_json::Value)> {
+		use crate::commands::registry::CommandId as Id;
+
+		Some(match self {
+			AuthAction::Login { url, output, timeout } => (
+				Id::AuthLogin,
+				serde_json::json!({
+					"url": url,
+					"output": output,
+					"timeoutSecs": timeout,
+				}),
+			),
+			AuthAction::Cookies { url, format } => (
+				Id::AuthCookies,
+				serde_json::json!({
+					"url": url,
+					"format": format,
+				}),
+			),
+			AuthAction::Show { file } => (
+				Id::AuthShow,
+				serde_json::json!({
+					"file": file,
+				}),
+			),
+			AuthAction::Listen { host, port } => (
+				Id::AuthListen,
+				serde_json::json!({
+					"host": host,
+					"port": port,
+				}),
+			),
+		})
+	}
+}
+
+impl SessionAction {
+	pub fn into_registry_args(&self) -> Option<(crate::commands::registry::CommandId, serde_json::Value)> {
+		use crate::commands::registry::CommandId as Id;
+
+		Some(match self {
+			SessionAction::Status => (Id::SessionStatus, serde_json::json!({})),
+			SessionAction::Clear => (Id::SessionClear, serde_json::json!({})),
+			SessionAction::Start { headful } => (
+				Id::SessionStart,
+				serde_json::json!({
+					"headful": headful,
+				}),
+			),
+			SessionAction::Stop => (Id::SessionStop, serde_json::json!({})),
+		})
+	}
+}
+
+impl DaemonAction {
+	pub fn into_registry_args(&self) -> Option<(crate::commands::registry::CommandId, serde_json::Value)> {
+		use crate::commands::registry::CommandId as Id;
+
+		Some(match self {
+			DaemonAction::Start { foreground } => (
+				Id::DaemonStart,
+				serde_json::json!({
+					"foreground": foreground,
+				}),
+			),
+			DaemonAction::Stop => (Id::DaemonStop, serde_json::json!({})),
+			DaemonAction::Status => (Id::DaemonStatus, serde_json::json!({})),
+		})
+	}
+}
+
+impl TabsAction {
+	pub fn into_registry_args(&self) -> Option<(crate::commands::registry::CommandId, serde_json::Value)> {
+		use crate::commands::registry::CommandId as Id;
+
+		Some(match self {
+			TabsAction::List => (Id::TabsList, serde_json::json!({})),
+			TabsAction::Switch { target } => (
+				Id::TabsSwitch,
+				serde_json::json!({
+					"target": target,
+				}),
+			),
+			TabsAction::Close { target } => (
+				Id::TabsClose,
+				serde_json::json!({
+					"target": target,
+				}),
+			),
+			TabsAction::New { url } => (
+				Id::TabsNew,
+				serde_json::json!({
+					"url": url,
+				}),
+			),
+		})
+	}
+}
+
+impl ProtectAction {
+	pub fn into_registry_args(&self) -> Option<(crate::commands::registry::CommandId, serde_json::Value)> {
+		use crate::commands::registry::CommandId as Id;
+
+		Some(match self {
+			ProtectAction::Add { pattern } => (
+				Id::ProtectAdd,
+				serde_json::json!({
+					"pattern": pattern,
+				}),
+			),
+			ProtectAction::Remove { pattern } => (
+				Id::ProtectRemove,
+				serde_json::json!({
+					"pattern": pattern,
+				}),
+			),
+			ProtectAction::List => (Id::ProtectList, serde_json::json!({})),
+		})
+	}
+}
+
+impl HarAction {
+	pub fn into_registry_args(&self) -> Option<(crate::commands::registry::CommandId, serde_json::Value)> {
+		use crate::commands::registry::CommandId as Id;
+
+		Some(match self {
+			HarAction::Set {
+				file,
+				content,
+				mode,
+				omit_content,
+				url_filter,
+			} => (
+				Id::HarSet,
+				serde_json::json!({
+					"file": file,
+					"content": content,
+					"mode": mode,
+					"omitContent": omit_content,
+					"urlFilter": url_filter,
+				}),
+			),
+			HarAction::Show => (Id::HarShow, serde_json::json!({})),
+			HarAction::Clear => (Id::HarClear, serde_json::json!({})),
 		})
 	}
 }

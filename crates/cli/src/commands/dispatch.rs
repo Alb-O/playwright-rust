@@ -9,7 +9,6 @@ use crate::context_store::ContextState;
 use crate::error::Result;
 use crate::output::OutputFormat;
 use crate::session_broker::SessionBroker;
-use crate::target::ResolveEnv;
 
 /// Executes a registry-backed command through the unified pipeline.
 ///
@@ -27,19 +26,19 @@ pub async fn dispatch_registry_command<'ctx>(
 	artifacts_dir: Option<&'ctx Path>,
 ) -> Result<()> {
 	let has_cdp = ctx.cdp_endpoint().is_some();
-	let env = ResolveEnv::new(ctx_state, has_cdp, registry::command_name(id));
 	let last_url = ctx_state.last_url().map(str::to_string);
 
 	let exec = ExecCtx {
 		mode,
 		ctx,
+		ctx_state,
 		broker,
 		format,
 		artifacts_dir,
 		last_url: last_url.as_deref(),
 	};
 
-	let out = registry::run_command(id, args, &env, exec).await?;
+	let out = registry::run_command(id, args, has_cdp, exec).await?;
 	emit_success(out.command, out.inputs, out.data, format);
 	out.delta.apply(ctx_state);
 	Ok(())

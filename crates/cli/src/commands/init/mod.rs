@@ -21,11 +21,100 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use pw_rs::dirs;
+use serde::{Deserialize, Serialize};
 
 use crate::cli::InitTemplate;
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
 use crate::error::{PwError, Result};
+use crate::output::CommandInputs;
+use crate::target::ResolveEnv;
+
+fn default_init_path() -> PathBuf {
+	PathBuf::from(".")
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InitRaw {
+	#[serde(default = "default_init_path")]
+	pub path: PathBuf,
+	#[serde(default)]
+	pub template: InitTemplate,
+	#[serde(default)]
+	pub no_config: bool,
+	#[serde(default)]
+	pub no_example: bool,
+	#[serde(default)]
+	pub typescript: bool,
+	#[serde(default)]
+	pub force: bool,
+	#[serde(default)]
+	pub nix: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct InitResolved {
+	pub options: InitOptions,
+}
+
+pub struct InitCommand;
+
+impl CommandDef for InitCommand {
+	const NAME: &'static str = "init";
+
+	type Raw = InitRaw;
+	type Resolved = InitResolved;
+	type Data = serde_json::Value;
+
+	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		Ok(InitResolved {
+			options: InitOptions {
+				path: raw.path,
+				template: raw.template,
+				no_config: raw.no_config,
+				no_example: raw.no_example,
+				typescript: raw.typescript,
+				force: raw.force,
+				nix: raw.nix,
+			},
+		})
+	}
+
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, _exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			let options = args.options.clone();
+			let result = scaffold_project(options)?;
+			let data = serde_json::json!({
+				"projectRoot": result.project_root,
+				"filesCreated": result.files_created,
+				"directoriesCreated": result.directories_created,
+			});
+
+			Ok(CommandOutcome {
+				inputs: CommandInputs {
+					extra: Some(serde_json::json!({
+						"path": args.options.path,
+						"template": args.options.template,
+						"noConfig": args.options.no_config,
+						"noExample": args.options.no_example,
+						"typescript": args.options.typescript,
+						"force": args.options.force,
+						"nix": args.options.nix,
+					})),
+					..Default::default()
+				},
+				data,
+				delta: ContextDelta::default(),
+			})
+		})
+	}
+}
 
 /// Options for project initialization
+#[derive(Debug, Clone)]
 pub struct InitOptions {
 	pub path: PathBuf,
 	pub template: InitTemplate,

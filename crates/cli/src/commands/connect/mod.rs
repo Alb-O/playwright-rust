@@ -8,19 +8,40 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use pw_rs::{Playwright, StorageState, dirs};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::debug;
 
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
 use crate::context_store::ContextState;
 use crate::error::{PwError, Result};
-use crate::output::{OutputFormat, ResultBuilder, print_result};
+use crate::output::CommandInputs;
+use crate::target::ResolveEnv;
 use crate::workspace::{STATE_VERSION_DIR, compute_cdp_port, ensure_state_root_gitignore};
 
 mod wsl;
 
-/// Options for the connect command.
-pub struct ConnectOptions {
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectRaw {
+	#[serde(default)]
+	pub endpoint: Option<String>,
+	#[serde(default)]
+	pub clear: bool,
+	#[serde(default)]
+	pub launch: bool,
+	#[serde(default)]
+	pub discover: bool,
+	#[serde(default)]
+	pub kill: bool,
+	#[serde(default)]
+	pub port: Option<u16>,
+	#[serde(default)]
+	pub user_data_dir: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConnectResolved {
 	pub endpoint: Option<String>,
 	pub clear: bool,
 	pub launch: bool,
@@ -28,7 +49,153 @@ pub struct ConnectOptions {
 	pub kill: bool,
 	pub port: Option<u16>,
 	pub user_data_dir: Option<PathBuf>,
-	pub auth_file: Option<PathBuf>,
+}
+
+pub struct ConnectCommand;
+
+impl CommandDef for ConnectCommand {
+	const NAME: &'static str = "connect";
+
+	type Raw = ConnectRaw;
+	type Resolved = ConnectResolved;
+	type Data = serde_json::Value;
+
+	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		Ok(ConnectResolved {
+			endpoint: raw.endpoint,
+			clear: raw.clear,
+			launch: raw.launch,
+			discover: raw.discover,
+			kill: raw.kill,
+			port: raw.port,
+			user_data_dir: raw.user_data_dir,
+		})
+	}
+
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			let port = resolve_connect_port(exec.ctx_state, args.port);
+			let auth_file = exec.ctx.auth_file();
+
+			let data = if args.kill {
+				match kill_chrome(port).await? {
+					Some(pids) => {
+						exec.ctx_state.set_cdp_endpoint(None);
+						json!({
+							"action": "killed",
+							"port": port,
+							"pids": pids,
+							"message": format!("Killed Chrome process(es) on port {}: {}", port, pids)
+						})
+					}
+					None => json!({
+						"action": "kill",
+						"port": port,
+						"message": format!("No Chrome process found on port {}", port)
+					}),
+				}
+			} else if args.clear {
+				exec.ctx_state.set_cdp_endpoint(None);
+				json!({
+					"action": "cleared",
+					"message": "CDP endpoint cleared"
+				})
+			} else if args.launch {
+				let launch_data_dir = resolve_user_data_dir(exec.ctx_state, args.user_data_dir.as_deref())?;
+				let info = launch_chrome(port, Some(launch_data_dir.as_path())).await?;
+				let auth_applied = maybe_apply_auth(&info.web_socket_debugger_url, auth_file).await?;
+				exec.ctx_state.set_cdp_endpoint(Some(info.web_socket_debugger_url.clone()));
+
+				json!({
+					"action": "launched",
+					"endpoint": info.web_socket_debugger_url,
+					"browser": info.browser,
+					"port": port,
+					"user_data_dir": launch_data_dir,
+					"auth": auth_applied.as_ref().map(|s| json!({
+						"file": s.auth_file,
+						"cookiesApplied": s.cookies_applied,
+						"originsPresent": s.origins_present
+					})),
+					"message": if let Some(summary) = &auth_applied {
+						format!(
+							"Chrome launched and connected on port {} (applied {} auth cookies from {})",
+							port,
+							summary.cookies_applied,
+							summary.auth_file.display()
+						)
+					} else {
+						format!("Chrome launched and connected on port {}", port)
+					}
+				})
+			} else if args.discover {
+				let info = discover_chrome(port).await?;
+				let auth_applied = maybe_apply_auth(&info.web_socket_debugger_url, auth_file).await?;
+				exec.ctx_state.set_cdp_endpoint(Some(info.web_socket_debugger_url.clone()));
+
+				json!({
+					"action": "discovered",
+					"endpoint": info.web_socket_debugger_url,
+					"browser": info.browser,
+					"port": port,
+					"auth": auth_applied.as_ref().map(|s| json!({
+						"file": s.auth_file,
+						"cookiesApplied": s.cookies_applied,
+						"originsPresent": s.origins_present
+					})),
+					"message": if let Some(summary) = &auth_applied {
+						format!(
+							"Connected to existing Chrome instance (applied {} auth cookies from {})",
+							summary.cookies_applied,
+							summary.auth_file.display()
+						)
+					} else {
+						"Connected to existing Chrome instance".to_string()
+					}
+				})
+			} else if let Some(ep) = &args.endpoint {
+				exec.ctx_state.set_cdp_endpoint(Some(ep.clone()));
+				json!({
+					"action": "set",
+					"endpoint": ep,
+					"message": format!("CDP endpoint set to {}", ep)
+				})
+			} else {
+				match exec.ctx_state.cdp_endpoint() {
+					Some(ep) => json!({
+						"action": "show",
+						"endpoint": ep,
+						"message": format!("Current CDP endpoint: {}", ep)
+					}),
+					None => json!({
+						"action": "show",
+						"endpoint": null,
+						"message": "No CDP endpoint configured. Use --launch or --discover to connect."
+					}),
+				}
+			};
+
+			Ok(CommandOutcome {
+				inputs: CommandInputs {
+					extra: Some(json!({
+						"endpoint": args.endpoint,
+						"clear": args.clear,
+						"launch": args.launch,
+						"discover": args.discover,
+						"kill": args.kill,
+						"port": args.port,
+						"userDataDir": args.user_data_dir,
+					})),
+					..Default::default()
+				},
+				data,
+				delta: ContextDelta::default(),
+			})
+		})
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -418,169 +585,6 @@ async fn kill_chrome(port: u16) -> Result<Option<String>> {
 
 		Err(PwError::Context(format!("Could not find or kill process on port {}", port)))
 	}
-}
-
-pub async fn run(ctx_state: &mut ContextState, format: OutputFormat, opts: ConnectOptions) -> Result<()> {
-	let ConnectOptions {
-		endpoint,
-		clear,
-		launch,
-		discover,
-		kill,
-		port: requested_port,
-		user_data_dir,
-		auth_file,
-	} = opts;
-
-	let port = resolve_connect_port(ctx_state, requested_port);
-
-	if kill {
-		match kill_chrome(port).await? {
-			Some(pids) => {
-				ctx_state.set_cdp_endpoint(None);
-				let result = ResultBuilder::<serde_json::Value>::new("connect")
-					.data(json!({
-						"action": "killed",
-						"port": port,
-						"pids": pids,
-						"message": format!("Killed Chrome process(es) on port {}: {}", port, pids)
-					}))
-					.build();
-				print_result(&result, format);
-			}
-			None => {
-				let result = ResultBuilder::<serde_json::Value>::new("connect")
-					.data(json!({
-						"action": "kill",
-						"port": port,
-						"message": format!("No Chrome process found on port {}", port)
-					}))
-					.build();
-				print_result(&result, format);
-			}
-		}
-		return Ok(());
-	}
-
-	// Clear endpoint
-	if clear {
-		ctx_state.set_cdp_endpoint(None);
-		let result = ResultBuilder::<serde_json::Value>::new("connect")
-			.data(json!({
-				"action": "cleared",
-				"message": "CDP endpoint cleared"
-			}))
-			.build();
-		print_result(&result, format);
-		return Ok(());
-	}
-
-	// Launch Chrome with remote debugging
-	if launch {
-		let launch_data_dir = resolve_user_data_dir(ctx_state, user_data_dir.as_deref())?;
-		let info = launch_chrome(port, Some(launch_data_dir.as_path())).await?;
-		let auth_applied = maybe_apply_auth(&info.web_socket_debugger_url, auth_file.as_deref()).await?;
-		ctx_state.set_cdp_endpoint(Some(info.web_socket_debugger_url.clone()));
-
-		let result = ResultBuilder::<serde_json::Value>::new("connect")
-			.data(json!({
-				"action": "launched",
-				"endpoint": info.web_socket_debugger_url,
-				"browser": info.browser,
-				"port": port,
-				"user_data_dir": launch_data_dir,
-				"auth": auth_applied.as_ref().map(|s| json!({
-					"file": s.auth_file,
-					"cookiesApplied": s.cookies_applied,
-					"originsPresent": s.origins_present
-				})),
-				"message": if let Some(summary) = &auth_applied {
-					format!(
-						"Chrome launched and connected on port {} (applied {} auth cookies from {})",
-						port,
-						summary.cookies_applied,
-						summary.auth_file.display()
-					)
-				} else {
-					format!("Chrome launched and connected on port {}", port)
-				}
-			}))
-			.build();
-		print_result(&result, format);
-		return Ok(());
-	}
-
-	// Discover existing Chrome instance
-	if discover {
-		let info = discover_chrome(port).await?;
-		let auth_applied = maybe_apply_auth(&info.web_socket_debugger_url, auth_file.as_deref()).await?;
-		ctx_state.set_cdp_endpoint(Some(info.web_socket_debugger_url.clone()));
-
-		let result = ResultBuilder::<serde_json::Value>::new("connect")
-			.data(json!({
-				"action": "discovered",
-				"endpoint": info.web_socket_debugger_url,
-				"browser": info.browser,
-				"port": port,
-				"auth": auth_applied.as_ref().map(|s| json!({
-					"file": s.auth_file,
-					"cookiesApplied": s.cookies_applied,
-					"originsPresent": s.origins_present
-				})),
-				"message": if let Some(summary) = &auth_applied {
-					format!(
-						"Connected to existing Chrome instance (applied {} auth cookies from {})",
-						summary.cookies_applied,
-						summary.auth_file.display()
-					)
-				} else {
-					"Connected to existing Chrome instance".to_string()
-				}
-			}))
-			.build();
-		print_result(&result, format);
-		return Ok(());
-	}
-
-	// Set endpoint manually
-	if let Some(ep) = endpoint {
-		ctx_state.set_cdp_endpoint(Some(ep.clone()));
-		let result = ResultBuilder::<serde_json::Value>::new("connect")
-			.data(json!({
-				"action": "set",
-				"endpoint": ep,
-				"message": format!("CDP endpoint set to {}", ep)
-			}))
-			.build();
-		print_result(&result, format);
-		return Ok(());
-	}
-
-	// Show current endpoint
-	match ctx_state.cdp_endpoint() {
-		Some(ep) => {
-			let result = ResultBuilder::<serde_json::Value>::new("connect")
-				.data(json!({
-					"action": "show",
-					"endpoint": ep,
-					"message": format!("Current CDP endpoint: {}", ep)
-				}))
-				.build();
-			print_result(&result, format);
-		}
-		None => {
-			let result = ResultBuilder::<serde_json::Value>::new("connect")
-				.data(json!({
-					"action": "show",
-					"endpoint": null,
-					"message": "No CDP endpoint configured. Use --launch or --discover to connect."
-				}))
-				.build();
-			print_result(&result, format);
-		}
-	}
-
-	Ok(())
 }
 
 #[cfg(test)]

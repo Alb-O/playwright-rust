@@ -20,7 +20,7 @@ pub(crate) mod wait;
 
 use std::path::Path;
 
-use crate::cli::{AuthAction, Cli, Commands, DaemonAction, HarAction, ProtectAction, SessionAction, TabsAction};
+use crate::cli::{Cli, Commands};
 use crate::commands::def::ExecMode;
 use crate::context::CommandContext;
 use crate::context_store::ContextState;
@@ -29,7 +29,6 @@ use crate::output::OutputFormat;
 use crate::relay;
 use crate::runtime::{RuntimeConfig, RuntimeContext, build_runtime};
 use crate::session_broker::SessionBroker;
-use crate::target::{Resolve, ResolveEnv};
 
 pub async fn dispatch(cli: Cli, format: OutputFormat) -> Result<()> {
 	if let Commands::Relay { ref host, port } = cli.command {
@@ -69,8 +68,6 @@ async fn dispatch_command<'ctx>(
 	format: OutputFormat,
 	artifacts_dir: Option<&'ctx Path>,
 ) -> Result<()> {
-	let has_cdp = ctx.cdp_endpoint().is_some();
-
 	let command = match command {
 		Commands::Screenshot(mut args) => {
 			args.output = Some(ctx_state.resolve_output(ctx, args.output));
@@ -83,141 +80,6 @@ async fn dispatch_command<'ctx>(
 		return dispatch::dispatch_registry_command(id, args, ExecMode::Cli, ctx, ctx_state, broker, format, artifacts_dir).await;
 	}
 
-	dispatch_ad_hoc(command, ctx, ctx_state, broker, format, has_cdp).await
-}
-
-async fn dispatch_ad_hoc<'ctx>(
-	command: Commands,
-	ctx: &'ctx CommandContext,
-	ctx_state: &mut ContextState,
-	broker: &mut SessionBroker<'ctx>,
-	format: OutputFormat,
-	has_cdp: bool,
-) -> Result<()> {
-	match command {
-		Commands::Auth { action } => match action {
-			AuthAction::Login { url, output, timeout } => {
-				let resolved_output = resolve_auth_output(ctx, &output);
-				let raw = auth::LoginRaw::from_cli(url, resolved_output.clone(), timeout);
-				let env = ResolveEnv::new(ctx_state, has_cdp, "auth-login");
-				let resolved = raw.resolve(&env)?;
-				let last_url = ctx_state.last_url();
-				let outcome = auth::login_resolved(&resolved, ctx, broker, last_url).await;
-				if outcome.is_ok() {
-					ctx_state.apply_delta(def::ContextDelta {
-						url: resolved.target.url_str().map(String::from),
-						output: Some(resolved_output),
-						selector: None,
-					});
-				}
-				outcome
-			}
-			AuthAction::Cookies { url, format: cookie_format } => {
-				let raw = auth::CookiesRaw::from_cli(url, cookie_format);
-				let env = ResolveEnv::new(ctx_state, has_cdp, "auth-cookies");
-				let resolved = raw.resolve(&env)?;
-				let last_url = ctx_state.last_url();
-				let outcome = auth::cookies_resolved(&resolved, ctx, broker, last_url).await;
-				if outcome.is_ok() {
-					ctx_state.record_from_target(&resolved.target, None);
-				}
-				outcome
-			}
-			AuthAction::Show { file } => auth::show(&file).await,
-			AuthAction::Listen { host, port } => auth::listen(&host, port, ctx).await,
-		},
-		Commands::Session { action } => match action {
-			SessionAction::Status => session::status(ctx_state, format).await,
-			SessionAction::Clear => session::clear(ctx_state, format).await,
-			SessionAction::Start { headful } => session::start(ctx_state, broker, headful, format).await,
-			SessionAction::Stop => session::stop(ctx_state, broker, format).await,
-		},
-		Commands::Daemon { action } => match action {
-			DaemonAction::Start { foreground } => daemon::start(foreground, format).await,
-			DaemonAction::Stop => daemon::stop(format).await,
-			DaemonAction::Status => daemon::status(format).await,
-		},
-		Commands::Init {
-			path,
-			template,
-			no_config,
-			no_example,
-			typescript,
-			force,
-			nix,
-		} => init::execute(init::InitOptions {
-			path,
-			template,
-			no_config,
-			no_example,
-			typescript,
-			force,
-			nix,
-		}),
-		Commands::Relay { .. } => unreachable!("handled earlier"),
-		Commands::Run => unreachable!("handled earlier"),
-		Commands::Connect {
-			endpoint,
-			clear,
-			launch,
-			discover,
-			kill,
-			port,
-			user_data_dir,
-		} => {
-			connect::run(
-				ctx_state,
-				format,
-				connect::ConnectOptions {
-					endpoint,
-					clear,
-					launch,
-					discover,
-					kill,
-					port,
-					user_data_dir,
-					auth_file: ctx.auth_file().map(std::path::Path::to_path_buf),
-				},
-			)
-			.await
-		}
-		Commands::Tabs(action) => {
-			let protected = ctx_state.protected_urls();
-			match action {
-				TabsAction::List => tabs::list(ctx, broker, format, protected).await,
-				TabsAction::Switch { target } => tabs::switch(&target, ctx, broker, format, protected).await,
-				TabsAction::Close { target } => tabs::close_tab(&target, ctx, broker, format, protected).await,
-				TabsAction::New { url } => tabs::new_tab(url.as_deref(), ctx, broker, format).await,
-			}
-		}
-		Commands::Protect(action) => match action {
-			ProtectAction::Add { pattern } => protect::add(ctx_state, format, pattern),
-			ProtectAction::Remove { pattern } => protect::remove(ctx_state, format, &pattern),
-			ProtectAction::List => protect::list(ctx_state, format),
-		},
-		Commands::Har { action } => match action {
-			HarAction::Set {
-				file,
-				content,
-				mode,
-				omit_content,
-				url_filter,
-			} => har::set(ctx_state, format, file, content, mode, omit_content, url_filter),
-			HarAction::Show => har::show(ctx_state, format),
-			HarAction::Clear => har::clear(ctx_state, format),
-		},
-		Commands::Test { .. } => unreachable!("handled earlier"),
-		// Registry-backed commands should have been handled above
-		Commands::Navigate(_) | Commands::Screenshot(_) | Commands::Click(_) | Commands::Fill(_) | Commands::Wait(_) | Commands::Page(_) => {
-			unreachable!("registry command reached ad-hoc dispatch")
-		}
-	}
-}
-
-fn resolve_auth_output(ctx: &CommandContext, output: &Path) -> std::path::PathBuf {
-	if output.is_absolute() || output.parent().is_some_and(|p| !p.as_os_str().is_empty()) {
-		return output.to_path_buf();
-	}
-
-	ctx.namespace_auth_dir().join(output)
+	let name = format!("{command:?}");
+	Err(PwError::Context(format!("command is not registered for unified dispatch: {name}")))
 }

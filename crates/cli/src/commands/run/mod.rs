@@ -44,6 +44,25 @@
 //! | `screenshot` | `url?`, `output?`, `full_page?` | Capture screenshot |
 //! | `fill` | `url?`, `selector`, `text` | Fill input field |
 //! | `wait` | `url?`, `condition?` | Wait for condition |
+//! | `connect` | `endpoint?`, `clear?`, `launch?`, `discover?`, `kill?`, `port?` | Manage CDP endpoint |
+//! | `session.status` | - | Show reusable session status |
+//! | `session.clear` | - | Clear stored session descriptor |
+//! | `session.start` | `headful?` | Start reusable session |
+//! | `session.stop` | - | Stop reusable session |
+//! | `daemon.start` | `foreground?` | Start daemon (foreground unsupported in batch) |
+//! | `daemon.stop` | - | Stop daemon |
+//! | `daemon.status` | - | Show daemon status |
+//! | `tabs.list` | - | List open tabs |
+//! | `tabs.switch` | `target` | Switch tab by index or match |
+//! | `tabs.close` | `target` | Close tab by index or match |
+//! | `tabs.new` | `url?` | Open new tab |
+//! | `protect.add` | `pattern` | Add protected URL pattern |
+//! | `protect.remove` | `pattern` | Remove protected URL pattern |
+//! | `protect.list` | - | List protected URL patterns |
+//! | `har.set` | `file`, `content`, `mode`, `omitContent?`, `urlFilter?` | Persist HAR defaults |
+//! | `har.show` | - | Show HAR defaults |
+//! | `har.clear` | - | Clear HAR defaults |
+//! | `init` | `path?`, `template?`, `noConfig?`, `noExample?`, `typescript?`, `force?`, `nix?` | Scaffold project |
 //! | `ping` | - | Health check |
 //! | `quit` | - | Exit batch mode |
 //!
@@ -60,6 +79,8 @@
 //! | `page.read` | `url?`, `output_format?`, `metadata?` | Extract readable content |
 //! | `page.coords` | `url?`, `selector` | Get element coordinates |
 //! | `page.coords_all` | `url?`, `selector` | Get all matching coordinates |
+//!
+//! Interactive-only commands such as `auth.login` and `auth.listen` are rejected in batch mode.
 //!
 //! # Example Session
 //!

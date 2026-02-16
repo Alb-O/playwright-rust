@@ -192,6 +192,8 @@ pub enum ErrorCode {
 	SessionError,
 	/// Invalid input provided
 	InvalidInput,
+	/// Command is not supported in the current execution mode
+	UnsupportedMode,
 	/// Authentication required or failed
 	AuthError,
 	/// Unknown/internal error
@@ -211,6 +213,7 @@ impl std::fmt::Display for ErrorCode {
 			ErrorCode::IoError => write!(f, "IO_ERROR"),
 			ErrorCode::SessionError => write!(f, "SESSION_ERROR"),
 			ErrorCode::InvalidInput => write!(f, "INVALID_INPUT"),
+			ErrorCode::UnsupportedMode => write!(f, "UNSUPPORTED_MODE"),
 			ErrorCode::AuthError => write!(f, "AUTH_ERROR"),
 			ErrorCode::InternalError => write!(f, "INTERNAL_ERROR"),
 		}

@@ -16,12 +16,13 @@ use pw_rs::{StorageState, WaitUntil};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
+use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
 use crate::context::CommandContext;
 use crate::error::{PwError, Result};
+use crate::output::CommandInputs;
 use crate::session_broker::{SessionBroker, SessionRequest};
 use crate::target::{Resolve, ResolveEnv, ResolvedTarget, Target, TargetPolicy};
 
-/// Raw inputs for `auth login` from CLI or batch JSON.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginRaw {
@@ -33,17 +34,6 @@ pub struct LoginRaw {
 	pub timeout_secs: Option<u64>,
 }
 
-impl LoginRaw {
-	pub fn from_cli(url: Option<String>, output: PathBuf, timeout_secs: u64) -> Self {
-		Self {
-			url,
-			output: Some(output),
-			timeout_secs: Some(timeout_secs),
-		}
-	}
-}
-
-/// Resolved inputs for `auth login` ready for execution.
 #[derive(Debug, Clone)]
 pub struct LoginResolved {
 	pub target: ResolvedTarget,
@@ -69,7 +59,48 @@ impl Resolve for LoginRaw {
 	}
 }
 
-/// Raw inputs for `auth cookies` from CLI or batch JSON.
+#[derive(Debug, Clone)]
+pub struct LoginCommand;
+
+impl CommandDef for LoginCommand {
+	const NAME: &'static str = "auth login";
+	const INTERACTIVE_ONLY: bool = true;
+
+	type Raw = LoginRaw;
+	type Resolved = LoginResolved;
+	type Data = serde_json::Value;
+
+	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		raw.resolve(env)
+	}
+
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			let mut resolved = args.clone();
+			resolved.output = resolve_auth_output(exec.ctx, &resolved.output);
+
+			let data = login_resolved(&resolved, exec.ctx, exec.broker, exec.last_url, true).await?;
+
+			Ok(CommandOutcome {
+				inputs: CommandInputs {
+					url: resolved.target.url_str().map(str::to_string),
+					output_path: Some(resolved.output.clone()),
+					..Default::default()
+				},
+				data,
+				delta: ContextDelta {
+					url: resolved.target.url_str().map(str::to_string),
+					output: Some(resolved.output.clone()),
+					selector: None,
+				},
+			})
+		})
+	}
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CookiesRaw {
@@ -79,13 +110,6 @@ pub struct CookiesRaw {
 	pub format: Option<String>,
 }
 
-impl CookiesRaw {
-	pub fn from_cli(url: Option<String>, format: String) -> Self {
-		Self { url, format: Some(format) }
-	}
-}
-
-/// Resolved inputs for `auth cookies` ready for execution.
 #[derive(Debug, Clone)]
 pub struct CookiesResolved {
 	pub target: ResolvedTarget,
@@ -109,19 +133,160 @@ impl Resolve for CookiesRaw {
 	}
 }
 
-/// Opens a browser for manual login and saves the resulting session state.
-///
-/// Launches a headed (visible) browser, navigates to the target URL, and waits for the user
-/// to complete authentication. The session is saved when the user presses Enter
-/// or after `timeout_secs` elapses.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// * Browser launch fails
-/// * Navigation fails
-/// * File I/O fails when saving the auth state
-pub async fn login_resolved(args: &LoginResolved, ctx: &CommandContext, broker: &mut SessionBroker<'_>, last_url: Option<&str>) -> Result<()> {
+#[derive(Debug, Clone)]
+pub struct CookiesCommand;
+
+impl CommandDef for CookiesCommand {
+	const NAME: &'static str = "auth cookies";
+
+	type Raw = CookiesRaw;
+	type Resolved = CookiesResolved;
+	type Data = serde_json::Value;
+
+	fn resolve(raw: Self::Raw, env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		raw.resolve(env)
+	}
+
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			let data = cookies_resolved(args, exec.ctx, exec.broker, exec.last_url).await?;
+
+			Ok(CommandOutcome {
+				inputs: CommandInputs {
+					url: args.target.url_str().map(str::to_string),
+					extra: Some(serde_json::json!({ "format": args.format })),
+					..Default::default()
+				},
+				data,
+				delta: ContextDelta {
+					url: args.target.url_str().map(str::to_string),
+					output: None,
+					selector: None,
+				},
+			})
+		})
+	}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShowRaw {
+	pub file: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+pub struct ShowResolved {
+	pub file: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+pub struct ShowCommand;
+
+impl CommandDef for ShowCommand {
+	const NAME: &'static str = "auth show";
+
+	type Raw = ShowRaw;
+	type Resolved = ShowResolved;
+	type Data = serde_json::Value;
+
+	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		Ok(ShowResolved { file: raw.file })
+	}
+
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, _exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			let data = show(&args.file).await?;
+			Ok(CommandOutcome {
+				inputs: CommandInputs {
+					output_path: Some(args.file.clone()),
+					..Default::default()
+				},
+				data,
+				delta: ContextDelta::default(),
+			})
+		})
+	}
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListenRaw {
+	#[serde(default = "default_host")]
+	pub host: String,
+	#[serde(default = "default_port")]
+	pub port: u16,
+}
+
+fn default_host() -> String {
+	"127.0.0.1".to_string()
+}
+
+fn default_port() -> u16 {
+	9271
+}
+
+#[derive(Debug, Clone)]
+pub struct ListenResolved {
+	pub host: String,
+	pub port: u16,
+}
+
+#[derive(Debug, Clone)]
+pub struct ListenCommand;
+
+impl CommandDef for ListenCommand {
+	const NAME: &'static str = "auth listen";
+	const INTERACTIVE_ONLY: bool = true;
+
+	type Raw = ListenRaw;
+	type Resolved = ListenResolved;
+	type Data = serde_json::Value;
+
+	fn resolve(raw: Self::Raw, _env: &ResolveEnv<'_>) -> Result<Self::Resolved> {
+		Ok(ListenResolved {
+			host: raw.host,
+			port: raw.port,
+		})
+	}
+
+	fn execute<'exec, 'ctx>(args: &'exec Self::Resolved, exec: ExecCtx<'exec, 'ctx>) -> BoxFut<'exec, Result<CommandOutcome<Self::Data>>>
+	where
+		'ctx: 'exec,
+	{
+		Box::pin(async move {
+			listen(&args.host, args.port, exec.ctx).await?;
+			Ok(CommandOutcome {
+				inputs: CommandInputs {
+					extra: Some(serde_json::json!({
+						"host": args.host,
+						"port": args.port,
+					})),
+					..Default::default()
+				},
+				data: serde_json::json!({
+					"listening": false,
+					"host": args.host,
+					"port": args.port,
+				}),
+				delta: ContextDelta::default(),
+			})
+		})
+	}
+}
+
+async fn login_resolved(
+	args: &LoginResolved,
+	ctx: &CommandContext,
+	broker: &mut SessionBroker<'_>,
+	last_url: Option<&str>,
+	interactive_messages: bool,
+) -> Result<serde_json::Value> {
 	let url_display = args.target.url_str().unwrap_or("<current page>");
 	info!(target = "pw", url = %url_display, path = %args.output.display(), browser = %ctx.browser, "starting interactive login");
 
@@ -136,10 +301,12 @@ pub async fn login_resolved(args: &LoginResolved, ctx: &CommandContext, broker: 
 		.await?;
 	session.goto_target(&args.target.target, ctx.timeout_ms()).await?;
 
-	println!("Browser opened at: {url_display}");
-	println!();
-	println!("Log in manually, then press Enter to save session.");
-	println!("(Or wait {} seconds for auto-save)", args.timeout_secs);
+	if interactive_messages {
+		eprintln!("Browser opened at: {url_display}");
+		eprintln!();
+		eprintln!("Log in manually, then press Enter to save session.");
+		eprintln!("(Or wait {} seconds for auto-save)", args.timeout_secs);
+	}
 
 	let stdin_future = tokio::task::spawn_blocking(|| {
 		let mut input = String::new();
@@ -148,8 +315,17 @@ pub async fn login_resolved(args: &LoginResolved, ctx: &CommandContext, broker: 
 	let timeout_future = tokio::time::sleep(tokio::time::Duration::from_secs(args.timeout_secs));
 
 	tokio::select! {
-		_ = stdin_future => println!("Saving session..."),
-		_ = timeout_future => println!("\nTimeout reached, saving session..."),
+		_ = stdin_future => {
+			if interactive_messages {
+				eprintln!("Saving session...");
+			}
+		}
+		_ = timeout_future => {
+			if interactive_messages {
+				eprintln!();
+				eprintln!("Timeout reached, saving session...");
+			}
+		}
 	}
 
 	let state = session.context().storage_state(None).await?;
@@ -162,25 +338,26 @@ pub async fn login_resolved(args: &LoginResolved, ctx: &CommandContext, broker: 
 
 	state.to_file(&args.output)?;
 
-	println!();
-	println!("Authentication state saved to: {}", args.output.display());
-	println!("  Cookies: {}", state.cookies.len());
-	println!("  Origins with localStorage: {}", state.origins.len());
-	println!();
-	println!("Use with other commands: pw --auth {} <command>", args.output.display());
+	if interactive_messages {
+		eprintln!();
+		eprintln!("Authentication state saved to: {}", args.output.display());
+		eprintln!("  Cookies: {}", state.cookies.len());
+		eprintln!("  Origins with localStorage: {}", state.origins.len());
+		eprintln!();
+		eprintln!("Use with other commands: pw --auth {} <command>", args.output.display());
+	}
 
-	session.close().await
+	session.close().await?;
+
+	Ok(serde_json::json!({
+		"path": args.output,
+		"cookies": state.cookies.len(),
+		"origins": state.origins.len(),
+		"url": args.target.url_str(),
+	}))
 }
 
-/// Displays cookies for a URL in the specified format.
-///
-/// Navigates to the target URL and retrieves all cookies, displaying them as either
-/// JSON or a human-readable table.
-///
-/// # Errors
-///
-/// Returns an error if browser launch or navigation fails.
-pub async fn cookies_resolved(args: &CookiesResolved, ctx: &CommandContext, broker: &mut SessionBroker<'_>, last_url: Option<&str>) -> Result<()> {
+async fn cookies_resolved(args: &CookiesResolved, ctx: &CommandContext, broker: &mut SessionBroker<'_>, last_url: Option<&str>) -> Result<serde_json::Value> {
 	let url_display = args.target.url_str().unwrap_or("<current page>");
 	info!(target = "pw", url = %url_display, browser = %ctx.browser, "fetching cookies");
 
@@ -191,92 +368,67 @@ pub async fn cookies_resolved(args: &CookiesResolved, ctx: &CommandContext, brok
 
 	session.goto_target(&args.target.target, ctx.timeout_ms()).await?;
 
-	// Get the actual URL for cookie filtering
 	let cookie_url = match &args.target.target {
 		Target::Navigate(url) => url.as_str().to_string(),
 		Target::CurrentPage => session.page().url(),
 	};
 
 	let cookies = session.context().cookies(Some(vec![&cookie_url])).await?;
+	session.close().await?;
 
-	match args.format.as_str() {
-		"json" => println!("{}", serde_json::to_string_pretty(&cookies)?),
-		_ => print_cookies_table(&cookies, &cookie_url),
-	}
-
-	session.close().await
+	Ok(serde_json::json!({
+		"url": cookie_url,
+		"format": args.format,
+		"cookies": cookies,
+		"count": cookies.len(),
+	}))
 }
 
-fn print_cookies_table(cookies: &[pw_rs::Cookie], url: &str) {
-	if cookies.is_empty() {
-		println!("No cookies found for {url}");
-		return;
-	}
-
-	println!("{:<20} {:<40} {:<20}", "NAME", "VALUE", "DOMAIN");
-	println!("{}", "-".repeat(80));
-
-	for cookie in cookies {
-		let value = if cookie.value.len() > 37 {
-			format!("{}...", &cookie.value[..37])
-		} else {
-			cookie.value.clone()
-		};
-		let domain = cookie.domain.as_deref().unwrap_or("-");
-		println!("{:<20} {:<40} {:<20}", cookie.name, value, domain);
-	}
-
-	println!();
-	println!("Total: {} cookies", cookies.len());
-}
-
-/// Displays the contents of a saved authentication file.
-///
-/// Parses the JSON auth file and prints a summary of cookies and localStorage
-/// entries it contains.
-///
-/// # Errors
-///
-/// Returns an error if the file cannot be read or parsed.
-pub async fn show(file: &Path) -> Result<()> {
+async fn show(file: &Path) -> Result<serde_json::Value> {
 	let state = StorageState::from_file(file).map_err(|e| PwError::BrowserLaunch(format!("Failed to load auth file: {e}")))?;
 
-	println!("Authentication state from: {}", file.display());
-	println!();
+	let cookies: Vec<_> = state
+		.cookies
+		.iter()
+		.map(|cookie| {
+			serde_json::json!({
+				"name": cookie.name,
+				"domain": cookie.domain,
+				"expires": format_expiry(cookie.expires),
+			})
+		})
+		.collect();
 
-	println!("COOKIES ({}):", state.cookies.len());
-	if state.cookies.is_empty() {
-		println!("  (none)");
-	} else {
-		println!("  {:<20} {:<30} {:<20}", "NAME", "DOMAIN", "EXPIRES");
-		println!("  {}", "-".repeat(70));
-		for cookie in &state.cookies {
-			let domain = cookie.domain.as_deref().unwrap_or("-");
-			let expires = format_expiry(cookie.expires);
-			println!("  {:<20} {:<30} {:<20}", cookie.name, domain, expires);
-		}
+	let origins: Vec<_> = state
+		.origins
+		.iter()
+		.map(|origin| {
+			let storage: Vec<_> = origin
+				.local_storage
+				.iter()
+				.map(|entry| serde_json::json!({ "name": entry.name, "value": entry.value }))
+				.collect();
+			serde_json::json!({
+				"origin": origin.origin,
+				"localStorage": storage,
+			})
+		})
+		.collect();
+
+	Ok(serde_json::json!({
+		"file": file,
+		"cookies": cookies,
+		"cookieCount": state.cookies.len(),
+		"origins": origins,
+		"originCount": state.origins.len(),
+	}))
+}
+
+fn resolve_auth_output(ctx: &CommandContext, output: &Path) -> PathBuf {
+	if output.is_absolute() || output.parent().is_some_and(|p| !p.as_os_str().is_empty()) {
+		return output.to_path_buf();
 	}
-
-	println!();
-
-	println!("LOCAL STORAGE ({} origins):", state.origins.len());
-	if state.origins.is_empty() {
-		println!("  (none)");
-	} else {
-		for origin in &state.origins {
-			println!("  {}:", origin.origin);
-			for entry in &origin.local_storage {
-				let value = if entry.value.len() > 50 {
-					format!("{}...", &entry.value[..50])
-				} else {
-					entry.value.clone()
-				};
-				println!("    {}: {value}", entry.name);
-			}
-		}
-	}
-
-	Ok(())
+	ctx.namespace_auth_dir().join(output)
 }
 
 fn format_expiry(expires: Option<f64>) -> String {
