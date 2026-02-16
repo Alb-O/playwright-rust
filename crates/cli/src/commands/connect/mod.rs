@@ -12,8 +12,8 @@ use serde_json::json;
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx, Resolve};
 use crate::error::Result;
 use crate::output::CommandInputs;
+use crate::session::connect::resolve_connect_port;
 use crate::session::connect_service::ConnectService;
-use crate::session::connector::resolve_connect_port;
 use crate::target::ResolveEnv;
 
 #[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]

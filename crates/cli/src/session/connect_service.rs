@@ -4,7 +4,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::connector::{clear_cdp_endpoint, discover_and_connect, kill_browser_on_port, launch_and_connect, set_cdp_endpoint, show_cdp_endpoint};
+use super::connect::{clear_cdp_endpoint, discover_and_connect, kill_browser_on_port, launch_and_connect, set_cdp_endpoint, show_cdp_endpoint};
 use crate::context_store::ContextState;
 use crate::error::Result;
 

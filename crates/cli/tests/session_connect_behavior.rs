@@ -149,3 +149,32 @@ fn connect_set_persists_to_profile_config_defaults() {
 	let value: serde_json::Value = serde_json::from_str(&config).expect("config should parse");
 	assert_eq!(value["defaults"]["cdpEndpoint"], endpoint);
 }
+
+#[test]
+fn connect_action_precedence_prefers_kill_over_clear_and_endpoint_set() {
+	let tmp = TempDir::new().expect("temp dir should be created");
+	let original = "http://127.0.0.1:9222";
+
+	let (success, _json, stderr) = run_exec_json(tmp.path(), "connect", json!({ "endpoint": original }));
+	assert!(success, "connect set failed: {stderr}");
+
+	let (success, json, stderr) = run_exec_json(
+		tmp.path(),
+		"connect",
+		json!({
+			"kill": true,
+			"clear": true,
+			"endpoint": "http://127.0.0.1:9444",
+			"port": 0
+		}),
+	);
+	assert!(success, "connect precedence call failed: {stderr}");
+	assert_eq!(json["ok"], true);
+	assert_eq!(json["data"]["action"], "kill");
+	assert_eq!(json["data"]["message"], "No Chrome process found on port 0");
+
+	let (success, json, stderr) = run_exec_json(tmp.path(), "connect", json!({}));
+	assert!(success, "connect show failed: {stderr}");
+	assert_eq!(json["ok"], true);
+	assert_eq!(json["data"]["endpoint"], original);
+}

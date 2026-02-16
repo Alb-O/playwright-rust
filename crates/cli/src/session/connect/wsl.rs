@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use tracing::debug;
 
-use super::{CdpVersionInfo, fetch_cdp_endpoint};
+use super::cdp_probe::{CdpVersionInfo, fetch_cdp_endpoint};
 use crate::context_store::ContextState;
 use crate::error::{PwError, Result};
 
