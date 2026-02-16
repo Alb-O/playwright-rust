@@ -1583,6 +1583,7 @@ dependencies = [
  "dirs",
  "futures",
  "jsonrpsee",
+ "pw-cli-command-macros",
  "pw-protocol",
  "pw-rs",
  "pw-runtime",
@@ -1599,6 +1600,15 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "which",
+]
+
+[[package]]
+name = "pw-cli-command-macros"
+version = "0.18.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

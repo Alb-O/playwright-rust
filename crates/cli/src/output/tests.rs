@@ -47,6 +47,8 @@ fn error_code_display() {
 #[test]
 fn output_format_parse() {
 	assert_eq!("json".parse::<OutputFormat>().unwrap(), OutputFormat::Json);
+	assert_eq!("json-v1".parse::<OutputFormat>().unwrap(), OutputFormat::JsonV1);
+	assert_eq!("ndjson-v1".parse::<OutputFormat>().unwrap(), OutputFormat::NdjsonV1);
 	assert_eq!("text".parse::<OutputFormat>().unwrap(), OutputFormat::Text);
 	assert!("invalid".parse::<OutputFormat>().is_err());
 }
@@ -66,6 +68,25 @@ fn serialize_command_result() {
 	let json = serde_json::to_string(&result).unwrap();
 	assert!(json.contains("\"ok\":true"));
 	assert!(json.contains("\"navigated\":true"));
+	assert!(json.contains("\"schemaVersion\":2"));
+	assert!(json.contains("\"meta\""));
+}
+
+#[test]
+fn v1_output_reference_uses_schema_1_without_meta() {
+	let result: CommandResult<ClickData> = ResultBuilder::new("click")
+		.data(ClickData {
+			before_url: "https://example.com".into(),
+			after_url: "https://example.com/page".into(),
+			navigated: true,
+			selector: "a.link".into(),
+			downloads: Vec::new(),
+		})
+		.build();
+
+	let value = serde_json::to_value(as_v1_ref(&result)).unwrap();
+	assert_eq!(value.get("schemaVersion"), Some(&serde_json::Value::from(1)));
+	assert!(value.get("meta").is_none());
 }
 
 #[test]

@@ -65,7 +65,7 @@ pub struct Cli {
 	#[arg(short, long, global = true, action = clap::ArgAction::Count)]
 	pub verbose: u8,
 
-	/// Output format: toon (default), json, ndjson, or text
+	/// Output format: toon (default), json, json-v1, ndjson, ndjson-v1, or text
 	#[arg(short = 'f', long, global = true, value_enum, default_value = "toon")]
 	pub format: OutputFormat,
 

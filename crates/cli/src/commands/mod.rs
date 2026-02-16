@@ -1,4 +1,5 @@
 mod auth;
+pub(crate) mod catalog;
 pub(crate) mod click;
 mod connect;
 pub(crate) mod contract;
@@ -52,7 +53,7 @@ pub async fn dispatch(cli: Cli, format: OutputFormat) -> Result<()> {
 	);
 
 	let result = match cli.command {
-		Commands::Run => run::execute(&ctx, &mut ctx_state, &mut broker).await,
+		Commands::Run => run::execute(&ctx, &mut ctx_state, &mut broker, format).await,
 		Commands::Relay { .. } => unreachable!(),
 		command => dispatch_command(command, &ctx, &mut ctx_state, &mut broker, format, cli.artifacts_dir.as_deref()).await,
 	};

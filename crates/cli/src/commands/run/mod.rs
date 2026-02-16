@@ -106,7 +106,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use crate::context::CommandContext;
 use crate::context_store::ContextState;
 use crate::error::Result;
-use crate::output::{CommandInputs, SCHEMA_VERSION};
+use crate::output::{CommandInputs, OutputFormat, SCHEMA_VERSION};
 use crate::session_broker::SessionBroker;
 
 /// A batch request parsed from stdin.
@@ -138,8 +138,8 @@ pub struct BatchRequest {
 /// # Wire Format
 ///
 /// ```json
-/// {"id":"1","ok":true,"command":"navigate","data":{"url":"https://example.com"},"schemaVersion":1}
-/// {"id":"2","ok":false,"command":"click","error":{"code":"ELEMENT_NOT_FOUND","message":"..."},"schemaVersion":1}
+/// {"id":"1","ok":true,"command":"navigate","data":{"url":"https://example.com"},"schemaVersion":2}
+/// {"id":"2","ok":false,"command":"click","error":{"code":"ELEMENT_NOT_FOUND","message":"..."},"schemaVersion":2}
 /// ```
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -169,6 +169,10 @@ pub struct BatchResponse {
 	/// Resolved inputs used for this command (URLs, selectors after context resolution).
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub inputs: Option<CommandInputs>,
+
+	/// Additional metadata for machine consumers.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub meta: Option<BatchMeta>,
 }
 
 /// Structured error information in a [`BatchResponse`].
@@ -189,36 +193,49 @@ pub struct BatchError {
 	pub code: String,
 	/// Human-readable error description.
 	pub message: String,
+	/// Additional error details (context payload when available).
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub details: Option<serde_json::Value>,
+}
+
+/// Additional metadata attached to batch responses.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchMeta {
+	/// Schema version of the response envelope.
+	pub schema_version: u32,
 }
 
 impl BatchResponse {
-	fn success(id: Option<String>, command: &str, data: serde_json::Value) -> Self {
+	fn success(id: Option<String>, command: &str, data: serde_json::Value, schema_version: u32) -> Self {
 		Self {
-			schema_version: Some(SCHEMA_VERSION),
+			schema_version: Some(schema_version),
 			id,
 			ok: true,
 			command: command.to_string(),
 			data: Some(data),
 			error: None,
 			inputs: None,
+			meta: (schema_version > 1).then_some(BatchMeta { schema_version }),
 		}
 	}
 
-	fn success_empty(id: Option<String>, command: &str) -> Self {
+	fn success_empty(id: Option<String>, command: &str, schema_version: u32) -> Self {
 		Self {
-			schema_version: Some(SCHEMA_VERSION),
+			schema_version: Some(schema_version),
 			id,
 			ok: true,
 			command: command.to_string(),
 			data: None,
 			error: None,
 			inputs: None,
+			meta: (schema_version > 1).then_some(BatchMeta { schema_version }),
 		}
 	}
 
-	fn error(id: Option<String>, command: &str, code: &str, message: &str) -> Self {
+	fn error(id: Option<String>, command: &str, code: &str, message: &str, details: Option<serde_json::Value>, schema_version: u32) -> Self {
 		Self {
-			schema_version: Some(SCHEMA_VERSION),
+			schema_version: Some(schema_version),
 			id,
 			ok: false,
 			command: command.to_string(),
@@ -226,8 +243,10 @@ impl BatchResponse {
 			error: Some(BatchError {
 				code: code.to_string(),
 				message: message.to_string(),
+				details,
 			}),
 			inputs: None,
+			meta: (schema_version > 1).then_some(BatchMeta { schema_version }),
 		}
 	}
 
@@ -252,11 +271,15 @@ impl BatchResponse {
 ///
 /// Returns `Ok(())` on graceful exit (EOF or quit command). Individual command
 /// errors are reported in the response stream, not as function errors.
-pub async fn execute<'ctx>(ctx: &'ctx CommandContext, ctx_state: &mut ContextState, broker: &mut SessionBroker<'ctx>) -> Result<()> {
+pub async fn execute<'ctx>(ctx: &'ctx CommandContext, ctx_state: &mut ContextState, broker: &mut SessionBroker<'ctx>, format: OutputFormat) -> Result<()> {
 	let stdin = tokio::io::stdin();
 	let mut reader = BufReader::new(stdin);
 	let mut stdout = std::io::stdout();
 	let mut line = String::new();
+	let schema_version = match format {
+		OutputFormat::JsonV1 | OutputFormat::NdjsonV1 => 1,
+		_ => SCHEMA_VERSION,
+	};
 
 	loop {
 		line.clear();
@@ -277,24 +300,27 @@ pub async fn execute<'ctx>(ctx: &'ctx CommandContext, ctx_state: &mut ContextSta
 		let request: BatchRequest = match serde_json::from_str(line) {
 			Ok(r) => r,
 			Err(e) => {
-				output_response(&mut stdout, &BatchResponse::error(None, "unknown", "PARSE_ERROR", &e.to_string()));
+				output_response(
+					&mut stdout,
+					&BatchResponse::error(None, "unknown", "PARSE_ERROR", &e.to_string(), None, schema_version),
+				);
 				continue;
 			}
 		};
 
 		match request.command.as_str() {
 			"ping" => {
-				output_response(&mut stdout, &BatchResponse::success_empty(request.id, "ping"));
+				output_response(&mut stdout, &BatchResponse::success_empty(request.id, "ping", schema_version));
 				continue;
 			}
 			"quit" | "exit" => {
-				output_response(&mut stdout, &BatchResponse::success_empty(request.id, "quit"));
+				output_response(&mut stdout, &BatchResponse::success_empty(request.id, "quit", schema_version));
 				break;
 			}
 			_ => {}
 		}
 
-		let response = dispatch::execute_batch_command(&request, ctx, ctx_state, broker).await;
+		let response = dispatch::execute_batch_command(&request, ctx, ctx_state, broker, format, schema_version).await;
 		output_response(&mut stdout, &response);
 	}
 

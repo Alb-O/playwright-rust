@@ -43,7 +43,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Increment this when making breaking changes to the output structure.
 /// Agents can use this to detect incompatible CLI versions.
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// Output format for CLI results.
 ///
@@ -55,8 +55,14 @@ pub enum OutputFormat {
 	Toon,
 	/// JSON output
 	Json,
+	/// JSON output using schema v1 compatibility envelope
+	#[value(name = "json-v1")]
+	JsonV1,
 	/// Newline-delimited JSON (streaming)
 	Ndjson,
+	/// Newline-delimited JSON using schema v1 compatibility envelope
+	#[value(name = "ndjson-v1")]
+	NdjsonV1,
 	/// Human-readable text
 	Text,
 }
@@ -68,7 +74,9 @@ impl std::str::FromStr for OutputFormat {
 		match s.to_lowercase().as_str() {
 			"toon" => Ok(OutputFormat::Toon),
 			"json" => Ok(OutputFormat::Json),
+			"json-v1" | "json_v1" => Ok(OutputFormat::JsonV1),
 			"ndjson" => Ok(OutputFormat::Ndjson),
+			"ndjson-v1" | "ndjson_v1" => Ok(OutputFormat::NdjsonV1),
 			"text" => Ok(OutputFormat::Text),
 			_ => Err(format!("unknown format: {s}")),
 		}
@@ -80,7 +88,9 @@ impl std::fmt::Display for OutputFormat {
 		match self {
 			OutputFormat::Toon => write!(f, "toon"),
 			OutputFormat::Json => write!(f, "json"),
+			OutputFormat::JsonV1 => write!(f, "json-v1"),
 			OutputFormat::Ndjson => write!(f, "ndjson"),
+			OutputFormat::NdjsonV1 => write!(f, "ndjson-v1"),
 			OutputFormat::Text => write!(f, "text"),
 		}
 	}
@@ -118,6 +128,10 @@ pub struct CommandResult<T: Serialize> {
 	/// Timing information
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub timings: Option<Timings>,
+
+	/// Additional metadata for machine consumers.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub meta: Option<CommandMeta>,
 
 	/// Artifacts produced (screenshots, files, etc.)
 	#[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -244,6 +258,21 @@ impl From<Duration> for Timings {
 			wait_ms: None,
 		}
 	}
+}
+
+/// Additional machine-oriented metadata for command results.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandMeta {
+	/// Total command duration in milliseconds.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub duration_ms: Option<u64>,
+	/// Execution mode hint (`cli` or `batch`) when available.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub mode: Option<String>,
+	/// Whether an existing browser session was reused.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub session_reused: Option<bool>,
 }
 
 /// Artifact produced by a command (file, screenshot, etc.)
@@ -491,6 +520,11 @@ impl<T: Serialize> ResultBuilder<T> {
 		let ok = self.error.is_none() && self.data.is_some();
 
 		let timings = self.timings.or_else(|| self.start_time.map(|start| Timings::from(start.elapsed())));
+		let meta = timings.as_ref().map(|timings| CommandMeta {
+			duration_ms: Some(timings.duration_ms),
+			mode: None,
+			session_reused: None,
+		});
 
 		CommandResult {
 			schema_version: self.schema_version,
@@ -500,10 +534,49 @@ impl<T: Serialize> ResultBuilder<T> {
 			data: self.data,
 			error: self.error,
 			timings,
+			meta,
 			artifacts: self.artifacts,
 			diagnostics: self.diagnostics,
 			config: self.config,
 		}
+	}
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CommandResultV1Ref<'a, T: Serialize> {
+	#[serde(skip_serializing_if = "Option::is_none")]
+	schema_version: Option<u32>,
+	ok: bool,
+	command: &'a str,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	inputs: Option<&'a CommandInputs>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	data: Option<&'a T>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	error: Option<&'a CommandError>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	timings: Option<&'a Timings>,
+	#[serde(default, skip_serializing_if = "<[Artifact]>::is_empty")]
+	artifacts: &'a [Artifact],
+	#[serde(default, skip_serializing_if = "<[Diagnostic]>::is_empty")]
+	diagnostics: &'a [Diagnostic],
+	#[serde(skip_serializing_if = "Option::is_none")]
+	config: Option<&'a EffectiveConfig>,
+}
+
+fn as_v1_ref<'a, T: Serialize>(result: &'a CommandResult<T>) -> CommandResultV1Ref<'a, T> {
+	CommandResultV1Ref {
+		schema_version: Some(1),
+		ok: result.ok,
+		command: &result.command,
+		inputs: result.inputs.as_ref(),
+		data: result.data.as_ref(),
+		error: result.error.as_ref(),
+		timings: result.timings.as_ref(),
+		artifacts: &result.artifacts,
+		diagnostics: &result.diagnostics,
+		config: result.config.as_ref(),
 	}
 }
 
@@ -520,8 +593,18 @@ pub fn print_result<T: Serialize>(result: &CommandResult<T>, format: OutputForma
 				println!("{json}");
 			}
 		}
+		OutputFormat::JsonV1 => {
+			if let Ok(json) = serde_json::to_string_pretty(&as_v1_ref(result)) {
+				println!("{json}");
+			}
+		}
 		OutputFormat::Ndjson => {
 			if let Ok(json) = serde_json::to_string(result) {
+				println!("{json}");
+			}
+		}
+		OutputFormat::NdjsonV1 => {
+			if let Ok(json) = serde_json::to_string(&as_v1_ref(result)) {
 				println!("{json}");
 			}
 		}
@@ -622,6 +705,7 @@ pub fn print_failure_with_artifacts(command: &str, failure: &FailureWithArtifact
 		data: None::<()>,
 		error: Some(failure.error.clone()),
 		timings: result.timings,
+		meta: result.meta,
 		artifacts: failure.artifacts.clone(),
 		diagnostics: result.diagnostics,
 		config: result.config,
