@@ -18,7 +18,7 @@ fn result_builder_success() {
 
 	assert!(result.ok);
 	assert_eq!(result.command, "navigate");
-	assert_eq!(result.schema_version, Some(3));
+	assert_eq!(result.schema_version, Some(4));
 	assert!(result.data.is_some());
 	assert!(result.error.is_none());
 	assert!(result.duration_ms.is_some());
@@ -71,7 +71,7 @@ fn serialize_command_result() {
 	let json = serde_json::to_string(&result).expect("command result should serialize");
 	assert!(json.contains("\"ok\":true"));
 	assert!(json.contains("\"navigated\":true"));
-	assert!(json.contains("\"schemaVersion\":3"));
+	assert!(json.contains("\"schemaVersion\":4"));
 	assert!(json.contains("\"durationMs\""));
 	assert!(!json.contains("\"meta\""));
 	assert!(!json.contains("\"timings\""));

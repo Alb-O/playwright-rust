@@ -55,7 +55,7 @@ fn parse_ndjson(stdout: &str) -> Vec<serde_json::Value> {
 fn batch_supports_har_show() {
 	clear_context_store();
 
-	let (success, stdout, stderr) = run_pw_batch(&[r#"{"id":"1","command":"har.show","args":{}}"#, r#"{"id":"2","command":"quit","args":{}}"#]);
+	let (success, stdout, stderr) = run_pw_batch(&[r#"{"id":"1","op":"har.show","input":{}}"#, r#"{"id":"2","op":"quit","input":{}}"#]);
 
 	assert!(success, "batch run failed: {stderr}");
 	let lines = parse_ndjson(&stdout);
@@ -64,8 +64,9 @@ fn batch_supports_har_show() {
 	let first = &lines[0];
 	assert_eq!(first["id"], "1");
 	assert_eq!(first["ok"], true);
-	assert_eq!(first["command"], "har.show");
-	assert_eq!(first["data"]["enabled"], false);
+	assert_eq!(first["schemaVersion"], 4);
+	assert_eq!(first["op"], "har.show");
+	assert_eq!(first["result"]["enabled"], false);
 }
 
 #[test]
@@ -73,8 +74,8 @@ fn batch_rejects_auth_login_as_interactive() {
 	clear_context_store();
 
 	let (success, stdout, stderr) = run_pw_batch(&[
-		r#"{"id":"1","command":"auth-login","args":{"url":"https://example.com"}}"#,
-		r#"{"id":"2","command":"quit","args":{}}"#,
+		r#"{"id":"1","op":"auth-login","input":{"url":"https://example.com"}}"#,
+		r#"{"id":"2","op":"quit","input":{}}"#,
 	]);
 
 	assert!(success, "batch run should stay healthy: {stderr}");
@@ -84,7 +85,8 @@ fn batch_rejects_auth_login_as_interactive() {
 	let first = &lines[0];
 	assert_eq!(first["id"], "1");
 	assert_eq!(first["ok"], false);
-	assert_eq!(first["command"], "auth.login");
+	assert_eq!(first["schemaVersion"], 4);
+	assert_eq!(first["op"], "auth.login");
 	assert_eq!(first["error"]["code"], "UNSUPPORTED_MODE");
 }
 
@@ -92,7 +94,7 @@ fn batch_rejects_auth_login_as_interactive() {
 fn batch_alias_response_uses_canonical_command_name() {
 	clear_context_store();
 
-	let (success, stdout, stderr) = run_pw_batch(&[r#"{"id":"1","command":"har-show","args":{}}"#, r#"{"id":"2","command":"quit","args":{}}"#]);
+	let (success, stdout, stderr) = run_pw_batch(&[r#"{"id":"1","op":"har-show","input":{}}"#, r#"{"id":"2","op":"quit","input":{}}"#]);
 
 	assert!(success, "batch run failed: {stderr}");
 	let lines = parse_ndjson(&stdout);
@@ -101,5 +103,6 @@ fn batch_alias_response_uses_canonical_command_name() {
 	let first = &lines[0];
 	assert_eq!(first["id"], "1");
 	assert_eq!(first["ok"], true);
-	assert_eq!(first["command"], "har.show");
+	assert_eq!(first["schemaVersion"], 4);
+	assert_eq!(first["op"], "har.show");
 }

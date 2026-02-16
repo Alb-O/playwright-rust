@@ -65,7 +65,8 @@ impl Parse for CatalogInput {
 struct CommandEntry {
 	id: Ident,
 	ty: Path,
-	names: Vec<LitStr>,
+	canonical: LitStr,
+	aliases: Vec<LitStr>,
 	cli_pat: Pat,
 	cli_args: Expr,
 	interactive: bool,
@@ -82,6 +83,8 @@ impl Parse for CommandEntry {
 		braced!(content in input);
 
 		let mut names: Option<Vec<LitStr>> = None;
+		let mut canonical: Option<LitStr> = None;
+		let mut aliases: Option<Vec<LitStr>> = None;
 		let mut cli_pat: Option<Pat> = None;
 		let mut cli_args: Option<Expr> = None;
 		let mut interactive = false;
@@ -93,16 +96,26 @@ impl Parse for CommandEntry {
 
 			match key.to_string().as_str() {
 				"names" => {
-					let names_content;
-					bracketed!(names_content in content);
-					let parsed = names_content
-						.parse_terminated(|input: ParseStream<'_>| input.parse(), Token![,])?
-						.into_iter()
-						.collect::<Vec<_>>();
+					if names.is_some() {
+						return Err(Error::new(key.span(), "duplicate 'names' field"));
+					}
+					let parsed = parse_string_list(&content)?;
 					if parsed.is_empty() {
 						return Err(Error::new(key.span(), "'names' must include at least one command name"));
 					}
 					names = Some(parsed);
+				}
+				"canonical" => {
+					if canonical.is_some() {
+						return Err(Error::new(key.span(), "duplicate 'canonical' field"));
+					}
+					canonical = Some(content.parse()?);
+				}
+				"aliases" => {
+					if aliases.is_some() {
+						return Err(Error::new(key.span(), "duplicate 'aliases' field"));
+					}
+					aliases = Some(parse_string_list(&content)?);
 				}
 				"cli" => {
 					let pat = Pat::parse_single(&content)?;
@@ -122,7 +135,7 @@ impl Parse for CommandEntry {
 				other => {
 					return Err(Error::new(
 						key.span(),
-						format!("unsupported command field '{other}', expected names/cli/interactive/batch"),
+						format!("unsupported command field '{other}', expected names/canonical/aliases/cli/interactive/batch"),
 					));
 				}
 			}
@@ -132,14 +145,24 @@ impl Parse for CommandEntry {
 			}
 		}
 
-		let names = names.ok_or_else(|| Error::new(id.span(), "missing required field 'names'"))?;
+		if let Some(name_list) = names {
+			if canonical.is_some() || aliases.is_some() {
+				return Err(Error::new(id.span(), "'names' cannot be combined with 'canonical' or 'aliases'; use one style"));
+			}
+			canonical = Some(name_list[0].clone());
+			aliases = Some(name_list.into_iter().skip(1).collect());
+		}
+
+		let canonical = canonical.ok_or_else(|| Error::new(id.span(), "missing required command name; use either 'names' or 'canonical'"))?;
+		let aliases = aliases.unwrap_or_default();
 		let cli_pat = cli_pat.ok_or_else(|| Error::new(id.span(), "missing required field 'cli'"))?;
 		let cli_args = cli_args.ok_or_else(|| Error::new(id.span(), "missing required field 'cli'"))?;
 
 		Ok(Self {
 			id,
 			ty,
-			names,
+			canonical,
+			aliases,
 			cli_pat,
 			cli_args,
 			interactive,
@@ -148,14 +171,21 @@ impl Parse for CommandEntry {
 	}
 }
 
-#[proc_macro]
-pub fn command_catalog(input: TokenStream) -> TokenStream {
-	let catalog = parse_macro_input!(input as CatalogInput);
+fn parse_string_list(input: ParseStream<'_>) -> Result<Vec<LitStr>> {
+	let content;
+	bracketed!(content in input);
+	let parsed = content
+		.parse_terminated(|inner: ParseStream<'_>| inner.parse(), Token![,])?
+		.into_iter()
+		.collect::<Vec<_>>();
+	Ok(parsed)
+}
 
+fn expand_command_graph(catalog: CatalogInput) -> TokenStream {
 	let ids = catalog.entries.iter().map(|entry| &entry.id);
 	let lookup_arms = catalog.entries.iter().map(|entry| {
 		let id = &entry.id;
-		let names = &entry.names;
+		let names = std::iter::once(&entry.canonical).chain(entry.aliases.iter()).collect::<Vec<_>>();
 		quote! {
 			#(#names)|* => Some(CommandId::#id),
 		}
@@ -163,15 +193,41 @@ pub fn command_catalog(input: TokenStream) -> TokenStream {
 
 	let name_arms = catalog.entries.iter().map(|entry| {
 		let id = &entry.id;
-		let ty = &entry.ty;
+		let canonical = &entry.canonical;
 		quote! {
-			CommandId::#id => <#ty as crate::commands::def::CommandDef>::NAME,
+			CommandId::#id => #canonical,
+		}
+	});
+
+	let meta_rows = catalog.entries.iter().map(|entry| {
+		let id = &entry.id;
+		let canonical = &entry.canonical;
+		let aliases = &entry.aliases;
+		let interactive = entry.interactive;
+		let batch = entry.batch;
+		quote! {
+			CommandMeta {
+				id: CommandId::#id,
+				canonical: #canonical,
+				aliases: &[#(#aliases),*],
+				interactive_only: #interactive,
+				batch_enabled: #batch,
+			}
+		}
+	});
+
+	let meta_match_arms = catalog.entries.iter().enumerate().map(|(idx, entry)| {
+		let id = &entry.id;
+		let index = syn::Index::from(idx);
+		quote! {
+			CommandId::#id => &COMMAND_GRAPH[#index],
 		}
 	});
 
 	let run_arms = catalog.entries.iter().map(|entry| {
 		let id = &entry.id;
 		let ty = &entry.ty;
+		let canonical = &entry.canonical;
 		let interactive = entry.interactive;
 		let batch = entry.batch;
 		quote! {
@@ -179,6 +235,12 @@ pub fn command_catalog(input: TokenStream) -> TokenStream {
 				type Cmd = #ty;
 				use crate::commands::def::ExecMode;
 
+				let canonical = #canonical;
+				debug_assert_eq!(
+					<Cmd as crate::commands::def::CommandDef>::NAME,
+					canonical,
+					"command graph canonical name must match CommandDef::NAME"
+				);
 				let interactive_only = #interactive || <Cmd as crate::commands::def::CommandDef>::INTERACTIVE_ONLY;
 				let batch_enabled = #batch;
 
@@ -186,13 +248,13 @@ pub fn command_catalog(input: TokenStream) -> TokenStream {
 					if !batch_enabled {
 						return Err(crate::error::PwError::UnsupportedMode(format!(
 							"command '{}' is not available in batch/ndjson mode",
-							<Cmd as crate::commands::def::CommandDef>::NAME
+							canonical,
 						)));
 					}
 					if interactive_only {
 						return Err(crate::error::PwError::UnsupportedMode(format!(
 							"command '{}' is interactive-only and cannot run in batch/ndjson mode",
-							<Cmd as crate::commands::def::CommandDef>::NAME
+							canonical,
 						)));
 					}
 				}
@@ -205,13 +267,13 @@ pub fn command_catalog(input: TokenStream) -> TokenStream {
 					let env = crate::target::ResolveEnv::new(
 						&*exec.ctx_state,
 						has_cdp,
-						<Cmd as crate::commands::def::CommandDef>::NAME,
+						canonical,
 					);
 					<Cmd as crate::commands::def::CommandDef>::resolve(raw, &env)?
 				};
 
 				let outcome = <Cmd as crate::commands::def::CommandDef>::execute(&resolved, exec).await?;
-				outcome.erase(<Cmd as crate::commands::def::CommandDef>::NAME)
+				outcome.erase(canonical)
 			}
 		}
 	});
@@ -235,6 +297,29 @@ pub fn command_catalog(input: TokenStream) -> TokenStream {
 		#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 		pub enum CommandId {
 			#(#ids),*
+		}
+
+		#[derive(Debug, Clone, Copy)]
+		pub struct CommandMeta {
+			pub id: CommandId,
+			pub canonical: &'static str,
+			pub aliases: &'static [&'static str],
+			pub interactive_only: bool,
+			pub batch_enabled: bool,
+		}
+
+		pub const COMMAND_GRAPH: &[CommandMeta] = &[
+			#(#meta_rows),*
+		];
+
+		pub fn command_meta(id: CommandId) -> &'static CommandMeta {
+			match id {
+				#(#meta_match_arms)*
+			}
+		}
+
+		pub fn all_commands() -> &'static [CommandMeta] {
+			COMMAND_GRAPH
 		}
 
 		pub fn lookup_command(name: &str) -> Option<CommandId> {
@@ -284,4 +369,16 @@ pub fn command_catalog(input: TokenStream) -> TokenStream {
 			Ok(Some(invocation))
 		}
 	})
+}
+
+#[proc_macro]
+pub fn command_graph(input: TokenStream) -> TokenStream {
+	let catalog = parse_macro_input!(input as CatalogInput);
+	expand_command_graph(catalog)
+}
+
+#[proc_macro]
+pub fn command_catalog(input: TokenStream) -> TokenStream {
+	let catalog = parse_macro_input!(input as CatalogInput);
+	expand_command_graph(catalog)
 }

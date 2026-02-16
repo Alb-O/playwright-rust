@@ -21,11 +21,11 @@ pub async fn execute_batch_command<'ctx>(
 	schema_version: u32,
 ) -> BatchResponse {
 	let id = request.id.clone();
-	let cmd_str = request.command.as_str();
+	let op = request.op.as_str();
 	let has_cdp = ctx.cdp_endpoint().is_some();
 
-	let Some(cmd_id) = lookup_command(cmd_str) else {
-		return BatchResponse::error(id, cmd_str, "UNKNOWN_COMMAND", &format!("Unknown command: {}", cmd_str), None, schema_version);
+	let Some(cmd_id) = lookup_command(op) else {
+		return BatchResponse::error(id, op, "UNKNOWN_COMMAND", &format!("Unknown operation: {}", op), None, schema_version);
 	};
 
 	let last_url = ctx_state.last_url().map(str::to_string);
@@ -39,7 +39,7 @@ pub async fn execute_batch_command<'ctx>(
 		last_url: last_url.as_deref(),
 	};
 
-	match run_command(cmd_id, request.args.clone(), has_cdp, exec).await {
+	match run_command(cmd_id, request.input.clone(), has_cdp, exec).await {
 		Ok(out) => {
 			out.delta.apply(ctx_state);
 			BatchResponse::success(id, out.command, out.data, schema_version).with_inputs(out.inputs)

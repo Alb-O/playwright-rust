@@ -2,7 +2,8 @@
 
 use crate::output::{CommandInputs, OutputFormat, ResultBuilder, print_result};
 
-pub use crate::commands::catalog::{CommandId, command_name, lookup_command, run_command};
+#[allow(unused_imports)]
+pub use crate::commands::graph::{CommandId, CommandMeta, all_commands, command_meta, command_name, lookup_command, run_command};
 
 /// Print success result in the given format.
 pub fn emit_success(command: &'static str, inputs: CommandInputs, data: serde_json::Value, format: OutputFormat) {
@@ -45,5 +46,16 @@ mod tests {
 		assert_eq!(command_name(CommandId::Connect), "connect");
 		assert_eq!(command_name(CommandId::SessionStatus), "session.status");
 		assert_eq!(command_name(CommandId::HarShow), "har.show");
+	}
+
+	#[test]
+	fn command_meta_matches_lookup() {
+		let id = lookup_command("navigate").expect("navigate should resolve");
+		let meta = command_meta(id);
+		assert_eq!(meta.canonical, "navigate");
+		assert_eq!(meta.aliases, &["nav"]);
+		assert!(!meta.interactive_only);
+		assert!(meta.batch_enabled);
+		assert!(all_commands().iter().any(|entry| entry.id == id));
 	}
 }

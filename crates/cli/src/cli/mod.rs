@@ -277,11 +277,11 @@ pub enum Commands {
 	/// Run commands from stdin in batch mode (for AI agents)
 	///
 	/// Reads NDJSON commands from stdin and streams responses to stdout.
-	/// Each line should be a JSON object with "id", "command", and "args" fields.
+	/// Each line should be a JSON object with "id", "op", and "input" fields.
 	///
 	/// Example input:
-	///   {"id":"1","command":"navigate","args":{"url":"https://example.com"}}
-	///   {"id":"2","command":"screenshot","args":{"output":"page.png"}}
+	///   {"id":"1","op":"navigate","input":{"url":"https://example.com"}}
+	///   {"id":"2","op":"screenshot","input":{"output":"page.png"}}
 	///
 	/// Use Ctrl+D (EOF) to exit batch mode.
 	Run,

@@ -1,13 +1,13 @@
-//! Generated command catalog and dispatch helpers.
+//! Generated command graph and dispatch helpers.
 //!
 //! This module defines command metadata once and generates:
 //! * command lookup by name/alias
 //! * registry-backed execution dispatch
 //! * CLI enum to registry invocation mapping
 
-use pw_cli_command_macros::command_catalog;
+use pw_cli_command_macros::command_graph;
 
-command_catalog! {
+command_graph! {
 	commands: [
 		Navigate => crate::commands::navigate::NavigateCommand {
 			names: ["navigate", "nav"],

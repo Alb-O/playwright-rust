@@ -1,5 +1,4 @@
 mod auth;
-pub(crate) mod catalog;
 pub(crate) mod click;
 mod connect;
 pub(crate) mod contract;
@@ -9,6 +8,7 @@ pub(crate) mod dispatch;
 pub(crate) mod exec_flow;
 pub(crate) mod fill;
 pub(crate) mod flow;
+pub(crate) mod graph;
 mod har;
 pub mod init;
 pub(crate) mod invocation;

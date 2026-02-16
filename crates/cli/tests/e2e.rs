@@ -86,7 +86,10 @@ fn text_simple() {
 	// JSON envelope contains the text
 	assert!(stdout.contains("Hello World"), "Expected 'Hello World' in output");
 	assert!(stdout.contains("\"ok\": true"), "Expected success in JSON");
-	assert!(stdout.contains("\"schemaVersion\": 3"), "Expected schemaVersion=3 in JSON");
+	assert!(
+		stdout.contains("\"schemaVersion\":4") || stdout.contains("\"schemaVersion\": 4"),
+		"Expected schemaVersion=4 in JSON"
+	);
 	assert!(stdout.contains("\"durationMs\":"), "Expected durationMs in JSON");
 	assert!(stdout.contains("\"matchCount\": 1"), "Expected matchCount in output");
 }
@@ -185,7 +188,10 @@ fn navigate_returns_json() {
 
 	assert!(success, "Command failed: {}", stderr);
 	assert!(stdout.contains("\"ok\": true"), "Expected ok in JSON");
-	assert!(stdout.contains("\"schemaVersion\": 3"), "Expected schemaVersion=3 in JSON");
+	assert!(
+		stdout.contains("\"schemaVersion\":4") || stdout.contains("\"schemaVersion\": 4"),
+		"Expected schemaVersion=4 in JSON"
+	);
 	assert!(stdout.contains("\"durationMs\":"), "Expected durationMs in JSON");
 	assert!(stdout.contains("\"url\""), "Expected url in JSON");
 	assert!(stdout.contains("\"title\""), "Expected title in JSON");

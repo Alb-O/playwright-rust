@@ -12,11 +12,11 @@
 //! | Field | Type | Description |
 //! |-------|------|-------------|
 //! | `id` | `string?` | Request identifier echoed in response (optional) |
-//! | `command` | `string` | Command name (e.g., `"navigate"`, `"click"`) |
-//! | `args` | `object` | Command-specific arguments |
+//! | `op` | `string` | Operation name (e.g., `"navigate"`, `"click"`) |
+//! | `input` | `object` | Operation-specific arguments |
 //!
 //! ```json
-//! {"id": "1", "command": "navigate", "args": {"url": "https://example.com"}}
+//! {"id": "1", "op": "navigate", "input": {"url": "https://example.com"}}
 //! ```
 //!
 //! ## Response Format
@@ -24,13 +24,13 @@
 //! Each response is a single JSON line:
 //!
 //! ```json
-//! {"id": "1", "ok": true, "command": "navigate", "data": {"url": "..."}}
+//! {"id": "1", "ok": true, "op": "navigate", "result": {"url": "..."}}
 //! ```
 //!
 //! On error:
 //!
 //! ```json
-//! {"id": "1", "ok": false, "command": "navigate", "error": {"code": "...", "message": "..."}}
+//! {"id": "1", "ok": false, "op": "navigate", "error": {"code": "...", "message": "..."}}
 //! ```
 //!
 //! ## Supported Commands
@@ -86,14 +86,14 @@
 //!
 //! ```text
 //! $ pw run
-//! {"id":"1","command":"navigate","args":{"url":"https://example.com"}}
-//! {"id":"1","ok":true,"command":"navigate","data":{"url":"https://example.com"}}
-//! {"id":"2","command":"page.text","args":{"selector":"h1"}}
-//! {"id":"2","ok":true,"command":"page.text"}
-//! {"id":"3","command":"screenshot","args":{"output":"page.png"}}
-//! {"id":"3","ok":true,"command":"screenshot","data":{"path":"page.png"}}
-//! {"command":"quit"}
-//! {"ok":true,"command":"quit"}
+//! {"id":"1","op":"navigate","input":{"url":"https://example.com"}}
+//! {"id":"1","ok":true,"op":"navigate","result":{"url":"https://example.com"}}
+//! {"id":"2","op":"page.text","input":{"selector":"h1"}}
+//! {"id":"2","ok":true,"op":"page.text"}
+//! {"id":"3","op":"screenshot","input":{"output":"page.png"}}
+//! {"id":"3","ok":true,"op":"screenshot","result":{"path":"page.png"}}
+//! {"op":"quit"}
+//! {"ok":true,"op":"quit"}
 //! ```
 
 mod dispatch;
@@ -119,12 +119,12 @@ pub struct BatchRequest {
 	#[serde(default)]
 	pub id: Option<String>,
 
-	/// Command name (e.g., `"navigate"`, `"click"`, `"screenshot"`).
-	pub command: String,
+	/// Operation name (e.g., `"navigate"`, `"click"`, `"screenshot"`).
+	pub op: String,
 
-	/// Command-specific arguments as a JSON object.
+	/// Operation-specific input arguments as a JSON object.
 	#[serde(default)]
-	pub args: serde_json::Value,
+	pub input: serde_json::Value,
 }
 
 /// A batch response written to stdout as NDJSON.
@@ -132,14 +132,14 @@ pub struct BatchRequest {
 /// Each response corresponds to a single [`BatchRequest`] and includes:
 /// * The echoed request `id` for correlation
 /// * Success/failure status via `ok`
-/// * Command-specific `data` on success
+/// * Operation-specific `result` payload on success
 /// * Structured [`BatchError`] on failure
 ///
 /// # Wire Format
 ///
 /// ```json
-/// {"id":"1","ok":true,"command":"navigate","data":{"url":"https://example.com"},"schemaVersion":3}
-/// {"id":"2","ok":false,"command":"click","error":{"code":"ELEMENT_NOT_FOUND","message":"..."},"schemaVersion":3}
+/// {"id":"1","ok":true,"op":"navigate","result":{"url":"https://example.com"},"schemaVersion":4}
+/// {"id":"2","ok":false,"op":"click","error":{"code":"ELEMENT_NOT_FOUND","message":"..."},"schemaVersion":4}
 /// ```
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -152,21 +152,21 @@ pub struct BatchResponse {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub id: Option<String>,
 
-	/// `true` if the command succeeded, `false` on error.
+	/// `true` if the operation succeeded, `false` on error.
 	pub ok: bool,
 
-	/// Command name echoed from the request.
-	pub command: String,
+	/// Operation name echoed from the request.
+	pub op: String,
 
-	/// Command-specific result data (present only on success).
+	/// Operation-specific result payload (present only on success).
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub data: Option<serde_json::Value>,
+	pub result: Option<serde_json::Value>,
 
 	/// Error details (present only on failure).
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub error: Option<BatchError>,
 
-	/// Resolved inputs used for this command (URLs, selectors after context resolution).
+	/// Resolved inputs used for this operation (URLs, selectors after context resolution).
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub inputs: Option<CommandInputs>,
 
@@ -183,7 +183,7 @@ pub struct BatchResponse {
 /// |------|-------------|
 /// | `PARSE_ERROR` | Invalid JSON in request |
 /// | `INVALID_INPUT` | Missing or invalid argument |
-/// | `UNKNOWN_COMMAND` | Unrecognized command name |
+/// | `UNKNOWN_COMMAND` | Unrecognized operation name |
 /// | `NAVIGATION_FAILED` | Page navigation error |
 /// | `ELEMENT_NOT_FOUND` | Selector matched no elements |
 /// | `*_FAILED` | Command-specific failure |
@@ -207,39 +207,39 @@ pub struct BatchMeta {
 }
 
 impl BatchResponse {
-	fn success(id: Option<String>, command: &str, data: serde_json::Value, schema_version: u32) -> Self {
+	fn success(id: Option<String>, op: &str, result: serde_json::Value, schema_version: u32) -> Self {
 		Self {
 			schema_version: Some(schema_version),
 			id,
 			ok: true,
-			command: command.to_string(),
-			data: Some(data),
+			op: op.to_string(),
+			result: Some(result),
 			error: None,
 			inputs: None,
 			meta: (schema_version > 1).then_some(BatchMeta { schema_version }),
 		}
 	}
 
-	fn success_empty(id: Option<String>, command: &str, schema_version: u32) -> Self {
+	fn success_empty(id: Option<String>, op: &str, schema_version: u32) -> Self {
 		Self {
 			schema_version: Some(schema_version),
 			id,
 			ok: true,
-			command: command.to_string(),
-			data: None,
+			op: op.to_string(),
+			result: None,
 			error: None,
 			inputs: None,
 			meta: (schema_version > 1).then_some(BatchMeta { schema_version }),
 		}
 	}
 
-	fn error(id: Option<String>, command: &str, code: &str, message: &str, details: Option<serde_json::Value>, schema_version: u32) -> Self {
+	fn error(id: Option<String>, op: &str, code: &str, message: &str, details: Option<serde_json::Value>, schema_version: u32) -> Self {
 		Self {
 			schema_version: Some(schema_version),
 			id,
 			ok: false,
-			command: command.to_string(),
-			data: None,
+			op: op.to_string(),
+			result: None,
 			error: Some(BatchError {
 				code: code.to_string(),
 				message: message.to_string(),
@@ -259,7 +259,7 @@ impl BatchResponse {
 /// Runs batch mode, reading NDJSON commands from stdin and streaming responses.
 ///
 /// This is the main entry point for `pw run`. It reads from stdin asynchronously,
-/// parsing each line as a [`BatchRequest`], executing the command, and writing
+/// parsing each line as a [`BatchRequest`], executing the operation, and writing
 /// the [`BatchResponse`] to stdout.
 ///
 /// # Special Commands
@@ -269,7 +269,7 @@ impl BatchResponse {
 ///
 /// # Errors
 ///
-/// Returns `Ok(())` on graceful exit (EOF or quit command). Individual command
+/// Returns `Ok(())` on graceful exit (EOF or quit command). Individual operation
 /// errors are reported in the response stream, not as function errors.
 pub async fn execute<'ctx>(ctx: &'ctx CommandContext, ctx_state: &mut ContextState, broker: &mut SessionBroker<'ctx>, format: OutputFormat) -> Result<()> {
 	let stdin = tokio::io::stdin();
@@ -305,7 +305,7 @@ pub async fn execute<'ctx>(ctx: &'ctx CommandContext, ctx_state: &mut ContextSta
 			}
 		};
 
-		match request.command.as_str() {
+		match request.op.as_str() {
 			"ping" => {
 				output_response(&mut stdout, &BatchResponse::success_empty(request.id, "ping", schema_version));
 				continue;
