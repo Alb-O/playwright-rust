@@ -34,7 +34,7 @@ use tokio::sync::{broadcast, oneshot};
 /// event handlers. The background task that invokes the callback is cancelled
 /// when this handle is dropped or [`unsubscribe`](Self::unsubscribe) is called.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// let sub = page.on_console(|msg| println!("{}", msg.text()));
@@ -159,13 +159,13 @@ impl<E: Clone + Send + 'static> EventBus<E> {
 	}
 
 	/// Returns the number of active subscribers.
-	#[allow(dead_code)]
+	#[allow(dead_code, reason = "reserved for event diagnostics and introspection APIs")]
 	pub fn subscriber_count(&self) -> usize {
 		self.tx.receiver_count()
 	}
 
 	/// Returns the number of registered waiters.
-	#[allow(dead_code)]
+	#[allow(dead_code, reason = "reserved for event diagnostics and introspection APIs")]
 	pub fn waiter_count(&self) -> usize {
 		self.waiters.lock().len()
 	}
@@ -183,7 +183,7 @@ impl<E: Clone + Send + 'static> Default for EventBus<E> {
 /// a warning and continuing to receive. This prevents lag errors from breaking
 /// event processing loops.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// let mut stream = EventStream::new(bus.subscribe());
@@ -249,7 +249,7 @@ impl<E: Clone + Send + 'static> EventStream<E> {
 /// * With timeout: Call [`wait()`](Self::wait) for timeout support
 /// * Without timeout: Use `.await` directly (implements [`Future`])
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// let waiter = EventWaiter::new(rx, Duration::from_secs(10));

@@ -28,24 +28,20 @@ pub async fn send_message<W>(stdin: &mut W, message: JsonValue) -> Result<()>
 where
 	W: AsyncWriteExt + Unpin,
 {
-	// Serialize to JSON
 	let json_bytes = serde_json::to_vec(&message).map_err(|e| Error::TransportError(format!("Failed to serialize JSON: {}", e)))?;
 
 	let length = json_bytes.len() as u32;
 
-	// Write 4-byte little-endian length prefix
 	stdin
 		.write_all(&length.to_le_bytes())
 		.await
 		.map_err(|e| Error::TransportError(format!("Failed to write length: {}", e)))?;
 
-	// Write JSON payload
 	stdin
 		.write_all(&json_bytes)
 		.await
 		.map_err(|e| Error::TransportError(format!("Failed to write message: {}", e)))?;
 
-	// Flush to ensure message is sent
 	stdin.flush().await.map_err(|e| Error::TransportError(format!("Failed to flush: {}", e)))?;
 
 	Ok(())
@@ -104,13 +100,13 @@ pub struct TransportParts {
 ///
 /// # Platform-Specific Cleanup
 ///
-/// **Windows**: The transport takes ownership of stdin/stdout from a Child process.
+/// Windows: The transport takes ownership of stdin/stdout from a Child process.
 /// When the transport is dropped, these handles are closed. On Windows, tokio uses
 /// a blocking threadpool for child process stdio, so proper cleanup requires that
 /// stdio handles be closed before terminating the parent process. See `PlaywrightServer`
 /// for the platform-specific cleanup logic.
 ///
-/// **Unix**: Standard pipe cleanup applies - no special handling needed.
+/// Unix: Standard pipe cleanup applies; no special handling is needed.
 pub struct PipeTransport<W, R>
 where
 	W: AsyncWrite + Unpin + Send,
@@ -224,7 +220,7 @@ where
 	///
 	/// Returns a tuple of (PipeTransport, message receiver channel)
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// # use pw_rs::server::transport::PipeTransport;
@@ -307,11 +303,9 @@ where
 	///
 	/// Returns an error if reading from stdout fails or if message parsing fails.
 	pub async fn run(&mut self) -> Result<()> {
-		const CHUNK_SIZE: usize = 32_768; // 32KB chunks
+		const CHUNK_SIZE: usize = 32_768;
 
 		loop {
-			// Read 4-byte little-endian length prefix
-			// Matches: buffer = await self._proc.stdout.readexactly(4)
 			let mut len_buf = [0u8; 4];
 			self.stdout
 				.read_exact(&mut len_buf)
@@ -320,11 +314,7 @@ where
 
 			let length = u32::from_le_bytes(len_buf) as usize;
 
-			// Read message payload
-			// Python reads in 32KB chunks for large messages
-			// Matches: to_read = min(length, 32768)
 			let message_buf = if length <= CHUNK_SIZE {
-				// Small message: read all at once
 				let mut buf = vec![0u8; length];
 				self.stdout
 					.read_exact(&mut buf)
@@ -332,8 +322,6 @@ where
 					.map_err(|e| Error::TransportError(format!("Failed to read message: {}", e)))?;
 				buf
 			} else {
-				// Large message: read in chunks
-				// Matches Python: while length > 0: data = await readexactly(min(length, 32768))
 				let mut buf = Vec::with_capacity(length);
 				let mut remaining = length;
 
@@ -353,14 +341,9 @@ where
 				buf
 			};
 
-			// Parse JSON
-			// Matches: obj = json.loads(data.decode("utf-8"))
 			let message: JsonValue = serde_json::from_slice(&message_buf).map_err(|e| Error::ProtocolError(format!("Failed to parse JSON: {}", e)))?;
 
-			// Dispatch message
-			// Matches: self.on_message(obj)
 			if self.message_tx.send(message).is_err() {
-				// Channel closed, stop reading
 				break;
 			}
 		}

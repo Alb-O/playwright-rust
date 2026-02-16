@@ -31,7 +31,7 @@ pub enum SameSite {
 /// Represents a cookie with all its attributes. Used for adding cookies to
 /// a browser context and retrieving existing cookies.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_core::protocol::Cookie;
@@ -226,7 +226,7 @@ pub struct OriginState {
 /// Contains all cookies and localStorage data that can be saved and restored
 /// to persist authentication across browser sessions.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_core::protocol::{BrowserContext, StorageState};

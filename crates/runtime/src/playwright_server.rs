@@ -83,12 +83,12 @@ impl PlaywrightServer {
 	///
 	/// # Platform-Specific Behavior
 	///
-	/// **Windows**: Explicitly closes stdio pipes before killing the process to avoid
+	/// Windows: Explicitly closes stdio pipes before killing the process to avoid
 	/// hangs. On Windows, tokio uses a blocking threadpool for child process stdio,
 	/// and failing to close pipes before terminating can cause the cleanup to hang
 	/// indefinitely.
 	///
-	/// **Unix**: Uses standard process termination with graceful wait.
+	/// Unix: Uses standard process termination with graceful wait.
 	pub async fn shutdown(mut self) -> Result<()> {
 		#[cfg(windows)]
 		{

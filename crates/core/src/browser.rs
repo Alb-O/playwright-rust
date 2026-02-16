@@ -22,7 +22,7 @@ use crate::{BrowserContext, Page};
 /// A Browser is created when you call `BrowserType::launch()`. It provides methods
 /// to create browser contexts and pages.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_rs::protocol::Playwright;

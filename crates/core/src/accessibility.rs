@@ -4,7 +4,7 @@
 //! which is useful for testing accessibility features and understanding how assistive
 //! technologies see the page.
 //!
-//! # Example
+//! # Examples
 //!
 //! ```ignore
 //! // Get the full accessibility tree

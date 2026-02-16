@@ -36,7 +36,7 @@ use crate::{Browser, BrowserContext, BrowserType, Dialog, Frame, Page, Playwrigh
 /// Returns `Error::ProtocolError` if the type name is unknown or if
 /// object construction fails.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// # use pw_rs::server::object_factory::create_object;

@@ -11,7 +11,7 @@
 //! * Text inputs, textareas, selects
 //! * Checkboxes and radio buttons
 //!
-//! # Example
+//! # Examples
 //!
 //! ```bash
 //! pw elements https://example.com --wait --timeout-ms 5000

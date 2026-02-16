@@ -18,7 +18,7 @@ impl Page {
 	///
 	/// See <https://playwright.dev/docs/api/class-page#page-route>
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// let _sub = page.route("**/*.png", |route| async move {

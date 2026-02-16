@@ -10,7 +10,7 @@
 //! * text: Plain text with whitespace normalized
 //! * html: Cleaned HTML with only content elements
 //!
-//! # Example
+//! # Examples
 //!
 //! ```bash
 //! pw read https://example.com/article --metadata

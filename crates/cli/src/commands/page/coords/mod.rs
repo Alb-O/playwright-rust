@@ -9,7 +9,7 @@
 //! * `coords`: Get coordinates of the first matching element
 //! * `coords-all`: Get coordinates of all matching elements with indices
 //!
-//! # Example
+//! # Examples
 //!
 //! ```bash
 //! pw coords --selector "button.submit"

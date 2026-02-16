@@ -4,7 +4,7 @@
 //! Injects a capture script before navigation, then collects messages after
 //! a configurable timeout.
 //!
-//! # Example
+//! # Examples
 //!
 //! ```bash
 //! pw console https://example.com --timeout-ms 5000

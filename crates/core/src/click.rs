@@ -9,7 +9,7 @@ use serde::Serialize;
 
 /// Mouse button for click actions
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_rs::protocol::click::MouseButton;
@@ -29,7 +29,7 @@ pub enum MouseButton {
 
 /// Keyboard modifier keys
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_rs::protocol::click::KeyboardModifier;
@@ -54,7 +54,7 @@ pub enum KeyboardModifier {
 ///
 /// Coordinates are relative to the top-left corner of the element's padding box.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_rs::protocol::click::Position;
@@ -75,7 +75,7 @@ pub struct Position {
 ///
 /// Use the builder pattern to construct options:
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_rs::protocol::click::{ClickOptions, MouseButton, KeyboardModifier, Position};

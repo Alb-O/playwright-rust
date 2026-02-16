@@ -141,7 +141,7 @@ impl Route {
 	///
 	/// # Known Limitations
 	///
-	/// **Response body fulfillment is not supported in Playwright 1.49.0 - 1.56.1.**
+	/// Response body fulfillment is not supported in Playwright 1.49.0 through 1.56.1.
 	///
 	/// The route.fulfill() method can successfully send requests for status codes and headers,
 	/// but the response body is not transmitted to the browser JavaScript layer. This applies

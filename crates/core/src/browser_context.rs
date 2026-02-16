@@ -79,7 +79,7 @@ impl HarNotFound {
 /// has its own cookies, cache, and local storage, enabling independent sessions
 /// without interference.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_rs::protocol::Playwright;
@@ -236,7 +236,7 @@ impl BrowserContext {
 	///
 	/// * `cookies` - List of cookies to add
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// use pw_core::protocol::{Cookie, SameSite};
@@ -272,7 +272,7 @@ impl BrowserContext {
 	///
 	/// * `urls` - Optional list of URLs to filter cookies by
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// // Get all cookies
@@ -313,7 +313,7 @@ impl BrowserContext {
 	///
 	/// * `options` - Optional filter criteria for which cookies to clear
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// use pw_core::protocol::ClearCookiesOptions;
@@ -358,7 +358,7 @@ impl BrowserContext {
 	///
 	/// * `options` - Optional path to save the storage state to
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// use pw_core::protocol::StorageStateOptions;
@@ -407,7 +407,7 @@ impl BrowserContext {
 	/// writing to a file. The storage state includes cookies and localStorage
 	/// for all origins.
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// // Save authentication state
@@ -442,7 +442,7 @@ impl BrowserContext {
 	/// This is useful for replaying network traffic in tests. Pass `options` to
 	/// configure URL filtering and behavior for unmatched requests.
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// // Record HAR first
@@ -492,7 +492,7 @@ impl BrowserContext {
 	/// Tracing captures a trace of browser operations that can be viewed in the
 	/// [Playwright Trace Viewer](https://playwright.dev/docs/trace-viewer).
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// use pw_rs::protocol::{TracingStartOptions, TracingStopOptions};
@@ -537,7 +537,7 @@ impl BrowserContext {
 	///
 	/// Returns a HAR ID that must be passed to [`har_export`] to save the recording.
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// // Start recording
@@ -593,7 +593,7 @@ impl BrowserContext {
 	/// * `har_id` - The HAR ID returned by [`har_start`]
 	/// * `path` - Path to save the HAR file (use `.zip` extension for compressed output)
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// let har_id = context.har_start(Default::default()).await?;
@@ -1071,7 +1071,7 @@ impl BrowserContextOptionsBuilder {
 	///
 	/// Use this to restore a previously saved authentication state.
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// use pw_core::protocol::{BrowserContextOptions, StorageState};
@@ -1091,7 +1091,7 @@ impl BrowserContextOptionsBuilder {
 	///
 	/// Videos are saved to the specified directory.
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// let options = BrowserContextOptions::builder()
@@ -1113,7 +1113,7 @@ impl BrowserContextOptionsBuilder {
 
 	/// Enables HAR recording and saves to the specified path.
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// let options = BrowserContextOptions::builder()

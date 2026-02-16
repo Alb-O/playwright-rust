@@ -52,6 +52,10 @@ impl Frame {
 	///
 	/// Returns `None` when navigating to URLs that don't produce responses (e.g., data URLs,
 	/// about:blank). This matches Playwright's behavior across all language bindings.
+	/// When no timeout is provided, this method sends Playwright's default timeout value
+	/// because recent server versions require an explicit timeout field.
+	/// Response objects may be created asynchronously after the RPC resolves, so this
+	/// method waits briefly for the referenced response guid to materialize.
 	///
 	/// # Arguments
 	///
@@ -60,29 +64,23 @@ impl Frame {
 	///
 	/// See: <https://playwright.dev/docs/api/class-frame#frame-goto>
 	pub async fn goto(&self, url: &str, options: Option<GotoOptions>) -> Result<Option<Response>> {
-		// Build params manually using json! macro
 		let mut params = serde_json::json!({
 			"url": url,
 		});
 
-		// Add optional parameters
 		if let Some(opts) = options {
 			if let Some(timeout) = opts.timeout {
 				params["timeout"] = serde_json::json!(timeout.as_millis() as u64);
 			} else {
-				// Default timeout required in Playwright 1.56.1+
 				params["timeout"] = serde_json::json!(pw_protocol::options::DEFAULT_TIMEOUT_MS);
 			}
 			if let Some(wait_until) = opts.wait_until {
 				params["waitUntil"] = serde_json::json!(wait_until.as_str());
 			}
 		} else {
-			// No options provided, set default timeout (required in Playwright 1.56.1+)
 			params["timeout"] = serde_json::json!(pw_protocol::options::DEFAULT_TIMEOUT_MS);
 		}
 
-		// Send goto RPC to Frame
-		// The server returns { "response": { "guid": "..." } } or null
 		#[derive(Deserialize)]
 		struct GotoResponse {
 			response: Option<ResponseReference>,
@@ -97,7 +95,6 @@ impl Frame {
 		let goto_result: GotoResponse = self.channel().send("goto", params).await?;
 
 		if let Some(response_ref) = goto_result.response {
-			// Wait for Response object - __create__ may arrive after the response
 			let response_arc = self.connection().wait_for_object(&response_ref.guid, std::time::Duration::from_secs(1)).await?;
 
 			let initializer = response_arc.initializer();
@@ -123,12 +120,10 @@ impl Frame {
 					.to_string(),
 				status,
 				status_text: initializer["statusText"].as_str().unwrap_or("").to_string(),
-				ok: (200..300).contains(&status), // Compute ok from status code
+				ok: (200..300).contains(&status),
 				headers,
 			}))
 		} else {
-			// Navigation returned null (e.g., data URLs, about:blank)
-			// This is a valid result, not an error
 			Ok(None)
 		}
 	}
@@ -147,6 +142,8 @@ impl Frame {
 	}
 
 	/// Returns the first element matching the selector, or None if not found.
+	/// Playwright may encode the handle in either `element`, `handle`, or directly as
+	/// the response object depending on transport shape.
 	///
 	/// See: <https://playwright.dev/docs/api/class-frame#frame-query-selector>
 	pub async fn query_selector(&self, selector: &str) -> Result<Option<Arc<crate::ElementHandle>>> {
@@ -160,18 +157,15 @@ impl Frame {
 			)
 			.await?;
 
-		// Check if response is empty (no element found)
 		if response.as_object().map(|o| o.is_empty()).unwrap_or(true) {
 			return Ok(None);
 		}
 
-		// Try different possible field names
 		let element_value = if let Some(elem) = response.get("element") {
 			elem
 		} else if let Some(elem) = response.get("handle") {
 			elem
 		} else {
-			// Maybe the response IS the guid object itself
 			&response
 		};
 
@@ -179,16 +173,13 @@ impl Frame {
 			return Ok(None);
 		}
 
-		// Element response contains { guid: "elementHandle@123" }
 		let guid = element_value["guid"]
 			.as_str()
 			.ok_or_else(|| pw_runtime::Error::ProtocolError("Element GUID missing".to_string()))?;
 
-		// Look up the ElementHandle object in the connection's object registry
 		let connection = self.base.connection();
 		let element = connection.get_object(guid).await?;
 
-		// Downcast to ElementHandle
 		let handle = element
 			.downcast_ref::<crate::ElementHandle>()
 			.map(|e| Arc::new(e.clone()))

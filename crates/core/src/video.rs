@@ -3,7 +3,7 @@
 //! Videos are recorded when [`BrowserContextOptions::record_video_dir`] is set.
 //! Each page in the context will have video automatically recorded.
 //!
-//! # Example
+//! # Examples
 //!
 //! ```ignore
 //! use pw_rs::protocol::{BrowserContextOptions, Viewport};
@@ -44,7 +44,7 @@ use serde_json::Value;
 /// Videos are automatically recorded when video recording is enabled on the
 /// browser context. The video file is saved when the page closes.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// let video = page.video().expect("video recording enabled");

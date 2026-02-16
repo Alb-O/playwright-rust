@@ -21,7 +21,7 @@ const DEFAULT_POLL_INTERVAL: Duration = Duration::from_millis(100);
 ///
 /// Assertions will retry until they pass or timeout (default: 5 seconds).
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_rs::{expect, protocol::Playwright};

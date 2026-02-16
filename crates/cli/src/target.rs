@@ -238,7 +238,7 @@ impl<'a> ResolveEnv<'a> {
 /// Each command defines a `*Raw` struct (from CLI/JSON) and a `*Resolved` struct
 /// (ready for execution). This trait bridges them with consistent resolution logic.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// impl Resolve for HtmlRaw {

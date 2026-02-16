@@ -1,6 +1,6 @@
 //! Command registry and generated dispatch glue.
 
-#[allow(unused_imports)]
+#[allow(unused_imports, reason = "registry module re-exports generated command graph symbols")]
 pub use crate::commands::graph::{CommandId, CommandMeta, all_commands, command_meta, command_name, lookup_command, run_command};
 
 /// Looks up only canonical command ids.

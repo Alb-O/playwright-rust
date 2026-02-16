@@ -4,7 +4,7 @@
 //! [Playwright Trace Viewer](https://playwright.dev/docs/trace-viewer). This is
 //! invaluable for debugging test failures.
 //!
-//! # Example
+//! # Examples
 //!
 //! ```ignore
 //! // Start tracing before performing actions
@@ -72,7 +72,7 @@ impl Tracing {
 	///
 	/// * `options` - Configuration for what to capture in the trace
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// context.tracing().unwrap().start(TracingStartOptions {
@@ -128,7 +128,7 @@ impl Tracing {
 	///
 	/// * `options` - Where to save the trace file
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// // Stop and save to file

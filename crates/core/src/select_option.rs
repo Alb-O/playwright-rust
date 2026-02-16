@@ -9,7 +9,7 @@
 ///
 /// Represents different ways to select an option in a `<select>` element.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_rs::protocol::SelectOption;

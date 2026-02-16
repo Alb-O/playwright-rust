@@ -183,5 +183,5 @@ pub enum ReadOutputFormat {
 }
 
 /// Browser parsing helper retained for serde compatibility in command raw payloads.
-#[allow(dead_code)]
+#[allow(dead_code, reason = "serde compatibility marker for command raw payload parsing")]
 fn _browser_kind_marker(_: BrowserKind) {}

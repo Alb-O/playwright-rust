@@ -21,7 +21,7 @@ use crate::BrowserType;
 /// This is the main entry point for the Playwright API. It provides access to
 /// the three browser types (Chromium, Firefox, WebKit) and other top-level services.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_rs::protocol::Playwright;
@@ -271,9 +271,9 @@ impl Playwright {
 	///
 	/// # Platform-Specific Behavior
 	///
-	/// **Windows**: Closes stdio pipes before shutting down to prevent hangs.
+	/// Windows: Closes stdio pipes before shutting down to prevent hangs.
 	///
-	/// **Unix**: Standard graceful shutdown.
+	/// Unix: Standard graceful shutdown.
 	///
 	/// # Errors
 	///

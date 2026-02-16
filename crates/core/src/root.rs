@@ -30,7 +30,7 @@ use serde_json::Value;
 /// The Root object has an empty GUID (`""`) and is not registered in the
 /// object registry. It's discarded after initialization completes.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// # use pw_rs::protocol::Root;

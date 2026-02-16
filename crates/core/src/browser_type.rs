@@ -23,7 +23,7 @@ use crate::{Browser, BrowserContext, LaunchOptions};
 /// * `playwright.firefox()`
 /// * `playwright.webkit()`
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// # use pw_rs::protocol::Playwright;

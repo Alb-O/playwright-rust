@@ -10,7 +10,7 @@
 /// Allows explicit control over filename, MIME type, and file contents
 /// when uploading files to input elements.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// # use pw_rs::protocol::FilePayload;

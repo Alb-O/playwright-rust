@@ -8,7 +8,7 @@
 //! * [`SessionLike`]: Abstracts session lifecycle (goto, page access, close)
 //! * [`LocatorLike`]: Abstracts locator operations (click, text_content, count)
 //!
-//! # Example
+//! # Examples
 //!
 //! ```ignore
 //! use pw_cli::testing::{MockSession, MockPage};
@@ -147,7 +147,7 @@ pub trait SessionLike: Send + Sync {
 /// for later assertion. Configure expected responses with `set_*` methods,
 /// then retrieve recorded actions with [`actions()`](Self::actions).
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use pw_cli::testing::{MockPage, MockAction};
@@ -411,7 +411,7 @@ impl<'a> LocatorLike for MockLocator<'a> {
 /// Wraps a [`MockPage`] and tracks navigation state. Use [`default_session()`](Self::default_session)
 /// for a quick setup, or [`new()`](Self::new) with a pre-configured [`MockPage`].
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use pw_cli::testing::{MockSession, MockPage};

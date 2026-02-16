@@ -222,7 +222,6 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
 		std::env::current_dir()?.join(&options.path)
 	};
 
-	// Canonicalize if it exists, otherwise use as-is
 	let project_root = if project_root.exists() { project_root.canonicalize()? } else { project_root };
 
 	let playwright_dir = project_root.join(dirs::PLAYWRIGHT);
@@ -230,19 +229,15 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
 	let mut files_created = Vec::new();
 	let mut directories_created = Vec::new();
 
-	// Check for existing playwright setup
 	if !options.force {
 		check_existing_setup(&project_root)?;
 	}
 
-	// Create main playwright directory
 	create_dir_if_missing(&playwright_dir, &mut directories_created)?;
 
-	// Create tests directory (always)
 	let tests_dir = playwright_dir.join(dirs::TESTS);
 	create_dir_if_missing(&tests_dir, &mut directories_created)?;
 
-	// Create example test if requested
 	if !options.no_example {
 		let (test_filename, test_content) = if options.typescript {
 			("example.spec.ts", templates::EXAMPLE_TEST_TS)
@@ -253,16 +248,13 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
 		write_file_if_missing(&test_file, test_content, options.force, &mut files_created)?;
 	}
 
-	// Standard template creates additional directories
 	if matches!(options.template, InitTemplate::Standard) {
-		// Scripts directory with common utilities
 		let scripts_dir = playwright_dir.join(dirs::SCRIPTS);
 		create_dir_if_missing(&scripts_dir, &mut directories_created)?;
 
 		let common_sh = scripts_dir.join("common.sh");
 		write_file_if_missing(&common_sh, templates::COMMON_SH, options.force, &mut files_created)?;
 
-		// Make common.sh executable
 		#[cfg(unix)]
 		{
 			use std::os::unix::fs::PermissionsExt;
@@ -273,27 +265,22 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
 			}
 		}
 
-		// Output directories (gitignored, created empty for clarity)
 		for subdir in &[dirs::RESULTS, dirs::REPORTS, dirs::SCREENSHOTS, dirs::AUTH] {
 			let dir = playwright_dir.join(subdir);
 			create_dir_if_missing(&dir, &mut directories_created)?;
 		}
 	}
 
-	// Create .gitignore for playwright directory
 	let gitignore = playwright_dir.join(".gitignore");
 	write_file_if_missing(&gitignore, templates::PLAYWRIGHT_GITIGNORE, options.force, &mut files_created)?;
 
-	// Create Nix browser setup script if requested
 	if options.nix {
-		// Ensure scripts directory exists (even for minimal template)
 		let scripts_dir = playwright_dir.join(dirs::SCRIPTS);
 		create_dir_if_missing(&scripts_dir, &mut directories_created)?;
 
 		let setup_browsers = scripts_dir.join("setup-browsers.sh");
 		write_file_if_missing(&setup_browsers, templates::SETUP_BROWSERS_SH, options.force, &mut files_created)?;
 
-		// Make setup-browsers.sh executable
 		#[cfg(unix)]
 		{
 			use std::os::unix::fs::PermissionsExt;
@@ -305,7 +292,6 @@ fn scaffold_project(options: InitOptions) -> Result<InitResult> {
 		}
 	}
 
-	// Create playwright config in project root
 	if !options.no_config {
 		let (config_filename, config_content) = if options.typescript {
 			(dirs::CONFIG_TS, templates::PLAYWRIGHT_CONFIG_TS)

@@ -39,7 +39,7 @@ impl ElementHandle {
 	///
 	/// The screenshot is captured as PNG by default.
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// # use pw_rs::protocol::Playwright;

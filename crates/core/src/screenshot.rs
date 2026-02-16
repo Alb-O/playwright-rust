@@ -9,7 +9,7 @@ use serde::Serialize;
 
 /// Screenshot image format
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_rs::protocol::ScreenshotType;
@@ -29,7 +29,7 @@ pub enum ScreenshotType {
 ///
 /// Specifies a rectangular region to capture.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_rs::protocol::ScreenshotClip;
@@ -59,7 +59,7 @@ pub struct ScreenshotClip {
 ///
 /// Use the builder pattern to construct options:
 ///
-/// # Example
+/// # Examples
 ///
 /// ```ignore
 /// use pw_rs::protocol::{ScreenshotOptions, ScreenshotType, ScreenshotClip};

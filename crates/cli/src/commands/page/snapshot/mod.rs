@@ -16,7 +16,7 @@
 //! * Interactive elements (buttons, links, inputs) with stable CSS selectors
 //! * Visible text content (configurable length limit)
 //!
-//! # Example
+//! # Examples
 //!
 //! ```bash
 //! pw snapshot https://example.com

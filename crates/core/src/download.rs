@@ -96,7 +96,7 @@ impl Download {
 	/// This method can be safely called while the download is still in progress.
 	/// The file will be copied to the specified location after the download completes.
 	///
-	/// # Example
+	/// # Examples
 	///
 	/// ```ignore
 	/// # use pw_rs::protocol::Download;

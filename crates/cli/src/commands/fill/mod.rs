@@ -3,7 +3,7 @@
 //! Fills a form input element with text. Supports text inputs, textareas,
 //! and contenteditable elements.
 //!
-//! # Example
+//! # Examples
 //!
 //! ```bash
 //! pw fill --selector "input[name=email]" --text "user@example.com"
