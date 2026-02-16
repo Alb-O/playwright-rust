@@ -12,7 +12,7 @@ use pw_rs::WaitUntil;
 use crate::commands::def::ExecCtx;
 use crate::commands::exec_flow::navigation_plan;
 use crate::error::Result;
-use crate::session_broker::SessionHandle;
+use crate::session::SessionHandle;
 use crate::session_helpers::{ArtifactsPolicy, with_session};
 use crate::target::{ResolvedTarget, Target};
 

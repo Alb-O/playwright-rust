@@ -34,7 +34,7 @@ use crate::error::{PwError, Result};
 use crate::output::{CommandError, ErrorCode, OutputFormat};
 use crate::protocol::{CommandRequest, CommandResponse, EffectiveRuntime, RuntimeSpec, SCHEMA_VERSION, print_response};
 use crate::runtime::{RuntimeConfig, build_runtime};
-use crate::session_broker::SessionBroker;
+use crate::session::SessionManager;
 use crate::workspace::normalize_profile;
 
 pub async fn dispatch(cli: Cli) -> Result<()> {
@@ -226,7 +226,7 @@ async fn execute_request(request: CommandRequest, fallback_profile: Option<Strin
 		timeout_ms: info.timeout_ms,
 	};
 
-	let mut broker = SessionBroker::new(
+	let mut session = SessionManager::new(
 		&ctx,
 		ctx_state.session_descriptor_path(),
 		Some(ctx_state.profile_id()),
@@ -253,7 +253,7 @@ async fn execute_request(request: CommandRequest, fallback_profile: Option<Strin
 		mode,
 		ctx: &ctx,
 		ctx_state: &mut ctx_state,
-		broker: &mut broker,
+		session: &mut session,
 		format: OutputFormat::Json,
 		artifacts_dir,
 		last_url: last_url.as_deref(),

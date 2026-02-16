@@ -1,15 +1,12 @@
-use std::fs;
-
 use clap::Args;
 use pw_rs::WaitUntil;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tracing::{info, warn};
 
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
 use crate::error::{PwError, Result};
 use crate::output::{CommandInputs, SessionStartData};
-use crate::session_broker::{SessionDescriptor, SessionRequest};
+use crate::session::SessionRequest;
 use crate::target::ResolveEnv;
 use crate::types::BrowserKind;
 use crate::workspace::compute_cdp_port;
@@ -39,37 +36,7 @@ impl CommandDef for SessionStatusCommand {
 		'ctx: 'exec,
 	{
 		Box::pin(async move {
-			let data = match exec.ctx_state.session_descriptor_path() {
-				Some(path) => match SessionDescriptor::load(&path)? {
-					Some(desc) => {
-						let alive = desc.is_alive();
-						json!({
-							"active": true,
-							"path": path,
-							"schema_version": desc.schema_version,
-							"browser": desc.browser,
-							"headless": desc.headless,
-							"cdp_endpoint": desc.cdp_endpoint,
-							"ws_endpoint": desc.ws_endpoint,
-							"workspace_id": desc.workspace_id,
-							"namespace": desc.namespace,
-							"session_key": desc.session_key,
-							"driver_hash": desc.driver_hash,
-							"pid": desc.pid,
-							"created_at": desc.created_at,
-							"alive": alive,
-						})
-					}
-					None => json!({
-						"active": false,
-						"message": "No session descriptor for namespace; run a browser command to create one"
-					}),
-				},
-				None => json!({
-					"active": false,
-					"message": "No active namespace; session status unavailable"
-				}),
-			};
+			let data = exec.session.descriptor_status()?;
 
 			Ok(CommandOutcome {
 				inputs: CommandInputs::default(),
@@ -105,29 +72,7 @@ impl CommandDef for SessionClearCommand {
 		'ctx: 'exec,
 	{
 		Box::pin(async move {
-			let data = match exec.ctx_state.session_descriptor_path() {
-				Some(path) => {
-					if path.exists() {
-						fs::remove_file(&path)?;
-						info!(target = "pw.session", path = %path.display(), "session descriptor removed");
-						json!({
-							"cleared": true,
-							"path": path,
-						})
-					} else {
-						warn!(target = "pw.session", path = %path.display(), "no session descriptor to remove");
-						json!({
-							"cleared": false,
-							"path": path,
-							"message": "No session descriptor found"
-						})
-					}
-				}
-				None => json!({
-					"cleared": false,
-					"message": "No active namespace; nothing to clear"
-				}),
-			};
+			let data = exec.session.clear_descriptor_response()?;
 
 			Ok(CommandOutcome {
 				inputs: CommandInputs::default(),
@@ -168,7 +113,7 @@ impl CommandDef for SessionStartCommand {
 		'ctx: 'exec,
 	{
 		Box::pin(async move {
-			let ctx = exec.broker.context();
+			let ctx = exec.session.context();
 
 			if ctx.browser != BrowserKind::Chromium {
 				return Err(PwError::BrowserLaunch(format!(
@@ -187,7 +132,7 @@ impl CommandDef for SessionStartCommand {
 			request.remote_debugging_port = Some(port);
 			request.keep_browser_running = true;
 
-			let session = exec.broker.session(request).await?;
+			let session = exec.session.session(request).await?;
 
 			let data = SessionStartData {
 				ws_endpoint: session.ws_endpoint().map(|s| s.to_string()),
@@ -238,51 +183,7 @@ impl CommandDef for SessionStopCommand {
 		'ctx: 'exec,
 	{
 		Box::pin(async move {
-			let data = match exec.ctx_state.session_descriptor_path() {
-				Some(path) => match SessionDescriptor::load(&path)? {
-					Some(descriptor) => {
-						let endpoint = descriptor.cdp_endpoint.as_deref().or(descriptor.ws_endpoint.as_deref());
-						let endpoint = match endpoint {
-							Some(endpoint) => endpoint,
-							None => {
-								fs::remove_file(&path)?;
-								return Ok(CommandOutcome {
-									inputs: CommandInputs::default(),
-									data: json!({
-										"stopped": false,
-										"path": path,
-										"message": "Descriptor missing endpoint; removed descriptor"
-									}),
-									delta: ContextDelta::default(),
-								});
-							}
-						};
-
-						let mut request = SessionRequest::from_context(WaitUntil::NetworkIdle, exec.broker.context());
-						request.browser = descriptor.browser;
-						request.headless = descriptor.headless;
-						request.cdp_endpoint = Some(endpoint);
-						request.launch_server = false;
-
-						let session = exec.broker.session(request).await?;
-						session.browser().close().await?;
-						fs::remove_file(&path)?;
-
-						json!({
-							"stopped": true,
-							"path": path,
-						})
-					}
-					None => json!({
-						"stopped": false,
-						"message": "No session descriptor for namespace; nothing to stop"
-					}),
-				},
-				None => json!({
-					"stopped": false,
-					"message": "No active namespace; nothing to stop"
-				}),
-			};
+			let data = exec.session.stop_descriptor_session().await?;
 
 			Ok(CommandOutcome {
 				inputs: CommandInputs::default(),

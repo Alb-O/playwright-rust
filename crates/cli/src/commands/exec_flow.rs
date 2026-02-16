@@ -6,7 +6,7 @@
 use pw_rs::WaitUntil;
 
 use crate::context::CommandContext;
-use crate::session_broker::SessionRequest;
+use crate::session::SessionRequest;
 use crate::target::{ResolvedTarget, Target};
 
 /// Session + navigation settings derived from command context and target.

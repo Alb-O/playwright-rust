@@ -1,149 +1,175 @@
 //! Session orchestration for browser acquisition and lifecycle.
 
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use pw_rs::{StorageState, WaitUntil};
-use tracing::{debug, warn};
+use serde_json::json;
+use tracing::{debug, info, warn};
 
 use super::descriptor::{DRIVER_HASH, SESSION_DESCRIPTOR_SCHEMA_VERSION, SessionDescriptor, now_ts};
+use super::outcome::SessionHandle;
+use super::repository::SessionRepository;
+use super::spec::SessionRequest;
 use super::strategy::{PrimarySessionStrategy, SessionStrategyInput, resolve_session_strategy};
-use crate::artifact_collector::{CollectedArtifacts, collect_failure_artifacts};
-use crate::browser::{BrowserSession, DownloadInfo, SessionOptions};
-use crate::context::{BlockConfig, CommandContext, DownloadConfig, HarConfig};
+use crate::browser::{BrowserSession, SessionOptions};
+use crate::context::CommandContext;
 use crate::daemon;
 use crate::error::{PwError, Result};
 use crate::output::SessionSource;
-use crate::target::Target;
 use crate::types::BrowserKind;
 
-/// Fully resolved request for acquiring a browser session.
-pub struct SessionRequest<'a> {
-	/// Navigation wait strategy used by session page operations.
-	pub wait_until: WaitUntil,
-	/// Whether the session should run headless.
-	pub headless: bool,
-	/// Optional auth file used to bootstrap storage state.
-	pub auth_file: Option<&'a Path>,
-	/// Browser engine to launch/connect.
-	pub browser: BrowserKind,
-	/// Optional CDP endpoint to attach to an existing browser.
-	pub cdp_endpoint: Option<&'a str>,
-	/// Whether to launch a browser server instead of direct launch.
-	pub launch_server: bool,
-	/// Remote debugging port for persistent Chromium sessions.
-	pub remote_debugging_port: Option<u16>,
-	/// Whether browser lifecycle should outlive the session handle.
-	pub keep_browser_running: bool,
-	/// URL patterns excluded from page-reuse selection.
-	pub protected_urls: &'a [String],
-	/// Preferred URL for page-reuse selection.
-	pub preferred_url: Option<&'a str>,
-	/// HAR recording configuration.
-	pub har_config: &'a HarConfig,
-	/// Request-blocking configuration.
-	pub block_config: &'a BlockConfig,
-	/// Download-tracking configuration.
-	pub download_config: &'a DownloadConfig,
-}
-
-impl<'a> SessionRequest<'a> {
-	/// Builds a request from global command context defaults.
-	pub fn from_context(wait_until: WaitUntil, ctx: &'a CommandContext) -> Self {
-		Self {
-			wait_until,
-			headless: true,
-			auth_file: ctx.auth_file(),
-			browser: ctx.browser,
-			cdp_endpoint: ctx.cdp_endpoint(),
-			launch_server: ctx.launch_server(),
-			remote_debugging_port: None,
-			keep_browser_running: false,
-			protected_urls: &[],
-			preferred_url: None,
-			har_config: ctx.har_config(),
-			block_config: ctx.block_config(),
-			download_config: ctx.download_config(),
-		}
-	}
-
-	/// Sets protected URL patterns for page-reuse filtering.
-	pub fn with_protected_urls(mut self, urls: &'a [String]) -> Self {
-		self.protected_urls = urls;
-		self
-	}
-
-	/// Sets headless/headful mode.
-	pub fn with_headless(mut self, headless: bool) -> Self {
-		self.headless = headless;
-		self
-	}
-
-	/// Sets the auth storage-state file.
-	pub fn with_auth_file(mut self, auth_file: Option<&'a Path>) -> Self {
-		self.auth_file = auth_file;
-		self
-	}
-
-	/// Sets the target browser engine.
-	pub fn with_browser(mut self, browser: BrowserKind) -> Self {
-		self.browser = browser;
-		self
-	}
-
-	/// Sets an explicit CDP endpoint for attach mode.
-	pub fn with_cdp_endpoint(mut self, endpoint: Option<&'a str>) -> Self {
-		self.cdp_endpoint = endpoint;
-		self
-	}
-
-	/// Sets the persistent remote-debugging port.
-	pub fn with_remote_debugging_port(mut self, port: Option<u16>) -> Self {
-		self.remote_debugging_port = port;
-		self
-	}
-
-	/// Controls whether browser shutdown is skipped on close.
-	pub fn with_keep_browser_running(mut self, keep: bool) -> Self {
-		self.keep_browser_running = keep;
-		self
-	}
-
-	/// Sets the preferred URL used for tab/page reuse.
-	pub fn with_preferred_url(mut self, url: Option<&'a str>) -> Self {
-		self.preferred_url = url;
-		self
-	}
+struct DaemonLease {
+	endpoint: String,
+	session_key: String,
 }
 
 /// Session manager that applies strategy selection and orchestrates acquisition.
 pub struct SessionManager<'a> {
 	ctx: &'a CommandContext,
-	descriptor_path: Option<PathBuf>,
+	repository: SessionRepository,
 	namespace_id: Option<String>,
 	refresh: bool,
 }
 
 impl<'a> SessionManager<'a> {
 	/// Creates a manager for the current command execution scope.
-	pub fn new(ctx: &'a CommandContext, descriptor_path: Option<PathBuf>, namespace_id: Option<String>, refresh: bool) -> Self {
+	pub fn new(ctx: &'a CommandContext, descriptor_path: Option<std::path::PathBuf>, namespace_id: Option<String>, refresh: bool) -> Self {
 		Self {
 			ctx,
-			descriptor_path,
+			repository: SessionRepository::new(descriptor_path),
 			namespace_id,
 			refresh,
 		}
 	}
 
-	/// Acquires a session using descriptor reuse, daemon leasing, or launch flows.
-	pub async fn session(&mut self, request: SessionRequest<'_>) -> Result<SessionHandle> {
-		let storage_state = match request.auth_file {
-			Some(path) => Some(load_storage_state(path)?),
-			None => None,
+	/// Returns immutable command context used by this manager.
+	pub fn context(&self) -> &'a CommandContext {
+		self.ctx
+	}
+
+	/// Returns descriptor path when persistence is enabled.
+	pub fn descriptor_path(&self) -> Option<&Path> {
+		self.repository.path()
+	}
+
+	/// Loads descriptor metadata from persistence.
+	pub fn load_descriptor(&self) -> Result<Option<SessionDescriptor>> {
+		self.repository.load()
+	}
+
+	/// Clears descriptor metadata from persistence.
+	pub fn clear_descriptor(&self) -> Result<bool> {
+		self.repository.clear()
+	}
+
+	/// Returns the structured payload used by `session.status`.
+	pub fn descriptor_status(&self) -> Result<serde_json::Value> {
+		let Some(path) = self.descriptor_path().map(Path::to_path_buf) else {
+			return Ok(json!({
+				"active": false,
+				"message": "No active namespace; session status unavailable"
+			}));
 		};
 
+		match self.load_descriptor()? {
+			Some(desc) => {
+				let alive = desc.is_alive();
+				Ok(json!({
+					"active": true,
+					"path": path,
+					"schema_version": desc.schema_version,
+					"browser": desc.browser,
+					"headless": desc.headless,
+					"cdp_endpoint": desc.cdp_endpoint,
+					"ws_endpoint": desc.ws_endpoint,
+					"workspace_id": desc.workspace_id,
+					"namespace": desc.namespace,
+					"session_key": desc.session_key,
+					"driver_hash": desc.driver_hash,
+					"pid": desc.pid,
+					"created_at": desc.created_at,
+					"alive": alive,
+				}))
+			}
+			None => Ok(json!({
+				"active": false,
+				"message": "No session descriptor for namespace; run a browser command to create one"
+			})),
+		}
+	}
+
+	/// Removes descriptor metadata and returns the structured payload for `session.clear`.
+	pub fn clear_descriptor_response(&self) -> Result<serde_json::Value> {
+		let Some(path) = self.descriptor_path().map(Path::to_path_buf) else {
+			return Ok(json!({
+				"cleared": false,
+				"message": "No active namespace; nothing to clear"
+			}));
+		};
+
+		if self.clear_descriptor()? {
+			info!(target = "pw.session", path = %path.display(), "session descriptor removed");
+			Ok(json!({
+				"cleared": true,
+				"path": path,
+			}))
+		} else {
+			warn!(target = "pw.session", path = %path.display(), "no session descriptor to remove");
+			Ok(json!({
+				"cleared": false,
+				"path": path,
+				"message": "No session descriptor found"
+			}))
+		}
+	}
+
+	/// Stops an active descriptor-backed browser session.
+	pub async fn stop_descriptor_session(&mut self) -> Result<serde_json::Value> {
+		let Some(path) = self.descriptor_path().map(Path::to_path_buf) else {
+			return Ok(json!({
+				"stopped": false,
+				"message": "No active namespace; nothing to stop"
+			}));
+		};
+
+		let Some(descriptor) = self.load_descriptor()? else {
+			return Ok(json!({
+				"stopped": false,
+				"message": "No session descriptor for namespace; nothing to stop"
+			}));
+		};
+
+		let endpoint = descriptor.cdp_endpoint.as_deref().or(descriptor.ws_endpoint.as_deref());
+		let Some(endpoint) = endpoint else {
+			let _ = self.clear_descriptor()?;
+			return Ok(json!({
+				"stopped": false,
+				"path": path,
+				"message": "Descriptor missing endpoint; removed descriptor"
+			}));
+		};
+
+		let mut request = SessionRequest::from_context(WaitUntil::NetworkIdle, self.context());
+		request.browser = descriptor.browser;
+		request.headless = descriptor.headless;
+		request.cdp_endpoint = Some(endpoint);
+		request.launch_server = false;
+
+		let session = self.session(request).await?;
+		session.browser().close().await?;
+		let _ = self.clear_descriptor()?;
+
+		Ok(json!({
+			"stopped": true,
+			"path": path,
+		}))
+	}
+
+	/// Acquires a session using descriptor reuse, daemon leasing, or launch flows.
+	pub async fn session(&mut self, request: SessionRequest<'_>) -> Result<SessionHandle> {
+		let storage_state = request.auth_file.map(load_storage_state).transpose()?;
 		let strategy = resolve_session_strategy(SessionStrategyInput {
-			has_descriptor_path: self.descriptor_path.is_some(),
+			has_descriptor_path: self.descriptor_path().is_some(),
 			refresh: self.refresh,
 			no_daemon: self.ctx.no_daemon(),
 			browser: request.browser,
@@ -152,155 +178,161 @@ impl<'a> SessionManager<'a> {
 			launch_server: request.launch_server,
 		});
 
-		if let Some(path) = &self.descriptor_path {
-			if self.refresh {
-				let _ = fs::remove_file(path);
-			} else if strategy.try_descriptor_reuse {
-				if let Some(descriptor) = SessionDescriptor::load(path)? {
-					if descriptor.belongs_to(self.ctx)
-						&& descriptor.matches(request.browser, request.headless, request.cdp_endpoint, Some(DRIVER_HASH))
-						&& descriptor.is_alive()
-					{
-						if let Some(endpoint) = descriptor.cdp_endpoint.as_deref().or(descriptor.ws_endpoint.as_deref()) {
-							debug!(
-								target = "pw.session",
-								%endpoint,
-								pid = descriptor.pid,
-								"reusing existing browser via cdp"
-							);
-							let mut session = BrowserSession::with_options(SessionOptions {
-								wait_until: request.wait_until,
-								storage_state: storage_state.clone(),
-								headless: request.headless,
-								browser_kind: request.browser,
-								cdp_endpoint: Some(endpoint),
-								launch_server: false,
-								protected_urls: request.protected_urls,
-								preferred_url: request.preferred_url,
-								har_config: request.har_config,
-								block_config: request.block_config,
-								download_config: request.download_config,
-							})
-							.await?;
-							session.set_keep_browser_running(true);
-							return Ok(SessionHandle {
-								session,
-								source: SessionSource::CachedDescriptor,
-							});
-						} else {
-							debug!(target = "pw.session", "descriptor lacks endpoint; ignoring");
-						}
-					}
-				}
+		if self.refresh {
+			let _ = self.clear_descriptor();
+		} else if strategy.try_descriptor_reuse {
+			if let Some(handle) = self.acquire_from_descriptor(&request, storage_state.clone()).await? {
+				return Ok(handle);
 			}
 		}
 
-		let mut daemon_endpoint = None;
-		let mut daemon_session_key = None;
-		if strategy.try_daemon_lease {
-			if let Some(client) = daemon::try_connect().await {
-				if let Some(namespace_id) = &self.namespace_id {
-					let session_key = format!("{}:{}:{}", namespace_id, request.browser, if request.headless { "headless" } else { "headful" });
-					match daemon::request_browser(&client, request.browser, request.headless, &session_key).await {
-						Ok(endpoint) => {
-							debug!(
-								target = "pw.session",
-								%endpoint,
-								session_key = %session_key,
-								"using daemon browser"
-							);
-							daemon_endpoint = Some(endpoint);
-							daemon_session_key = Some(session_key);
-						}
-						Err(err) => {
-							debug!(
-								target = "pw.session",
-								error = %err,
-								"daemon request failed; falling back"
-							);
-						}
-					}
-				}
-			}
-		}
+		let daemon_lease = self.acquire_from_daemon(&request, strategy.try_daemon_lease).await?;
+		let (mut session, source) = self.acquire_primary(&request, strategy.primary, storage_state, daemon_lease.as_ref()).await?;
 
-		let (session, source) = if let Some(endpoint) = daemon_endpoint.as_deref() {
-			let mut s = BrowserSession::with_options(SessionOptions {
-				wait_until: request.wait_until,
-				storage_state: storage_state.clone(),
-				headless: request.headless,
-				browser_kind: request.browser,
-				cdp_endpoint: Some(endpoint),
-				launch_server: false,
-				protected_urls: request.protected_urls,
-				preferred_url: request.preferred_url,
-				har_config: request.har_config,
-				block_config: request.block_config,
-				download_config: request.download_config,
-			})
-			.await?;
-			s.set_keep_browser_running(true);
-			(s, SessionSource::Daemon)
-		} else {
-			match strategy.primary {
-				PrimarySessionStrategy::AttachCdp => {
-					let endpoint = request
-						.cdp_endpoint
-						.ok_or_else(|| PwError::Context("missing CDP endpoint for attach strategy".to_string()))?;
-					let mut s = BrowserSession::with_options(SessionOptions {
-						wait_until: request.wait_until,
-						storage_state,
-						headless: request.headless,
-						browser_kind: request.browser,
-						cdp_endpoint: Some(endpoint),
-						launch_server: false,
-						protected_urls: request.protected_urls,
-						preferred_url: request.preferred_url,
-						har_config: request.har_config,
-						block_config: request.block_config,
-						download_config: request.download_config,
-					})
-					.await?;
-					s.set_keep_browser_running(true);
-					(s, SessionSource::CdpConnect)
-				}
-				PrimarySessionStrategy::PersistentDebug => {
-					let port = request
-						.remote_debugging_port
-						.ok_or_else(|| PwError::Context("missing remote_debugging_port for persistent strategy".to_string()))?;
-					if request.browser != BrowserKind::Chromium {
-						return Err(PwError::BrowserLaunch(
-							"Persistent sessions with remote_debugging_port require Chromium".to_string(),
-						));
-					}
-					let s = BrowserSession::launch_persistent(request.wait_until, storage_state, request.headless, port, request.keep_browser_running).await?;
-					(s, SessionSource::PersistentDebug)
-				}
-				PrimarySessionStrategy::LaunchServer => {
-					let s = BrowserSession::launch_server_session(request.wait_until, storage_state, request.headless, request.browser).await?;
-					(s, SessionSource::BrowserServer)
-				}
-				PrimarySessionStrategy::FreshLaunch => {
-					let s = BrowserSession::with_options(SessionOptions {
-						wait_until: request.wait_until,
-						storage_state,
-						headless: request.headless,
-						browser_kind: request.browser,
-						cdp_endpoint: None,
-						launch_server: false,
-						protected_urls: request.protected_urls,
-						preferred_url: request.preferred_url,
-						har_config: request.har_config,
-						block_config: request.block_config,
-						download_config: request.download_config,
-					})
-					.await?;
-					(s, SessionSource::Fresh)
-				}
-			}
+		self.auto_inject_auth_if_needed(&request, daemon_lease.as_ref(), &mut session).await?;
+		self.persist_descriptor_if_needed(&request, &session, daemon_lease.as_ref());
+
+		Ok(SessionHandle { session, source })
+	}
+
+	async fn acquire_from_descriptor(&self, request: &SessionRequest<'_>, storage_state: Option<StorageState>) -> Result<Option<SessionHandle>> {
+		let Some(descriptor) = self.load_descriptor()? else {
+			return Ok(None);
 		};
 
-		let attached_endpoint = request.cdp_endpoint.is_some() || daemon_endpoint.is_some();
+		if !(descriptor.belongs_to(self.ctx)
+			&& descriptor.matches(request.browser, request.headless, request.cdp_endpoint, Some(DRIVER_HASH))
+			&& descriptor.is_alive())
+		{
+			return Ok(None);
+		}
+
+		let Some(endpoint) = descriptor.cdp_endpoint.as_deref().or(descriptor.ws_endpoint.as_deref()) else {
+			debug!(target = "pw.session", "descriptor lacks endpoint; ignoring");
+			return Ok(None);
+		};
+
+		debug!(
+			target = "pw.session",
+			%endpoint,
+			pid = descriptor.pid,
+			"reusing existing browser via cdp"
+		);
+
+		let mut session = self.session_with_options(request, storage_state, Some(endpoint)).await?;
+		session.set_keep_browser_running(true);
+
+		Ok(Some(SessionHandle {
+			session,
+			source: SessionSource::CachedDescriptor,
+		}))
+	}
+
+	async fn acquire_from_daemon(&self, request: &SessionRequest<'_>, try_daemon_lease: bool) -> Result<Option<DaemonLease>> {
+		if !try_daemon_lease {
+			return Ok(None);
+		}
+
+		let Some(client) = daemon::try_connect().await else {
+			return Ok(None);
+		};
+
+		let Some(namespace_id) = &self.namespace_id else {
+			return Ok(None);
+		};
+
+		let session_key = format!("{}:{}:{}", namespace_id, request.browser, if request.headless { "headless" } else { "headful" });
+		match daemon::request_browser(&client, request.browser, request.headless, &session_key).await {
+			Ok(endpoint) => {
+				debug!(
+					target = "pw.session",
+					%endpoint,
+					session_key = %session_key,
+					"using daemon browser"
+				);
+				Ok(Some(DaemonLease { endpoint, session_key }))
+			}
+			Err(err) => {
+				debug!(
+					target = "pw.session",
+					error = %err,
+					"daemon request failed; falling back"
+				);
+				Ok(None)
+			}
+		}
+	}
+
+	async fn acquire_primary(
+		&self,
+		request: &SessionRequest<'_>,
+		primary: PrimarySessionStrategy,
+		storage_state: Option<StorageState>,
+		daemon_lease: Option<&DaemonLease>,
+	) -> Result<(BrowserSession, SessionSource)> {
+		if let Some(lease) = daemon_lease {
+			let mut session = self.session_with_options(request, storage_state.clone(), Some(lease.endpoint.as_str())).await?;
+			session.set_keep_browser_running(true);
+			return Ok((session, SessionSource::Daemon));
+		}
+
+		match primary {
+			PrimarySessionStrategy::AttachCdp => {
+				let endpoint = request
+					.cdp_endpoint
+					.ok_or_else(|| PwError::Context("missing CDP endpoint for attach strategy".to_string()))?;
+				let mut session = self.session_with_options(request, storage_state, Some(endpoint)).await?;
+				session.set_keep_browser_running(true);
+				Ok((session, SessionSource::CdpConnect))
+			}
+			PrimarySessionStrategy::PersistentDebug => {
+				let port = request
+					.remote_debugging_port
+					.ok_or_else(|| PwError::Context("missing remote_debugging_port for persistent strategy".to_string()))?;
+				if request.browser != BrowserKind::Chromium {
+					return Err(PwError::BrowserLaunch(
+						"Persistent sessions with remote_debugging_port require Chromium".to_string(),
+					));
+				}
+				let session =
+					BrowserSession::launch_persistent(request.wait_until, storage_state, request.headless, port, request.keep_browser_running).await?;
+				Ok((session, SessionSource::PersistentDebug))
+			}
+			PrimarySessionStrategy::LaunchServer => {
+				let session = BrowserSession::launch_server_session(request.wait_until, storage_state, request.headless, request.browser).await?;
+				Ok((session, SessionSource::BrowserServer))
+			}
+			PrimarySessionStrategy::FreshLaunch => {
+				let session = self.session_with_options(request, storage_state, None).await?;
+				Ok((session, SessionSource::Fresh))
+			}
+		}
+	}
+
+	async fn session_with_options(
+		&self,
+		request: &SessionRequest<'_>,
+		storage_state: Option<StorageState>,
+		cdp_endpoint: Option<&str>,
+	) -> Result<BrowserSession> {
+		BrowserSession::with_options(SessionOptions {
+			wait_until: request.wait_until,
+			storage_state,
+			headless: request.headless,
+			browser_kind: request.browser,
+			cdp_endpoint,
+			launch_server: false,
+			protected_urls: request.protected_urls,
+			preferred_url: request.preferred_url,
+			har_config: request.har_config,
+			block_config: request.block_config,
+			download_config: request.download_config,
+		})
+		.await
+	}
+
+	async fn auto_inject_auth_if_needed(&self, request: &SessionRequest<'_>, daemon_lease: Option<&DaemonLease>, session: &mut BrowserSession) -> Result<()> {
+		let attached_endpoint = request.cdp_endpoint.is_some() || daemon_lease.is_some();
 		if attached_endpoint && request.auth_file.is_none() {
 			let auth_files = self.ctx.auth_files();
 			if !auth_files.is_empty() {
@@ -312,137 +344,55 @@ impl<'a> SessionManager<'a> {
 				session.inject_auth_files(&auth_files).await?;
 			}
 		}
+		Ok(())
+	}
 
-		if let Some(path) = &self.descriptor_path {
-			let cdp = session.cdp_endpoint().map(|e| e.to_string());
-			let ws = session.ws_endpoint().map(|e| e.to_string());
+	fn persist_descriptor_if_needed(&self, request: &SessionRequest<'_>, session: &BrowserSession, daemon_lease: Option<&DaemonLease>) {
+		if self.descriptor_path().is_none() {
+			return;
+		}
 
-			if cdp.is_some() || ws.is_some() {
-				let descriptor = SessionDescriptor {
-					schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
-					pid: std::process::id(),
-					browser: request.browser,
-					headless: request.headless,
-					cdp_endpoint: cdp,
-					ws_endpoint: ws,
-					workspace_id: Some(self.ctx.workspace_id().to_string()),
-					namespace: Some(self.ctx.namespace().to_string()),
-					session_key: daemon_session_key.or_else(|| Some(self.ctx.session_key(request.browser, request.headless).to_string())),
-					driver_hash: Some(DRIVER_HASH.to_string()),
-					created_at: now_ts(),
-				};
-				if let Err(err) = descriptor.save(path) {
-					warn!(
-						target = "pw.session",
-						path = %path.display(),
-						error = %err,
-						"failed to save session descriptor"
-					);
-				} else {
-					debug!(
-						target = "pw.session",
-						cdp = ?descriptor.cdp_endpoint,
-						ws = ?descriptor.ws_endpoint,
-						"saved session descriptor"
-					);
-				}
+		let cdp = session.cdp_endpoint().map(|e| e.to_string());
+		let ws = session.ws_endpoint().map(|e| e.to_string());
+		if cdp.is_none() && ws.is_none() {
+			debug!(target = "pw.session", "no endpoint available; skipping descriptor save");
+			return;
+		}
+
+		let descriptor = SessionDescriptor {
+			schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
+			pid: std::process::id(),
+			browser: request.browser,
+			headless: request.headless,
+			cdp_endpoint: cdp,
+			ws_endpoint: ws,
+			workspace_id: Some(self.ctx.workspace_id().to_string()),
+			namespace: Some(self.ctx.namespace().to_string()),
+			session_key: daemon_lease
+				.map(|lease| lease.session_key.clone())
+				.or_else(|| Some(self.ctx.session_key(request.browser, request.headless))),
+			driver_hash: Some(DRIVER_HASH.to_string()),
+			created_at: now_ts(),
+		};
+
+		if let Err(err) = self.repository.save(&descriptor) {
+			if let Some(path) = self.descriptor_path() {
+				warn!(
+					target = "pw.session",
+					path = %path.display(),
+					error = %err,
+					"failed to save session descriptor"
+				);
 			} else {
-				debug!(target = "pw.session", "no endpoint available; skipping descriptor save");
+				warn!(target = "pw.session", error = %err, "failed to save session descriptor");
 			}
-		}
-
-		Ok(SessionHandle { session, source })
-	}
-
-	/// Returns immutable command context used by this manager.
-	pub fn context(&self) -> &'a CommandContext {
-		self.ctx
-	}
-}
-
-/// Active session handle used by command flows.
-pub struct SessionHandle {
-	session: BrowserSession,
-	source: SessionSource,
-}
-
-impl SessionHandle {
-	/// Returns where this session was sourced from.
-	pub fn source(&self) -> SessionSource {
-		self.source
-	}
-
-	/// Navigates to a URL.
-	pub async fn goto(&self, url: &str, timeout_ms: Option<u64>) -> Result<()> {
-		self.session.goto(url, timeout_ms).await
-	}
-
-	/// Navigates only when current URL differs from `url`.
-	pub async fn goto_if_needed(&self, url: &str, timeout_ms: Option<u64>) -> Result<bool> {
-		let current_url = self.page().evaluate_value("window.location.href").await.unwrap_or_else(|_| self.page().url());
-		let current = current_url.trim_matches('"');
-
-		if urls_match(current, url) {
-			Ok(false)
 		} else {
-			self.session.goto(url, timeout_ms).await?;
-			Ok(true)
-		}
-	}
-
-	/// Navigates according to typed [`Target`] semantics.
-	pub async fn goto_target(&self, target: &Target, timeout_ms: Option<u64>) -> Result<bool> {
-		match target {
-			Target::Navigate(url) => self.goto_if_needed(url.as_str(), timeout_ms).await,
-			Target::CurrentPage => Ok(false),
-		}
-	}
-
-	/// Returns the active page.
-	pub fn page(&self) -> &pw_rs::Page {
-		self.session.page()
-	}
-
-	/// Returns the active browser context.
-	pub fn context(&self) -> &pw_rs::BrowserContext {
-		self.session.context()
-	}
-
-	/// Returns WebSocket endpoint when available.
-	pub fn ws_endpoint(&self) -> Option<&str> {
-		self.session.ws_endpoint()
-	}
-
-	/// Returns CDP endpoint when available.
-	pub fn cdp_endpoint(&self) -> Option<&str> {
-		self.session.cdp_endpoint()
-	}
-
-	/// Returns browser handle.
-	pub fn browser(&self) -> &pw_rs::Browser {
-		self.session.browser()
-	}
-
-	/// Returns downloads observed in this session.
-	pub fn downloads(&self) -> Vec<DownloadInfo> {
-		self.session.downloads()
-	}
-
-	/// Closes session resources.
-	pub async fn close(self) -> Result<()> {
-		self.session.close().await
-	}
-
-	/// Shuts down launched browser server (when applicable).
-	pub async fn shutdown_server(self) -> Result<()> {
-		self.session.shutdown_server().await
-	}
-
-	/// Collects failure artifacts from current page state.
-	pub async fn collect_failure_artifacts(&self, artifacts_dir: Option<&Path>, command_name: &str) -> CollectedArtifacts {
-		match artifacts_dir {
-			Some(dir) => collect_failure_artifacts(self.page(), dir, command_name).await,
-			None => CollectedArtifacts::default(),
+			debug!(
+				target = "pw.session",
+				cdp = ?descriptor.cdp_endpoint,
+				ws = ?descriptor.ws_endpoint,
+				"saved session descriptor"
+			);
 		}
 	}
 }
@@ -451,22 +401,12 @@ fn load_storage_state(path: &Path) -> Result<StorageState> {
 	StorageState::from_file(path).map_err(|e| PwError::BrowserLaunch(format!("Failed to load auth file: {}", e)))
 }
 
-fn urls_match(current: &str, target: &str) -> bool {
-	if current == target {
-		return true;
-	}
-
-	let current_normalized = current.trim_end_matches('/');
-	let target_normalized = target.trim_end_matches('/');
-
-	current_normalized == target_normalized
-}
-
 #[cfg(test)]
 mod tests {
-	use tempfile::tempdir;
+	use pw_rs::WaitUntil;
 
 	use super::*;
+	use crate::context::{BlockConfig, DownloadConfig, HarConfig};
 
 	static DEFAULT_HAR_CONFIG: HarConfig = HarConfig {
 		path: None,
@@ -478,113 +418,6 @@ mod tests {
 
 	static DEFAULT_BLOCK_CONFIG: BlockConfig = BlockConfig { patterns: Vec::new() };
 	static DEFAULT_DOWNLOAD_CONFIG: DownloadConfig = DownloadConfig { dir: None };
-
-	#[test]
-	fn descriptor_round_trip_and_match() {
-		let dir = tempdir().unwrap();
-		let path = dir.path().join("session.json");
-
-		let desc = SessionDescriptor {
-			schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
-			pid: std::process::id(),
-			browser: BrowserKind::Chromium,
-			headless: true,
-			cdp_endpoint: Some("ws://localhost:1234".into()),
-			ws_endpoint: Some("ws://localhost:1234".into()),
-			workspace_id: Some("ws".into()),
-			namespace: Some("default".into()),
-			session_key: Some("ws:default:chromium:headless".into()),
-			driver_hash: Some(DRIVER_HASH.to_string()),
-			created_at: 123,
-		};
-
-		desc.save(&path).unwrap();
-		let loaded = SessionDescriptor::load(&path).unwrap().unwrap();
-		assert!(loaded.is_alive());
-		assert!(loaded.matches(BrowserKind::Chromium, true, Some("ws://localhost:1234"), Some(DRIVER_HASH)));
-	}
-
-	#[test]
-	fn descriptor_save_creates_state_gitignore_for_state_paths() {
-		let dir = tempdir().unwrap();
-		let path = dir
-			.path()
-			.join("playwright")
-			.join(crate::workspace::STATE_VERSION_DIR)
-			.join("profiles")
-			.join("default")
-			.join("sessions")
-			.join("session.json");
-
-		let desc = SessionDescriptor {
-			schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
-			pid: std::process::id(),
-			browser: BrowserKind::Chromium,
-			headless: true,
-			cdp_endpoint: Some("ws://localhost:1234".into()),
-			ws_endpoint: Some("ws://localhost:1234".into()),
-			workspace_id: Some("ws".into()),
-			namespace: Some("default".into()),
-			session_key: Some("ws:default:chromium:headless".into()),
-			driver_hash: Some(DRIVER_HASH.to_string()),
-			created_at: 123,
-		};
-
-		desc.save(&path).unwrap();
-		let gitignore = dir.path().join("playwright").join(crate::workspace::STATE_VERSION_DIR).join(".gitignore");
-		assert!(gitignore.exists());
-		assert_eq!(std::fs::read_to_string(gitignore).unwrap(), "*\n");
-	}
-
-	#[test]
-	fn descriptor_mismatch_when_endpoint_differs() {
-		let desc = SessionDescriptor {
-			schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
-			pid: std::process::id(),
-			browser: BrowserKind::Chromium,
-			headless: true,
-			cdp_endpoint: Some("ws://localhost:9999".into()),
-			ws_endpoint: Some("ws://localhost:9999".into()),
-			workspace_id: Some("ws".into()),
-			namespace: Some("default".into()),
-			session_key: Some("ws:default:chromium:headless".into()),
-			driver_hash: Some(DRIVER_HASH.to_string()),
-			created_at: 0,
-		};
-
-		assert!(!desc.matches(BrowserKind::Chromium, true, Some("ws://localhost:1234"), Some(DRIVER_HASH)));
-	}
-
-	#[test]
-	fn descriptor_invalidated_by_driver_hash_change() {
-		let desc = SessionDescriptor {
-			schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
-			pid: std::process::id(),
-			browser: BrowserKind::Chromium,
-			headless: true,
-			cdp_endpoint: Some("ws://localhost:1234".into()),
-			ws_endpoint: Some("ws://localhost:1234".into()),
-			workspace_id: Some("ws".into()),
-			namespace: Some("default".into()),
-			session_key: Some("ws:default:chromium:headless".into()),
-			driver_hash: Some("old-hash".into()),
-			created_at: 42,
-		};
-
-		assert!(!desc.matches(BrowserKind::Chromium, true, Some("ws://localhost:1234"), Some(DRIVER_HASH)));
-	}
-
-	#[test]
-	fn test_urls_match() {
-		assert!(urls_match("https://example.com", "https://example.com"));
-		assert!(urls_match("https://example.com/", "https://example.com"));
-		assert!(urls_match("https://example.com", "https://example.com/"));
-		assert!(urls_match("https://example.com/path/", "https://example.com/path"));
-
-		assert!(!urls_match("https://example.com", "https://other.com"));
-		assert!(!urls_match("https://example.com/a", "https://example.com/b"));
-		assert!(!urls_match("https://example.com", "http://example.com"));
-	}
 
 	#[test]
 	fn session_request_builders_round_trip() {
@@ -606,43 +439,6 @@ mod tests {
 	}
 
 	#[test]
-	fn descriptor_match_helper_handles_no_requested_endpoint() {
-		let desc = SessionDescriptor {
-			schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
-			pid: std::process::id(),
-			browser: BrowserKind::Chromium,
-			headless: true,
-			cdp_endpoint: Some("ws://localhost:1234".into()),
-			ws_endpoint: None,
-			workspace_id: Some("ws".into()),
-			namespace: Some("default".into()),
-			session_key: Some("ws:default:chromium:headless".into()),
-			driver_hash: Some(DRIVER_HASH.to_string()),
-			created_at: 0,
-		};
-		assert!(desc.matches(BrowserKind::Chromium, true, None, Some(DRIVER_HASH)));
-	}
-
-	#[test]
-	fn descriptor_match_helper_respects_browser_and_headless() {
-		let desc = SessionDescriptor {
-			schema_version: SESSION_DESCRIPTOR_SCHEMA_VERSION,
-			pid: std::process::id(),
-			browser: BrowserKind::Chromium,
-			headless: true,
-			cdp_endpoint: Some("ws://localhost:1234".into()),
-			ws_endpoint: None,
-			workspace_id: Some("ws".into()),
-			namespace: Some("default".into()),
-			session_key: Some("ws:default:chromium:headless".into()),
-			driver_hash: Some(DRIVER_HASH.to_string()),
-			created_at: 0,
-		};
-		assert!(!desc.matches(BrowserKind::Firefox, true, Some("ws://localhost:1234"), Some(DRIVER_HASH)));
-		assert!(!desc.matches(BrowserKind::Chromium, false, Some("ws://localhost:1234"), Some(DRIVER_HASH)));
-	}
-
-	#[test]
 	fn default_configs_are_accessible() {
 		let request = SessionRequest {
 			wait_until: WaitUntil::NetworkIdle,
@@ -661,5 +457,23 @@ mod tests {
 		};
 		assert_eq!(request.block_config.patterns.len(), 0);
 		assert!(request.download_config.dir.is_none());
+	}
+
+	#[test]
+	fn descriptor_status_without_path_reports_inactive() {
+		let ctx = CommandContext::new(BrowserKind::Chromium, true, None, None, false, false);
+		let manager = SessionManager::new(&ctx, None, None, false);
+		let status = manager.descriptor_status().unwrap();
+		assert_eq!(status["active"], false);
+		assert_eq!(status["message"], "No active namespace; session status unavailable");
+	}
+
+	#[test]
+	fn clear_descriptor_without_path_reports_noop() {
+		let ctx = CommandContext::new(BrowserKind::Chromium, true, None, None, false, false);
+		let manager = SessionManager::new(&ctx, None, None, false);
+		let status = manager.clear_descriptor_response().unwrap();
+		assert_eq!(status["cleared"], false);
+		assert_eq!(status["message"], "No active namespace; nothing to clear");
 	}
 }

@@ -3,7 +3,7 @@
 use crate::commands::def::ExecCtx;
 use crate::error::{PwError, Result};
 use crate::output::FailureWithArtifacts;
-use crate::session_broker::{SessionHandle, SessionRequest};
+use crate::session::{SessionHandle, SessionRequest};
 
 /// When to collect failure artifacts (screenshots, traces).
 #[derive(Debug, Clone, Copy)]
@@ -22,7 +22,7 @@ pub async fn with_session<'exec, 'ctx, T>(
 where
 	'ctx: 'exec,
 {
-	let session = exec.broker.session(req).await?;
+	let session = exec.session.session(req).await?;
 
 	let res = f(&session).await;
 

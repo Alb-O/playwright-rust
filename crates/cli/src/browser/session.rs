@@ -104,6 +104,28 @@ pub struct BrowserSession {
 	downloads: Arc<Mutex<Vec<DownloadInfo>>>,
 }
 
+struct BrowserContextBuild {
+	browser: pw_rs::Browser,
+	context: pw_rs::BrowserContext,
+	ws_endpoint: Option<String>,
+	cdp_endpoint: Option<String>,
+	launched_server: Option<pw_rs::LaunchedServer>,
+	keep_server_running: bool,
+	reuse_existing_page: bool,
+}
+
+struct BrowserBuildInput<'a> {
+	storage_state: Option<StorageState>,
+	headless: bool,
+	browser_kind: BrowserKind,
+	cdp_endpoint: Option<&'a str>,
+	launch_server: bool,
+	har_config: &'a HarConfig,
+	download_config: &'a DownloadConfig,
+}
+
+type DownloadTracking = (Arc<Mutex<Vec<DownloadInfo>>>, Option<Subscription>);
+
 impl BrowserSession {
 	pub async fn new(wait_until: WaitUntil) -> Result<Self> {
 		let har_config = HarConfig::default();
@@ -180,18 +202,54 @@ impl BrowserSession {
 			"starting Playwright..."
 		);
 		let mut playwright = Playwright::launch().await.map_err(|e| PwError::BrowserLaunch(e.to_string()))?;
+		let build = Self::build_browser_context(
+			&mut playwright,
+			BrowserBuildInput {
+				storage_state,
+				headless,
+				browser_kind,
+				cdp_endpoint,
+				launch_server,
+				har_config,
+				download_config,
+			},
+		)
+		.await?;
+		let page = Self::select_page(&build.context, build.reuse_existing_page, protected_urls, preferred_url).await?;
+		let har_recording = Self::start_har_recording(&build.context, har_config).await?;
+		let route_subscriptions = Self::install_block_routes(&page, block_config).await?;
+		let (downloads, download_subscription) = Self::install_download_tracking(&page, download_config)?;
 
-		let mut ws_endpoint = None;
-		let mut cdp_endpoint_stored = None;
-		let mut launched_server = None;
-		let mut keep_server_running = false;
+		Ok(Self {
+			_playwright: playwright,
+			browser: build.browser,
+			context: build.context,
+			page,
+			wait_until,
+			ws_endpoint: build.ws_endpoint,
+			cdp_endpoint: build.cdp_endpoint,
+			launched_server: build.launched_server,
+			keep_server_running: build.keep_server_running,
+			keep_browser_running: false,
+			har_recording,
+			route_subscriptions,
+			download_subscription,
+			downloads,
+		})
+	}
 
-		// Track whether we're connecting to existing browser (for page reuse)
-		let mut reuse_existing_page = false;
+	async fn build_browser_context(playwright: &mut Playwright, input: BrowserBuildInput<'_>) -> Result<BrowserContextBuild> {
+		let BrowserBuildInput {
+			storage_state,
+			headless,
+			browser_kind,
+			cdp_endpoint,
+			launch_server,
+			har_config,
+			download_config,
+		} = input;
 
-		let (browser, context) = if let Some(endpoint) = cdp_endpoint {
-			// Store the CDP endpoint for later retrieval
-			cdp_endpoint_stored = Some(endpoint.to_string());
+		if let Some(endpoint) = cdp_endpoint {
 			if browser_kind != BrowserKind::Chromium {
 				return Err(PwError::BrowserLaunch("CDP endpoint connections require the chromium browser".to_string()));
 			}
@@ -204,27 +262,34 @@ impl BrowserSession {
 
 			let browser = connect_result.browser;
 			let needs_custom_context = storage_state.is_some() || har_config.is_enabled() || download_config.is_enabled();
+			let mut reuse_existing_page = false;
 			let context = if needs_custom_context {
-				let options = build_context_options(storage_state.clone(), har_config, download_config);
+				let options = build_context_options(storage_state, har_config, download_config);
 				browser.new_context_with_options(options).await?
 			} else if let Some(default_ctx) = connect_result.default_context {
-				// Reuse existing pages when using default context from CDP
 				reuse_existing_page = true;
 				default_ctx
 			} else {
 				browser.new_context().await?
 			};
 
-			(browser, context)
-		} else if launch_server {
-			playwright.keep_server_running();
-			keep_server_running = true;
+			return Ok(BrowserContextBuild {
+				browser,
+				context,
+				ws_endpoint: None,
+				cdp_endpoint: Some(endpoint.to_string()),
+				launched_server: None,
+				keep_server_running: false,
+				reuse_existing_page,
+			});
+		}
 
+		if launch_server {
+			playwright.keep_server_running();
 			let launch_options = pw_rs::LaunchOptions {
 				headless: Some(headless),
 				..Default::default()
 			};
-
 			let launched = match browser_kind {
 				BrowserKind::Chromium => playwright
 					.chromium()
@@ -243,33 +308,7 @@ impl BrowserSession {
 					.map_err(|e| PwError::BrowserLaunch(e.to_string()))?,
 			};
 
-			ws_endpoint = Some(launched.ws_endpoint().to_string());
-			launched_server = Some(launched.clone());
-
 			let browser = launched.browser().clone();
-			let needs_custom_context = storage_state.is_some() || har_config.is_enabled() || download_config.is_enabled();
-			let context = if needs_custom_context {
-				let options = build_context_options(storage_state.clone(), har_config, download_config);
-				browser.new_context_with_options(options).await?
-			} else {
-				browser.new_context().await?
-			};
-
-			(browser, context)
-		} else {
-			let launch_options = pw_rs::LaunchOptions {
-				headless: Some(headless),
-				..Default::default()
-			};
-
-			// Select browser type based on browser_kind
-			let browser = match browser_kind {
-				BrowserKind::Chromium => playwright.chromium().launch_with_options(launch_options).await?,
-				BrowserKind::Firefox => playwright.firefox().launch_with_options(launch_options).await?,
-				BrowserKind::Webkit => playwright.webkit().launch_with_options(launch_options).await?,
-			};
-
-			// Create context with optional storage state, HAR, or download config
 			let needs_custom_context = storage_state.is_some() || har_config.is_enabled() || download_config.is_enabled();
 			let context = if needs_custom_context {
 				let options = build_context_options(storage_state, har_config, download_config);
@@ -278,80 +317,118 @@ impl BrowserSession {
 				browser.new_context().await?
 			};
 
-			(browser, context)
+			return Ok(BrowserContextBuild {
+				browser,
+				context,
+				ws_endpoint: Some(launched.ws_endpoint().to_string()),
+				cdp_endpoint: None,
+				launched_server: Some(launched.clone()),
+				keep_server_running: true,
+				reuse_existing_page: false,
+			});
+		}
+
+		let launch_options = pw_rs::LaunchOptions {
+			headless: Some(headless),
+			..Default::default()
+		};
+		let browser = match browser_kind {
+			BrowserKind::Chromium => playwright.chromium().launch_with_options(launch_options).await?,
+			BrowserKind::Firefox => playwright.firefox().launch_with_options(launch_options).await?,
+			BrowserKind::Webkit => playwright.webkit().launch_with_options(launch_options).await?,
+		};
+		let needs_custom_context = storage_state.is_some() || har_config.is_enabled() || download_config.is_enabled();
+		let context = if needs_custom_context {
+			let options = build_context_options(storage_state, har_config, download_config);
+			browser.new_context_with_options(options).await?
+		} else {
+			browser.new_context().await?
 		};
 
-		// Reuse existing page if connecting to existing browser, otherwise create new
-		let page = if reuse_existing_page {
-			let existing_pages = context.pages();
-			// Use page.url() (cached) instead of evaluate_value to avoid JS execution on each page
-			// First, try to find a page matching preferred_url
-			let mut preferred_page = None;
-			let mut fallback_page = None;
+		Ok(BrowserContextBuild {
+			browser,
+			context,
+			ws_endpoint: None,
+			cdp_endpoint: None,
+			launched_server: None,
+			keep_server_running: false,
+			reuse_existing_page: false,
+		})
+	}
 
-			for page in existing_pages {
-				let url = page.url();
-				let is_protected = protected_urls.iter().any(|pattern| url.to_lowercase().contains(&pattern.to_lowercase()));
+	async fn select_page(
+		context: &pw_rs::BrowserContext,
+		reuse_existing_page: bool,
+		protected_urls: &[String],
+		preferred_url: Option<&str>,
+	) -> Result<pw_rs::Page> {
+		if !reuse_existing_page {
+			return context.new_page().await.map_err(Into::into);
+		}
 
-				if is_protected {
-					debug!(target = "pw", url = %url, "skipping protected page");
-					continue;
-				}
+		let existing_pages = context.pages();
+		let mut preferred_page = None;
+		let mut fallback_page = None;
 
-				// Check if this page matches the preferred URL
-				if let Some(pref) = preferred_url {
-					if url.starts_with(pref) || pref.starts_with(&url) || urls_match_loosely(&url, pref) {
-						debug!(target = "pw", url = %url, preferred = %pref, "found preferred page");
-						preferred_page = Some(page);
-						break;
-					}
-				}
+		for page in existing_pages {
+			let url = page.url();
+			let is_protected = protected_urls.iter().any(|pattern| url.to_lowercase().contains(&pattern.to_lowercase()));
+			if is_protected {
+				debug!(target = "pw", url = %url, "skipping protected page");
+				continue;
+			}
 
-				// Keep first non-protected page as fallback
-				if fallback_page.is_none() {
-					fallback_page = Some(page);
+			if let Some(pref) = preferred_url {
+				if url.starts_with(pref) || pref.starts_with(&url) || urls_match_loosely(&url, pref) {
+					debug!(target = "pw", url = %url, preferred = %pref, "found preferred page");
+					preferred_page = Some(page);
+					break;
 				}
 			}
 
-			match preferred_page.or(fallback_page) {
-				Some(page) => {
-					debug!(target = "pw", url = %page.url(), "reusing existing page");
-					page
-				}
-				None => {
-					debug!(target = "pw", "no suitable pages found, creating new");
-					context.new_page().await?
-				}
+			if fallback_page.is_none() {
+				fallback_page = Some(page);
 			}
-		} else {
-			context.new_page().await?
-		};
+		}
 
-		// Start HAR recording if configured
-		let har_recording = if let Some(ref path) = har_config.path {
-			debug!(
-				target = "pw",
-				har_path = %path.display(),
-				"starting HAR recording"
-			);
-			let options = pw_rs::HarStartOptions {
-				content: har_config.content_policy,
-				mode: har_config.mode,
-				url_glob: har_config.url_filter.clone(),
-			};
-			let har_id = context
-				.har_start(options)
-				.await
-				.map_err(|e| PwError::BrowserLaunch(format!("Failed to start HAR recording: {}", e)))?;
-			Some(HarRecording {
-				id: har_id,
-				path: path.clone(),
-			})
-		} else {
-			None
-		};
+		match preferred_page.or(fallback_page) {
+			Some(page) => {
+				debug!(target = "pw", url = %page.url(), "reusing existing page");
+				Ok(page)
+			}
+			None => {
+				debug!(target = "pw", "no suitable pages found, creating new");
+				Ok(context.new_page().await?)
+			}
+		}
+	}
 
-		// Set up request blocking routes
+	async fn start_har_recording(context: &pw_rs::BrowserContext, har_config: &HarConfig) -> Result<Option<HarRecording>> {
+		let Some(path) = &har_config.path else {
+			return Ok(None);
+		};
+		debug!(
+			target = "pw",
+			har_path = %path.display(),
+			"starting HAR recording"
+		);
+
+		let options = pw_rs::HarStartOptions {
+			content: har_config.content_policy,
+			mode: har_config.mode,
+			url_glob: har_config.url_filter.clone(),
+		};
+		let har_id = context
+			.har_start(options)
+			.await
+			.map_err(|e| PwError::BrowserLaunch(format!("Failed to start HAR recording: {}", e)))?;
+		Ok(Some(HarRecording {
+			id: har_id,
+			path: path.clone(),
+		}))
+	}
+
+	async fn install_block_routes(page: &pw_rs::Page, block_config: &BlockConfig) -> Result<Vec<Subscription>> {
 		let mut route_subscriptions = Vec::with_capacity(block_config.patterns.len());
 		for pattern in &block_config.patterns {
 			debug!(target = "pw", %pattern, "blocking pattern");
@@ -361,67 +438,48 @@ impl BrowserSession {
 				.map_err(|e| PwError::BrowserLaunch(format!("route setup failed: {e}")))?;
 			route_subscriptions.push(sub);
 		}
+		Ok(route_subscriptions)
+	}
 
-		// Set up download handler if tracking is enabled
+	fn install_download_tracking(page: &pw_rs::Page, download_config: &DownloadConfig) -> Result<DownloadTracking> {
 		let downloads: Arc<Mutex<Vec<DownloadInfo>>> = Arc::new(Mutex::new(Vec::new()));
-		let download_subscription = if let Some(ref dir) = download_config.dir {
-			let downloads_dir = dir.clone();
-			let downloads_ref = Arc::clone(&downloads);
-			debug!(target = "pw", dir = %downloads_dir.display(), "download tracking enabled");
 
-			// Ensure downloads directory exists
-			if let Err(e) = std::fs::create_dir_all(&downloads_dir) {
-				return Err(PwError::BrowserLaunch(format!("failed to create downloads dir: {e}")));
-			}
-
-			let sub = page.on_download(move |download| {
-				let downloads_dir = downloads_dir.clone();
-				let downloads_ref = Arc::clone(&downloads_ref);
-				async move {
-					let url = download.url().to_string();
-					let suggested = download.suggested_filename().to_string();
-					let save_path = downloads_dir.join(&suggested);
-
-					debug!(
-						target = "pw",
-						url = %url,
-						filename = %suggested,
-						path = %save_path.display(),
-						"saving download"
-					);
-
-					download.save_as(&save_path).await?;
-
-					let info = DownloadInfo {
-						url,
-						suggested_filename: suggested,
-						path: save_path,
-					};
-					downloads_ref.lock().unwrap().push(info);
-					Ok(())
-				}
-			});
-			Some(sub)
-		} else {
-			None
+		let Some(downloads_dir) = download_config.dir.clone() else {
+			return Ok((downloads, None));
 		};
 
-		Ok(Self {
-			_playwright: playwright,
-			browser,
-			context,
-			page,
-			wait_until,
-			ws_endpoint,
-			cdp_endpoint: cdp_endpoint_stored,
-			launched_server,
-			keep_server_running,
-			keep_browser_running: false,
-			har_recording,
-			route_subscriptions,
-			download_subscription,
-			downloads,
-		})
+		debug!(target = "pw", dir = %downloads_dir.display(), "download tracking enabled");
+		std::fs::create_dir_all(&downloads_dir).map_err(|e| PwError::BrowserLaunch(format!("failed to create downloads dir: {e}")))?;
+
+		let downloads_ref = Arc::clone(&downloads);
+		let sub = page.on_download(move |download| {
+			let downloads_dir = downloads_dir.clone();
+			let downloads_ref = Arc::clone(&downloads_ref);
+			async move {
+				let url = download.url().to_string();
+				let suggested = download.suggested_filename().to_string();
+				let save_path = downloads_dir.join(&suggested);
+
+				debug!(
+					target = "pw",
+					url = %url,
+					filename = %suggested,
+					path = %save_path.display(),
+					"saving download"
+				);
+
+				download.save_as(&save_path).await?;
+
+				let info = DownloadInfo {
+					url,
+					suggested_filename: suggested,
+					path: save_path,
+				};
+				downloads_ref.lock().unwrap().push(info);
+				Ok(())
+			}
+		});
+		Ok((downloads, Some(sub)))
 	}
 
 	/// Create a session with auth loaded from a file

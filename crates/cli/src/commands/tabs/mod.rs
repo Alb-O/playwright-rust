@@ -6,7 +6,7 @@ use serde_json::json;
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
 use crate::error::{PwError, Result};
 use crate::output::CommandInputs;
-use crate::session_broker::SessionRequest;
+use crate::session::SessionRequest;
 use crate::target::ResolveEnv;
 
 #[derive(Debug, Serialize)]
@@ -46,7 +46,7 @@ impl CommandDef for TabsListCommand {
 		Box::pin(async move {
 			let protected_patterns = exec.ctx_state.protected_urls().to_vec();
 			let request = SessionRequest::from_context(WaitUntil::Load, exec.ctx).with_protected_urls(&protected_patterns);
-			let session = exec.broker.session(request).await?;
+			let session = exec.session.session(request).await?;
 			let context = session.context();
 			let pages = context.pages();
 			let sorted_pages = sort_pages_by_url(&pages).await;
@@ -108,7 +108,7 @@ impl CommandDef for TabsSwitchCommand {
 		Box::pin(async move {
 			let protected_patterns = exec.ctx_state.protected_urls().to_vec();
 			let request = SessionRequest::from_context(WaitUntil::Load, exec.ctx).with_protected_urls(&protected_patterns);
-			let session = exec.broker.session(request).await?;
+			let session = exec.session.session(request).await?;
 			let context = session.context();
 			let pages = context.pages();
 			let sorted = sort_pages_by_url(&pages).await;
@@ -165,7 +165,7 @@ impl CommandDef for TabsCloseCommand {
 		Box::pin(async move {
 			let protected_patterns = exec.ctx_state.protected_urls().to_vec();
 			let request = SessionRequest::from_context(WaitUntil::Load, exec.ctx).with_protected_urls(&protected_patterns);
-			let session = exec.broker.session(request).await?;
+			let session = exec.session.session(request).await?;
 			let context = session.context();
 			let pages = context.pages();
 			let sorted = sort_pages_by_url(&pages).await;
@@ -221,7 +221,7 @@ impl CommandDef for TabsNewCommand {
 	{
 		Box::pin(async move {
 			let request = SessionRequest::from_context(WaitUntil::Load, exec.ctx);
-			let session = exec.broker.session(request).await?;
+			let session = exec.session.session(request).await?;
 			let context = session.context();
 			let page = context.new_page().await?;
 

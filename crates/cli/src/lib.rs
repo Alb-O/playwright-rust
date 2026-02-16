@@ -15,7 +15,6 @@ pub mod readable;
 pub mod relay;
 pub mod runtime;
 pub mod session;
-pub mod session_broker;
 pub mod session_helpers;
 pub mod styles;
 pub mod target;

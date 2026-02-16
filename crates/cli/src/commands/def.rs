@@ -13,7 +13,7 @@ use crate::context::CommandContext;
 use crate::context_store::ContextState;
 use crate::error::Result;
 use crate::output::{CommandInputs, OutputFormat};
-use crate::session_broker::SessionBroker;
+use crate::session::SessionManager;
 use crate::target::ResolveEnv;
 
 /// Execution mode matters for I/O (interactive prompts) and for output formatting expectations.
@@ -36,7 +36,7 @@ pub struct ExecCtx<'exec, 'ctx> {
 	pub ctx_state: &'exec mut ContextState,
 
 	/// Session factory + session tracking.
-	pub broker: &'exec mut SessionBroker<'ctx>,
+	pub session: &'exec mut SessionManager<'ctx>,
 
 	/// Output format selection (json, ndjson, pretty, etc.).
 	pub format: OutputFormat,

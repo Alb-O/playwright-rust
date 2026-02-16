@@ -21,7 +21,7 @@ use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, Exe
 use crate::context::CommandContext;
 use crate::error::{PwError, Result};
 use crate::output::CommandInputs;
-use crate::session_broker::{SessionBroker, SessionRequest};
+use crate::session::{SessionManager, SessionRequest};
 use crate::target::{Resolve, ResolveEnv, ResolvedTarget, Target, TargetPolicy};
 
 #[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
@@ -86,7 +86,7 @@ impl CommandDef for LoginCommand {
 			let mut resolved = args.clone();
 			resolved.output = resolve_auth_output(exec.ctx, &resolved.output);
 
-			let data = login_resolved(&resolved, exec.ctx, exec.broker, exec.last_url, true).await?;
+			let data = login_resolved(&resolved, exec.ctx, exec.session, exec.last_url, true).await?;
 
 			Ok(CommandOutcome {
 				inputs: CommandInputs {
@@ -158,7 +158,7 @@ impl CommandDef for CookiesCommand {
 		'ctx: 'exec,
 	{
 		Box::pin(async move {
-			let data = cookies_resolved(args, exec.ctx, exec.broker, exec.last_url).await?;
+			let data = cookies_resolved(args, exec.ctx, exec.session, exec.last_url).await?;
 
 			Ok(CommandOutcome {
 				inputs: CommandInputs {
@@ -292,7 +292,7 @@ impl CommandDef for ListenCommand {
 async fn login_resolved(
 	args: &LoginResolved,
 	ctx: &CommandContext,
-	broker: &mut SessionBroker<'_>,
+	session: &mut SessionManager<'_>,
 	last_url: Option<&str>,
 	interactive_messages: bool,
 ) -> Result<serde_json::Value> {
@@ -300,7 +300,7 @@ async fn login_resolved(
 	info!(target = "pw", url = %url_display, path = %args.output.display(), browser = %ctx.browser, "starting interactive login");
 
 	let preferred_url = args.preferred_url(last_url);
-	let session = broker
+	let session = session
 		.session(
 			SessionRequest::from_context(WaitUntil::Load, ctx)
 				.with_headless(false)
@@ -366,12 +366,12 @@ async fn login_resolved(
 	}))
 }
 
-async fn cookies_resolved(args: &CookiesResolved, ctx: &CommandContext, broker: &mut SessionBroker<'_>, last_url: Option<&str>) -> Result<serde_json::Value> {
+async fn cookies_resolved(args: &CookiesResolved, ctx: &CommandContext, session: &mut SessionManager<'_>, last_url: Option<&str>) -> Result<serde_json::Value> {
 	let url_display = args.target.url_str().unwrap_or("<current page>");
 	info!(target = "pw", url = %url_display, browser = %ctx.browser, "fetching cookies");
 
 	let preferred_url = args.preferred_url(last_url);
-	let session = broker
+	let session = session
 		.session(SessionRequest::from_context(WaitUntil::Load, ctx).with_preferred_url(preferred_url))
 		.await?;
 

@@ -12,9 +12,8 @@ use serde_json::json;
 use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ContextDelta, ExecCtx};
 use crate::error::Result;
 use crate::output::CommandInputs;
-use crate::session::connector::{
-	clear_cdp_endpoint, discover_and_connect, kill_browser_on_port, launch_and_connect, resolve_connect_port, set_cdp_endpoint, show_cdp_endpoint,
-};
+use crate::session::connect_service::ConnectService;
+use crate::session::connector::resolve_connect_port;
 use crate::target::ResolveEnv;
 
 #[derive(Debug, Clone, Default, Args, Serialize, Deserialize)]
@@ -97,20 +96,20 @@ impl CommandDef for ConnectCommand {
 	{
 		Box::pin(async move {
 			let port = resolve_connect_port(exec.ctx_state, args.port);
-			let auth_file = exec.ctx.auth_file();
+			let mut service = ConnectService::new(exec.ctx_state, exec.ctx.auth_file());
 
 			let data = if args.kill {
-				kill_browser_on_port(exec.ctx_state, port).await?
+				service.kill(port).await?
 			} else if args.clear {
-				clear_cdp_endpoint(exec.ctx_state)
+				service.clear()
 			} else if args.launch {
-				launch_and_connect(exec.ctx_state, port, args.user_data_dir.as_deref(), auth_file).await?
+				service.launch(port, args.user_data_dir.as_deref()).await?
 			} else if args.discover {
-				discover_and_connect(exec.ctx_state, port, auth_file).await?
+				service.discover(port).await?
 			} else if let Some(ep) = &args.endpoint {
-				set_cdp_endpoint(exec.ctx_state, ep)
+				service.set_endpoint(ep)
 			} else {
-				show_cdp_endpoint(exec.ctx_state)
+				service.show()
 			};
 
 			Ok(CommandOutcome {

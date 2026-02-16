@@ -27,7 +27,7 @@ use crate::commands::def::{BoxFut, CommandDef, CommandOutcome, ExecCtx};
 use crate::commands::flow::page::run_page_flow;
 use crate::error::Result;
 use crate::output::{ElementsData, InteractiveElement};
-use crate::session_broker::SessionHandle;
+use crate::session::SessionHandle;
 use crate::session_helpers::ArtifactsPolicy;
 use crate::target::{ResolveEnv, ResolvedTarget, TargetPolicy};
 

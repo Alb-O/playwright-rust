@@ -116,7 +116,7 @@ pub struct BoundingBox {
 
 /// Abstracts session operations for testing.
 ///
-/// Mirrors the subset of [`crate::session_broker::SessionHandle`] methods used by CLI commands.
+/// Mirrors the subset of [`crate::session::SessionHandle`] methods used by CLI commands.
 /// A session represents a browser connection with an active page.
 #[async_trait]
 pub trait SessionLike: Send + Sync {
