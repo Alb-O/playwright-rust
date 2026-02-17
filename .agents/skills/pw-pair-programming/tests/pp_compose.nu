@@ -33,6 +33,19 @@ def "test compose supports slice entries" [] {
     assert equal true ($out | str contains "line2\nline3")
 }
 
+def "test compose supports shorthand range entries" [] {
+    let f = (fixture)
+    let out = (pp compose --preamble-file $f.prompt $"($f.code):2-3")
+    let out_multi = (pp compose --preamble-file $f.prompt $"($f.code):1-1,4-4")
+
+    assert equal true ($out | str contains $"[FILE: ($f.code) | lines 2-3]")
+    assert equal true ($out | str contains "line2\nline3")
+    assert equal true ($out_multi | str contains $"[FILE: ($f.code) | line 1]")
+    assert equal true ($out_multi | str contains $"[FILE: ($f.code) | line 4]")
+    assert equal true ($out_multi | str contains "line1")
+    assert equal true ($out_multi | str contains "line4")
+}
+
 def "test compose rejects invalid slice range" [] {
     let f = (fixture)
     let result = (try {
@@ -75,6 +88,7 @@ def main [] {
     let results = [
         (run-test "test compose includes full file blocks" { test compose includes full file blocks })
         (run-test "test compose supports slice entries" { test compose supports slice entries })
+        (run-test "test compose supports shorthand range entries" { test compose supports shorthand range entries })
         (run-test "test compose rejects invalid slice range" { test compose rejects invalid slice range })
         (run-test "test compose rejects out of bounds slice end" { test compose rejects out of bounds slice end })
     ]

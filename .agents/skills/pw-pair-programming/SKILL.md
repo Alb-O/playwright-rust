@@ -22,6 +22,7 @@ From a global skills directory (most basic usage):
 
 1. Write a prompt preamble to a temp file.
 2. Run `pp brief --preamble-file <file> ...<entries> --wait`.
+3. Run from your project root when using relative paths.
 
 ## commands
 
@@ -42,9 +43,12 @@ From a global skills directory (most basic usage):
 
 * full file: `src/main.rs` or `file:src/main.rs`
 * line slice: `slice:path:start:end[:label]`
+* shorthand line slice: `path:start-end` or `path:start-end,start-end`
 
 ## notes
 
 * write preamble content to files instead of inline shell.
 * when running inside nu -c, prefer list + splat (`...$entries`) instead of bash-style line continuations.
+* if you have xeno-style entries like `path:10-40`, pass them directly as shorthand slices.
+* `pp send` and `pp brief` (without `--wait`) return compact send metadata by default; use `pp send --echo-message` only when you need the full text echoed back.
 * always set a long timeout on your bash command when `--wait`ing (10+ minutes) - navigator needs to think and prep

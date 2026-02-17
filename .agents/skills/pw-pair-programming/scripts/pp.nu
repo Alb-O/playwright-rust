@@ -291,6 +291,50 @@ def parse-slice-entry [entry: string]: nothing -> record {
     }
 }
 
+# Parse shorthand range entry syntax: "path:start-end[,start-end...]"
+# Returns null when the entry is not in shorthand format.
+def parse-range-shorthand-entry [entry: string]: nothing -> any {
+    let parsed = ($entry | parse --regex '^(?<path>.+):(?<ranges>\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*)$')
+    if ($parsed | is-empty) {
+        return null
+    }
+
+    let row = ($parsed | first)
+    mut ranges = []
+
+    for token in ($row.ranges | split row ",") {
+        let match = ($token | parse --regex '^(?<start>\d+)(?:-(?<end>\d+))?$')
+        if ($match | is-empty) {
+            error make {
+                msg: $"Invalid shorthand range token: ($token) in entry ($entry). Expected start-end or a single line number."
+            }
+        }
+
+        let range = ($match | first)
+        let start = ($range.start | into int)
+        let end = if (($range.end? | default "") | is-empty) {
+            $start
+        } else {
+            $range.end | into int
+        }
+
+        if $start < 1 {
+            error make { msg: $"Shorthand range start must be >= 1: ($entry)" }
+        }
+        if $end < $start {
+            error make { msg: $"Shorthand range end must be >= start: ($entry)" }
+        }
+
+        $ranges = ($ranges | append { start: $start, end: $end })
+    }
+
+    {
+        path_text: $row.path
+        path: ($row.path | into string)
+        ranges: $ranges
+    }
+}
+
 # Read a 1-indexed line range from a file.
 def read-slice [file_path: path, start: int, end: int]: nothing -> string {
     let lines = (open --raw $file_path | lines)
@@ -317,6 +361,7 @@ def read-slice [file_path: path, start: int, end: int]: nothing -> string {
 # Entry formats:
 #   - full file: "src/main.rs" or "file:src/main.rs"
 #   - line slice: "slice:src/parser.rs:45:67:optional label"
+#   - shorthand line slice(s): "src/parser.rs:45-67" or "src/parser.rs:45-67,80-90"
 export def "pp compose" [
     --preamble-file (-p): path  # Required prompt preamble file
     ...entries: string          # File and slice entries
@@ -347,7 +392,9 @@ export def "pp compose" [
             let parsed = (parse-slice-entry $spec)
             let file_path = $parsed.path
             if not ($file_path | path exists) {
-                error make { msg: $"Slice file not found: ($parsed.path_text) cwd=($env.PWD)" }
+                error make {
+                    msg: $"Slice file not found: ($parsed.path_text) cwd=($env.PWD). Run from your project root or use absolute paths."
+                }
             }
 
             let snippet = (read-slice $file_path $parsed.start $parsed.end)
@@ -365,13 +412,38 @@ export def "pp compose" [
             }
 
             let file_path = $file_text
+            if ($file_path | path exists) {
+                let content = (open --raw $file_path | into string)
+                $parts = ($parts | append $"\n\n[FILE: ($file_text)]\n($content)")
+                continue
+            }
+
+            let shorthand = (parse-range-shorthand-entry $file_text)
+            if ($shorthand | is-not-empty) {
+                let shorthand_path = $shorthand.path
+                if not ($shorthand_path | path exists) {
+                    error make {
+                        msg: $"Range entry file not found: ($shorthand.path_text) cwd=($env.PWD). Parsed from '($file_text)'. Run from your project root or use absolute paths."
+                    }
+                }
+
+                for range in $shorthand.ranges {
+                    let snippet = (read-slice $shorthand_path $range.start $range.end)
+                    let header = if $range.start == $range.end {
+                        $"[FILE: ($shorthand.path_text) | line ($range.start)]"
+                    } else {
+                        $"[FILE: ($shorthand.path_text) | lines ($range.start)-($range.end)]"
+                    }
+                    $parts = ($parts | append $"\n\n($header)\n($snippet)")
+                }
+                continue
+            }
+
             if not ($file_path | path exists) {
                 error make {
-                    msg: $"File not found: ($file_text) cwd=($env.PWD). If you used bash-style \\ continuation in nu -c, remove it or pass entries via a Nu list and splat ...$entries."
+                    msg: $"File not found: ($file_text) cwd=($env.PWD). If this was intended as a line range, use 'slice:path:start:end' or shorthand 'path:start-end[,start-end...]'. If you used bash-style \\ continuation in nu -c, remove it or pass entries via a Nu list and splat ...$entries."
                 }
             }
-            let content = (open --raw $file_path | into string)
-            $parts = ($parts | append $"\n\n[FILE: ($file_text)]\n($content)")
         }
     }
 
@@ -621,6 +693,7 @@ export def "pp send" [
     --new (-n)             # Start new temporary chat
     --file (-f): path      # Read message from file (avoids shell escaping)
     --force                # Send even if last message matches (bypass dedup)
+    --echo-message (-e)    # Include full message text in output
 ]: [string -> record, nothing -> record] {
     # Resolve message: --file > positional > stdin
     let msg = if ($file | is-not-empty) {
@@ -654,7 +727,18 @@ export def "pp send" [
     if not $force and not $new {
         let last_msg = (last-driver-message)
         if ($last_msg | is-not-empty) and ($last_msg | str trim) == ($msg | str trim) {
-            return { success: true, message: $msg, model: (get-current-model), already_sent: true }
+            let dedup = {
+                success: true
+                sent: false
+                already_sent: true
+                model: (get-current-model)
+                chars: ($msg | str length)
+            }
+            return (if $echo_message {
+                $dedup | merge { message: $msg }
+            } else {
+                $dedup
+            })
         }
     }
 
@@ -679,7 +763,18 @@ export def "pp send" [
         error make { msg: ($send_result.error) }
     }
 
-    { success: true, message: $msg, model: (get-current-model) }
+    let sent = {
+        success: true
+        sent: true
+        already_sent: false
+        model: (get-current-model)
+        chars: ($msg | str length)
+    }
+    if $echo_message {
+        $sent | merge { message: $msg }
+    } else {
+        $sent
+    }
 }
 
 # Check if response is still in progress (thinking or streaming)
