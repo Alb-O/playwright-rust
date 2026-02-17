@@ -10,13 +10,13 @@ interact with the navigator using the pp.nu nushell script. uses pw protocol-fir
 * the driver (you) must collaborate with the navigator in back-and-forth loops.
 * the driver writes code and runs tools; the navigator steers design.
 
-setup: requires cdp connection to a debug-enabled browser with an active navigator session.
+setup: requires cdp connection to a debug-enabled browser with an active navigator session. user should already have this setup.
 
 ## invocation
 
-From a global skills directory:
+From a global skills directory (most basic usage):
 
-nu -I ~/.claude/skills/pw-pair-programming/scripts -c "use pp.nu *; pp send 'Hello'"
+`nu -I ~/.claude/skills/pw-pair-programming/scripts -c "use pp.nu *; pp send 'Hello'"`
 
 ## quickstart
 
@@ -27,7 +27,7 @@ nu -I ~/.claude/skills/pw-pair-programming/scripts -c "use pp.nu *; pp send 'Hel
 
 `pp send` send message (`--file` supported)
 `pp compose` build message from preamble + context entries
-`pp brief` compose + send
+`pp brief` compose + send (`--wait` for 10+ minutes to avoid timeouts)
 `pp attach` attach files/text/images (binary-safe; infers common MIME types)
 `pp paste` paste inline text
 `pp new` start fresh conversation
@@ -47,3 +47,4 @@ nu -I ~/.claude/skills/pw-pair-programming/scripts -c "use pp.nu *; pp send 'Hel
 
 * write preamble content to files instead of inline shell.
 * when running inside nu -c, prefer list + splat (`...$entries`) instead of bash-style line continuations.
+* always set a long timeout on your bash command when `--wait`ing (10+ minutes) - navigator needs to think and prep
