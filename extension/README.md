@@ -4,7 +4,7 @@ A Chrome extension that exports cookies from your browser to pw-cli for authenti
 
 ## How It Works
 
-1. Run `pw auth listen` in your terminal - this starts a WebSocket server and displays a one-time token
+1. Run `pw exec auth.listen --input '{}'` in your terminal - this starts a WebSocket server and displays a one-time token
 2. Open the extension popup and paste the token
 3. Select which domains to export (current tab's domain is auto-added)
 4. Click "Export Cookies" - cookies are saved to your auth directory
@@ -30,7 +30,7 @@ This outputs `dist/background.js` and `dist/background_bg.wasm` used by the mani
 
 ```bash
 # Start the auth listener
-pw auth listen
+pw exec auth.listen --input '{}'
 
 # Output:
 # Listening for browser extension on ws://127.0.0.1:9271/
@@ -54,11 +54,26 @@ pw auth listen
 ### Using Exported Cookies
 
 ```bash
-# Use exported cookies with pw commands
-pw --auth github_com.json navigate https://github.com/settings
+# Inspect an exported auth file
+pw exec auth.show --input '{"file":"playwright/auth/github_com.json"}'
 
-# Or if you have a playwright project:
-pw --auth github.json navigate https://github.com/settings
+# Use an exported auth file via runtime override
+cat > request.json <<'JSON'
+{
+  "schemaVersion": 5,
+  "op": "navigate",
+  "input": {
+    "url": "https://github.com/settings"
+  },
+  "runtime": {
+    "overrides": {
+      "authFile": "playwright/auth/github_com.json"
+    }
+  }
+}
+JSON
+
+pw exec --file request.json
 ```
 
 ## Security
@@ -79,15 +94,15 @@ pw --auth github.json navigate https://github.com/settings
 
 **"Failed to connect"**
 
-- Make sure `pw auth listen` is running
-- Check the server URL matches (default port is 9271)
+* Make sure `pw exec auth.listen --input '{}'` is running
+* Check the server URL matches (default port is 9271)
 
 **"Authentication rejected"**
 
-- Token may have been mistyped - copy it again from the terminal
-- The server may have restarted - get a new token
+* Token may have been mistyped - copy it again from the terminal
+* The server may have restarted - get a new token
 
 **"No cookies found"**
 
-- Make sure you're logged into the site in Chrome
-- Some sites use different cookie domains (try adding both `example.com` and `www.example.com`)
+* Make sure you're logged into the site in Chrome
+* Some sites use different cookie domains (try adding both `example.com` and `www.example.com`)

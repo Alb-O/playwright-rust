@@ -1,7 +1,7 @@
 //! Protocol types for browser extension cookie exchange.
 //!
 //! This module defines the WebSocket message format for communication between
-//! the `pw auth listen` server and the browser extension. The protocol is simple:
+//! the `pw exec auth.listen --input '{}'` server and the browser extension. The protocol is simple:
 //!
 //! 1. Extension connects and sends [`ExtensionMessage::Hello`] with a token
 //! 2. Server responds with [`ServerMessage::Welcome`] or [`ServerMessage::Rejected`]
@@ -28,7 +28,7 @@ use crate::cookie::{Cookie, SameSite, StorageState};
 pub enum ExtensionMessage {
 	/// Initial handshake containing the one-time authentication token.
 	Hello {
-		/// Token displayed by `pw auth listen`, proves the user authorized this connection.
+		/// Token displayed by `pw exec auth.listen --input '{}'`, proves the user authorized this connection.
 		token: String,
 	},
 	/// Push cookies for one or more domains to be saved as auth files.

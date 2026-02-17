@@ -1,7 +1,7 @@
 //! Background service worker for the pw Cookie Export extension.
 //!
 //! This WASM module handles communication between the popup UI and the
-//! `pw auth listen` server. It manages:
+//! `pw exec auth.listen --input '{}'` server. It manages:
 //!
 //! * WebSocket connection to the CLI's auth listener
 //! * Authentication via one-time token
@@ -11,7 +11,7 @@
 //! # Message Flow
 //!
 //! ```text
-//! Popup  <-->  Background (this module)  <-->  pw auth listen
+//! Popup  <-->  Background (this module)  <-->  pw exec auth.listen
 //!   |              |                              |
 //!   |--Connect---->|                              |
 //!   |              |----WebSocket + Hello-------->|

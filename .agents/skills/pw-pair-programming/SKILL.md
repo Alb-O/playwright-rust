@@ -28,7 +28,7 @@ nu -I ~/.claude/skills/pw-pair-programming/scripts -c "use pp.nu *; pp send 'Hel
 `pp send` send message (`--file` supported)
 `pp compose` build message from preamble + context entries
 `pp brief` compose + send
-`pp attach` attach files/text
+`pp attach` attach files/text/images (binary-safe; infers common MIME types)
 `pp paste` paste inline text
 `pp new` start fresh conversation
 `pp set-model` set mode (`auto` | `instant` | `thinking`)
