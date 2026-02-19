@@ -3,6 +3,7 @@
 //! Defines deterministic identifiers used for strict session isolation.
 
 use std::collections::hash_map::DefaultHasher;
+use std::ffi::OsString;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
@@ -13,6 +14,7 @@ use crate::project::Project;
 use crate::types::BrowserKind;
 
 pub const DEFAULT_PROFILE: &str = "default";
+pub const WORKSPACE_ROOT_ENV_VAR: &str = "PW_WORKSPACE_ROOT";
 pub const STATE_VERSION_DIR: &str = ".pw-cli-v4";
 pub const STATE_GITIGNORE_CONTENT: &str = "*\n";
 pub const CDP_PORT_RANGE_START: u16 = 9222;
@@ -152,6 +154,15 @@ fn find_state_root(path: &Path) -> Option<PathBuf> {
 }
 
 fn resolve_workspace_root(workspace: Option<&str>, no_project: bool) -> Result<PathBuf> {
+	let override_root = resolve_workspace_root_override(std::env::var_os(WORKSPACE_ROOT_ENV_VAR))?;
+	resolve_workspace_root_with_override(workspace, no_project, override_root)
+}
+
+fn resolve_workspace_root_with_override(workspace: Option<&str>, no_project: bool, override_root: Option<PathBuf>) -> Result<PathBuf> {
+	if let Some(root) = override_root {
+		return Ok(canonicalize_or_self(root));
+	}
+
 	if let Some(value) = workspace {
 		if value == "auto" {
 			return auto_workspace_root(no_project);
@@ -166,6 +177,20 @@ fn resolve_workspace_root(workspace: Option<&str>, no_project: bool) -> Result<P
 	}
 
 	std::env::current_dir().map(canonicalize_or_self).map_err(PwError::Io)
+}
+
+fn resolve_workspace_root_override(raw: Option<OsString>) -> Result<Option<PathBuf>> {
+	let Some(raw) = raw else {
+		return Ok(None);
+	};
+
+	let root = PathBuf::from(raw);
+	if root.as_os_str().is_empty() {
+		return Ok(None);
+	}
+
+	let resolved = if root.is_absolute() { root } else { std::env::current_dir()?.join(root) };
+	Ok(Some(canonicalize_or_self(resolved)))
 }
 
 fn auto_workspace_root(no_project: bool) -> Result<PathBuf> {
@@ -269,6 +294,33 @@ mod tests {
 
 		let scope = WorkspaceScope::resolve(Some("auto"), Some("default"), false).unwrap();
 		assert_eq!(scope.root(), project_root.as_path());
+	}
+
+	#[test]
+	fn workspace_root_override_relative_paths_are_resolved_from_cwd() {
+		let _cwd_lock = crate::test_sync::lock_cwd();
+		let temp = TempDir::new().unwrap();
+		let original_dir = std::env::current_dir().unwrap();
+		struct CwdGuard(PathBuf);
+		impl Drop for CwdGuard {
+			fn drop(&mut self) {
+				let _ = std::env::set_current_dir(&self.0);
+			}
+		}
+		let _guard = CwdGuard(original_dir);
+		std::env::set_current_dir(temp.path()).unwrap();
+
+		let resolved = resolve_workspace_root_override(Some(OsString::from("workspace-root"))).unwrap().unwrap();
+		assert_eq!(resolved, temp.path().join("workspace-root"));
+	}
+
+	#[test]
+	fn workspace_root_override_takes_precedence_over_workspace_input() {
+		let temp = TempDir::new().unwrap();
+		let forced_root = temp.path().join("forced");
+
+		let resolved = resolve_workspace_root_with_override(Some("auto"), false, Some(forced_root.clone())).unwrap();
+		assert_eq!(resolved, forced_root);
 	}
 
 	#[test]

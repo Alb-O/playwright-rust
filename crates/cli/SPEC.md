@@ -159,6 +159,14 @@ For each request, profile is chosen in this order:
 
 Resolved profile is normalized to `[A-Za-z0-9._-]` with invalid characters replaced by `-`.
 
+### Workspace Root Selection Order
+
+Workspace root for profile state (`playwright/.pw-cli-v4`) is resolved in this order:
+
+1. `PW_WORKSPACE_ROOT` environment variable (force override)
+2. explicit workspace value, if supplied
+3. current working directory
+
 ### Override Precedence
 
 For each runtime field, resolution order is:
