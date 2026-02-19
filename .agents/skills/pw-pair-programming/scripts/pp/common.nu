@@ -6,6 +6,8 @@ export const ARG_MAX_FALLBACK = 2097152
 export const ARG_MAX_HEADROOM = 131072
 export const SINGLE_ARG_LIMIT_FALLBACK = 131072
 export const SINGLE_ARG_HEADROOM = 16384
+export const CONVERSATION_LIMIT_BOOST_PCT = 120
+export const CONVERSATION_HARD_CAP_PCT = 100
 export const CONVERSATION_WARN_PCT = 70
 export const CONVERSATION_CRITICAL_PCT = 85
 
@@ -274,11 +276,12 @@ export def conversation-length-state []: nothing -> record {
     let raw_arg_max = (arg-max-raw)
     let total_limit = (arg-max-effective)
     let single_arg_limit = (single-arg-effective)
-    let effective_limit = if $single_arg_limit < $total_limit {
+    let base_effective_limit = if $single_arg_limit < $total_limit {
         $single_arg_limit
     } else {
         $total_limit
     }
+    let effective_limit = ((($base_effective_limit * $CONVERSATION_LIMIT_BOOST_PCT) / 100) | into int)
     let limit_kind = if $single_arg_limit < $total_limit {
         "single-arg"
     } else {
@@ -286,13 +289,25 @@ export def conversation-length-state []: nothing -> record {
     }
     let warn_at = (($effective_limit * $CONVERSATION_WARN_PCT) / 100 | into int)
     let critical_at = (($effective_limit * $CONVERSATION_CRITICAL_PCT) / 100 | into int)
-    let percent = if $effective_limit > 0 {
+    let percent_raw = if $effective_limit > 0 {
         (($chars * 100) / $effective_limit | into int)
     } else {
         0
     }
+    let percent = if $percent_raw > $CONVERSATION_HARD_CAP_PCT {
+        $CONVERSATION_HARD_CAP_PCT
+    } else {
+        $percent_raw
+    }
+    let at_or_over_cap = if $effective_limit > 0 {
+        $chars >= $effective_limit
+    } else {
+        false
+    }
 
-    let level = if $chars >= $critical_at {
+    let level = if $at_or_over_cap {
+        "cap"
+    } else if $chars >= $critical_at {
         "critical"
     } else if $chars >= $warn_at {
         "warn"
@@ -305,11 +320,15 @@ export def conversation-length-state []: nothing -> record {
         raw_arg_max: $raw_arg_max
         total_limit: $total_limit
         single_arg_limit: $single_arg_limit
+        base_effective_limit: $base_effective_limit
         effective_limit: $effective_limit
         limit_kind: $limit_kind
         warn_at: $warn_at
         critical_at: $critical_at
+        percent_raw: $percent_raw
         percent: $percent
+        hard_cap_pct: $CONVERSATION_HARD_CAP_PCT
+        at_or_over_cap: $at_or_over_cap
         level: $level
         warned: ($level != "ok")
     }
@@ -323,16 +342,25 @@ export def maybe-warn-conversation-length [source: string]: nothing -> record {
         {
             chars: 0
             raw_arg_max: (arg-max-raw)
-            effective_limit: (arg-max-effective)
+            total_limit: (arg-max-effective)
+            single_arg_limit: (single-arg-effective)
+            base_effective_limit: (arg-max-effective)
+            effective_limit: (((arg-max-effective) * $CONVERSATION_LIMIT_BOOST_PCT) / 100 | into int)
             warn_at: 0
             critical_at: 0
+            percent_raw: 0
             percent: 0
+            hard_cap_pct: $CONVERSATION_HARD_CAP_PCT
+            at_or_over_cap: false
             level: "unknown"
             warned: false
         }
     })
 
-    if $state.level == "critical" {
+    if $state.level == "cap" {
+        print -e $"\n⛔ Conversation reached hard cap: ($state.chars) chars \(100% of cap ($state.effective_limit)\)."
+        print -e "Start a fresh chat now: pp new, briefing with summary of work up until this point.\n"
+    } else if $state.level == "critical" {
         print -e $"\n⚠  Conversation is very large: ($state.chars) chars \(approx ($state.percent)% of safe limit ($state.effective_limit)\)."
         print -e "Start a fresh chat now: pp new, briefing with summary of work up until this point.\n"
     } else if $state.level == "warn" {
@@ -341,4 +369,47 @@ export def maybe-warn-conversation-length [source: string]: nothing -> record {
     }
 
     ($state | merge { source: $source })
+}
+
+export def block-send-if-capped [source: string]: nothing -> record {
+    let state = (try {
+        conversation-length-state
+    } catch {
+        {
+            chars: 0
+            raw_arg_max: (arg-max-raw)
+            total_limit: (arg-max-effective)
+            single_arg_limit: (single-arg-effective)
+            base_effective_limit: (arg-max-effective)
+            effective_limit: (((arg-max-effective) * $CONVERSATION_LIMIT_BOOST_PCT) / 100 | into int)
+            warn_at: 0
+            critical_at: 0
+            percent_raw: 0
+            percent: 0
+            hard_cap_pct: $CONVERSATION_HARD_CAP_PCT
+            at_or_over_cap: false
+            level: "unknown"
+            warned: false
+        }
+    })
+
+    if ($state.at_or_over_cap? | default false) {
+        print -e $"\n⛔ Send is disabled at the conversation hard cap \(100% of ($state.effective_limit) chars\)."
+        print -e "Start a fresh chat now: pp new, briefing with summary of work up until this point.\n"
+        return ($state | merge {
+            source: $source
+            allowed: false
+            blocked: true
+            reason: "conversation_cap_reached"
+            must_start_new: true
+        })
+    }
+
+    ($state | merge {
+        source: $source
+        allowed: true
+        blocked: false
+        reason: null
+        must_start_new: false
+    })
 }

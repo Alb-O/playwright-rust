@@ -65,6 +65,25 @@ export def "pp send" [
         }
     }
 
+    let send_gate = (block-send-if-capped "pp send")
+    if (($send_gate.allowed? | default true) == false) {
+        let blocked = {
+            success: false
+            sent: false
+            already_sent: false
+            blocked: true
+            must_start_new: true
+            reason: "conversation_cap_reached"
+            model: (get-current-model)
+            chars: ($msg | str length)
+        }
+        return (if $echo_message {
+            $blocked | merge { message: $msg }
+        } else {
+            $blocked
+        })
+    }
+
     let result = (insert-text $msg --clear)
     if ($result | get -o error | is-not-empty) {
         error make { msg: ($result.error) }

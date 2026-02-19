@@ -111,6 +111,21 @@ export def "pp paste" [
 ]: string -> record {
     ensure-project-tab --navigate | ignore
     let text = $in
+
+    if $send {
+        let send_gate = (block-send-if-capped "pp paste --send")
+        if (($send_gate.allowed? | default true) == false) {
+            return {
+                pasted: false
+                sent: false
+                blocked: true
+                must_start_new: true
+                reason: "conversation_cap_reached"
+                length: 0
+            }
+        }
+    }
+
     let result = if $clear { insert-text $text --clear } else { insert-text $text }
 
     if ($result | get -o error | is-not-empty) {

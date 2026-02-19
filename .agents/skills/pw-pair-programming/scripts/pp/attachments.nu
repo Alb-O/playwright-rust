@@ -163,6 +163,23 @@ export def "pp attach" [
     let pipeline_input = $in
 
     ensure-project-tab --navigate | ignore
+
+    if $send {
+        let send_gate = (block-send-if-capped "pp attach --send")
+        if (($send_gate.allowed? | default true) == false) {
+            return {
+                attached: false
+                filenames: []
+                attachments: []
+                size: 0
+                sent: false
+                blocked: true
+                must_start_new: true
+                reason: "conversation_cap_reached"
+            }
+        }
+    }
+
     let attachments = (collect-attachments $files $pipeline_input $name)
     let result = (paste-attachments $attachments)
 

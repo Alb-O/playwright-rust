@@ -43,7 +43,7 @@ export def "pp brief" [
         }
     }
 
-    if $wait {
+    if $wait and (($sent.sent? | default false) == true) {
         pp wait --timeout $timeout
     } else {
         $sent
