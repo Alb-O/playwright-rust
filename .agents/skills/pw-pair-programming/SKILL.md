@@ -49,6 +49,7 @@ From a global skills directory (most basic usage):
 
 * write preamble content to files instead of inline shell.
 * when running inside nu -c, prefer list + splat (`...$entries`) instead of bash-style line continuations.
-* if you have xeno-style entries like `path:10-40`, pass them directly as shorthand slices.
+* entries like `path:10-40`, can pass them directly as shorthand slices.
 * `pp send` and `pp brief` (without `--wait`) return compact send metadata by default; use `pp send --echo-message` only when you need the full text echoed back.
 * always set a long timeout on your bash command when `--wait`ing (10+ minutes) - navigator needs to think and prep
+* ask about good commit breakpoints, committing progress is encouraged, but no upstream PRs/pushes

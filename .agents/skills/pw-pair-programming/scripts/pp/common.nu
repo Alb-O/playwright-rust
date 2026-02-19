@@ -2,6 +2,12 @@ use ../pw.nu
 
 export const BASE_URL = "https://chatgpt.com"
 export const DEFAULT_MODEL = "thinking"
+export const ARG_MAX_FALLBACK = 2097152
+export const ARG_MAX_HEADROOM = 131072
+export const SINGLE_ARG_LIMIT_FALLBACK = 131072
+export const SINGLE_ARG_HEADROOM = 16384
+export const CONVERSATION_WARN_PCT = 70
+export const CONVERSATION_CRITICAL_PCT = 85
 
 export def active-profile []: nothing -> string {
     ($env.PW_PROFILE? | default ($env.PW_NAMESPACE? | default "default"))
@@ -195,4 +201,144 @@ export def clean-response-text [text: string]: nothing -> string {
     | lines
     | where { |line| ($line | str trim | is-not-empty) }
     | str join "\n"
+}
+
+# Read ARG_MAX from the environment, with fallback for portability.
+export def arg-max-raw []: nothing -> int {
+    let result = (try {
+        ^getconf ARG_MAX | complete
+    } catch {
+        null
+    })
+
+    if ($result | is-empty) {
+        return $ARG_MAX_FALLBACK
+    }
+
+    if $result.exit_code != 0 {
+        return $ARG_MAX_FALLBACK
+    }
+
+    let value = ($result.stdout | str trim)
+    if ($value | is-empty) {
+        return $ARG_MAX_FALLBACK
+    }
+
+    let parsed = (try {
+        $value | into int
+    } catch {
+        $ARG_MAX_FALLBACK
+    })
+
+    if $parsed > 0 { $parsed } else { $ARG_MAX_FALLBACK }
+}
+
+export def arg-max-effective []: nothing -> int {
+    let raw = (arg-max-raw)
+    if $raw > $ARG_MAX_HEADROOM {
+        $raw - $ARG_MAX_HEADROOM
+    } else {
+        $raw
+    }
+}
+
+export def single-arg-effective []: nothing -> int {
+    if $SINGLE_ARG_LIMIT_FALLBACK > $SINGLE_ARG_HEADROOM {
+        $SINGLE_ARG_LIMIT_FALLBACK - $SINGLE_ARG_HEADROOM
+    } else {
+        $SINGLE_ARG_LIMIT_FALLBACK
+    }
+}
+
+# Compute total conversation character count from rendered message text.
+export def conversation-char-length []: nothing -> int {
+    let js = "(() => {
+        const messages = document.querySelectorAll('[data-message-author-role]');
+        let total = 0;
+        for (const msg of messages) {
+            total += (msg.innerText || '').length;
+        }
+        return total;
+    })()"
+
+    let chars = ((pw eval $js).data.result | default 0)
+    (try {
+        $chars | into int
+    } catch {
+        0
+    })
+}
+
+export def conversation-length-state []: nothing -> record {
+    let chars = (conversation-char-length)
+    let raw_arg_max = (arg-max-raw)
+    let total_limit = (arg-max-effective)
+    let single_arg_limit = (single-arg-effective)
+    let effective_limit = if $single_arg_limit < $total_limit {
+        $single_arg_limit
+    } else {
+        $total_limit
+    }
+    let limit_kind = if $single_arg_limit < $total_limit {
+        "single-arg"
+    } else {
+        "arg-max"
+    }
+    let warn_at = (($effective_limit * $CONVERSATION_WARN_PCT) / 100 | into int)
+    let critical_at = (($effective_limit * $CONVERSATION_CRITICAL_PCT) / 100 | into int)
+    let percent = if $effective_limit > 0 {
+        (($chars * 100) / $effective_limit | into int)
+    } else {
+        0
+    }
+
+    let level = if $chars >= $critical_at {
+        "critical"
+    } else if $chars >= $warn_at {
+        "warn"
+    } else {
+        "ok"
+    }
+
+    {
+        chars: $chars
+        raw_arg_max: $raw_arg_max
+        total_limit: $total_limit
+        single_arg_limit: $single_arg_limit
+        effective_limit: $effective_limit
+        limit_kind: $limit_kind
+        warn_at: $warn_at
+        critical_at: $critical_at
+        percent: $percent
+        level: $level
+        warned: ($level != "ok")
+    }
+}
+
+# Emit a warning when conversation length approaches command argument limits.
+export def maybe-warn-conversation-length [source: string]: nothing -> record {
+    let state = (try {
+        conversation-length-state
+    } catch {
+        {
+            chars: 0
+            raw_arg_max: (arg-max-raw)
+            effective_limit: (arg-max-effective)
+            warn_at: 0
+            critical_at: 0
+            percent: 0
+            level: "unknown"
+            warned: false
+        }
+    })
+
+    if $state.level == "critical" {
+        print -e $"\n⚠  Conversation is very large: ($state.chars) chars (~($state.percent)% of safe limit ($state.effective_limit))."
+        print -e $"Start a fresh chat now: `pp new`, briefing with summary of work up until this point.\n"
+    } else if $state.level == "warn" {
+        print -e $"\n⚠️ Conversation is getting large: ($state.chars) chars (~($state.percent)% of safe limit ($state.effective_limit))."
+        print -e $"Consider starting a fresh chat soon (`pp new`) at a good breakpoint, briefing with summary of work up until this point.\n"
+    }
+
+    ($state | merge { source: $source })
 }

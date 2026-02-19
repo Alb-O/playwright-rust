@@ -119,6 +119,7 @@ export def "pp paste" [
 
     if $send {
         pw eval "document.querySelector('[data-testid=\"send-button\"]')?.click()"
+        maybe-warn-conversation-length "pp paste --send" | ignore
         { pasted: true, sent: true, length: ($result.inserted? | default ($result.length? | default 0)) }
     } else {
         { pasted: true, sent: false, length: ($result.inserted? | default ($result.length? | default 0)) }

@@ -49,6 +49,7 @@ export def "pp send" [
     if not $force and not $new {
         let last_msg = (last-driver-message)
         if ($last_msg | is-not-empty) and ($last_msg | str trim) == ($msg | str trim) {
+            maybe-warn-conversation-length "pp send (dedup)" | ignore
             let dedup = {
                 success: true
                 sent: false
@@ -81,6 +82,7 @@ export def "pp send" [
     if ($send_result | get -o error | is-not-empty) {
         error make { msg: ($send_result.error) }
     }
+    maybe-warn-conversation-length "pp send" | ignore
 
     let sent = {
         success: true
@@ -140,6 +142,7 @@ export def "pp get-response" []: nothing -> any {
         return last.innerText;
     })()"
     let response = (pw eval $js).data.result
+    maybe-warn-conversation-length "pp get-response" | ignore
     if ($response | is-empty) { "" } else { clean-response-text $response }
 }
 
@@ -150,6 +153,7 @@ export def "pp history" [
     --raw (-r)            # Output raw records (for nushell piping)
 ]: nothing -> any {
     ensure-project-tab | ignore
+    maybe-warn-conversation-length "pp history" | ignore
     let js = "(() => {
         const els = document.querySelectorAll('[data-message-author-role]');
         return Array.from(els).map((el, i) => ({

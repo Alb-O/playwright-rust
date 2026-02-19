@@ -184,6 +184,7 @@ export def "pp attach" [
             error make { msg: "send button did not enable (attachment still uploading?)" }
         }
         pw eval "document.querySelector('[data-testid=\"send-button\"]')?.click()"
+        maybe-warn-conversation-length "pp attach --send" | ignore
         ($result | merge { sent: true })
     } else {
         ($result | merge { sent: false })
