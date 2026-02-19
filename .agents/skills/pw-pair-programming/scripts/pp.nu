@@ -13,12 +13,211 @@
 use pw.nu
 
 const BASE_URL = "https://chatgpt.com"
-const DEFAULT_MODEL = "thinking"  # Default to GPT-5.2 Thinking
+const DEFAULT_MODEL = "thinking"
+
+def active-profile []: nothing -> string {
+    ($env.PW_PROFILE? | default ($env.PW_NAMESPACE? | default "default"))
+}
+
+def run-pw-exec [op: string, input: record, profile: string]: nothing -> any {
+    let payload = ($input | to json)
+    let result = (^pw -f json exec $op --profile $profile --input $payload | complete)
+
+    if ($result.stdout | str trim | is-empty) {
+        if $result.exit_code != 0 {
+            error make { msg: ($result.stderr | str trim) }
+        }
+        error make { msg: $"pw exec returned empty JSON output for op '($op)'" }
+    }
+
+    let parsed = (try {
+        $result.stdout | from json
+    } catch {|e|
+        error make {
+            msg: $"failed to parse pw exec JSON output for op '($op)': ($e.msg)\nstdout=($result.stdout | str trim)\nstderr=($result.stderr | str trim)"
+        }
+    })
+
+    if ($result.exit_code == 0) and (($parsed.ok? | default false) == true) {
+        return $parsed
+    }
+
+    let stderr = ($result.stderr | str trim)
+    let fallback = if ($stderr | is-empty) {
+        $"operation '($op)' failed"
+    } else {
+        $stderr
+    }
+    let msg = ($parsed | get -o error.message | default $fallback)
+    error make { msg: $msg }
+}
+
+def profile-config-show [profile: string]: nothing -> record {
+    (run-pw-exec "profile.show" { name: $profile } $profile).data
+}
+
+def profile-config-set [profile: string, config: record]: nothing -> record {
+    let tmp = (mktemp --suffix .json)
+    $config | to json | save -f $tmp
+
+    let result = (try {
+        run-pw-exec "profile.set" { name: $profile, file: $tmp } $profile
+    } catch {|e|
+        rm -f $tmp
+        error make { msg: $e.msg }
+    })
+
+    rm -f $tmp
+    $result.data
+}
+
+def parse-project-id [value: string]: nothing -> any {
+    let trimmed = ($value | str trim)
+    if ($trimmed | is-empty) {
+        error make { msg: "Project value is empty." }
+    }
+
+    let direct = ($trimmed | parse --regex '^(?<project_id>g-p-[A-Za-z0-9-]+)$')
+    if ($direct | is-not-empty) {
+        return (($direct | first).project_id)
+    }
+
+    let from_url = ($trimmed | parse --regex '^https?://chatgpt\.com/g/(?<project_id>g-p-[A-Za-z0-9-]+)(?:/(?:c/[A-Za-z0-9-]+|project))?(?:[/?#].*)?$')
+    if ($from_url | is-not-empty) {
+        return (($from_url | first).project_id)
+    }
+
+    error make {
+        msg: $"Invalid project reference: ($value). Use g-p-... or a ChatGPT project/conversation URL."
+    }
+}
+
+def project-urls [project_id: string]: nothing -> record {
+    let root = $"($BASE_URL)/g/($project_id)"
+    {
+        root: $root
+        project: $"($root)/project"
+    }
+}
+
+def url-in-project [url: string, project_id: string]: nothing -> bool {
+    if ($url | str trim | is-empty) {
+        return false
+    }
+
+    let parsed = ($url | parse --regex '^https?://chatgpt\.com/g/(?<project_id>g-p-[A-Za-z0-9-]+)(?:/(?:c/[A-Za-z0-9-]+|project))?(?:[/?#].*)?$')
+    if ($parsed | is-empty) {
+        return false
+    }
+
+    (($parsed | first).project_id) == $project_id
+}
+
+def configured-project []: nothing -> any {
+    let profile = (active-profile)
+    let config = (profile-config-show $profile)
+    let stored_base_url = ($config | get -o defaults.baseUrl | default "")
+
+    if ($stored_base_url | is-empty) {
+        return null
+    }
+
+    let project_id = (try {
+        parse-project-id $stored_base_url
+    } catch {
+        null
+    })
+    if ($project_id | is-empty) {
+        return null
+    }
+
+    let urls = (project-urls $project_id)
+
+    {
+        profile: $profile
+        project_id: $project_id
+        project_url: $urls.project
+        project_root_url: $urls.root
+    }
+}
+
+def ensure-project-tab [
+    --navigate (-n)  # Navigate to the configured project's fresh chat when outside the project
+]: nothing -> record {
+    ensure-tab
+    let project = (configured-project)
+
+    if ($project | is-empty) {
+        return {
+            profile: (active-profile)
+            project_id: null
+            project_url: null
+            project_root_url: null
+            current_url: (try { pw url } catch { "" })
+            navigated: false
+            fallback: true
+        }
+    }
+
+    let current_url = (try { pw url } catch { "" })
+    if (url-in-project $current_url $project.project_id) {
+        return ($project | merge { current_url: $current_url, navigated: false, fallback: false })
+    }
+
+    if not $navigate {
+        let shown = if ($current_url | is-empty) { "<unknown>" } else { $current_url }
+        error make {
+            msg: $"Current URL is outside configured project ($project.project_id): ($shown). Run `pp new` or navigate inside the project."
+        }
+    }
+
+    pw nav $project.project_url | ignore
+    let ready = (pw wait-for "#prompt-textarea")
+    if not $ready {
+        error make { msg: $"Project chat did not load composer: ($project.project_url)" }
+    }
+    sleep 500ms
+
+    ($project | merge { current_url: (pw url), navigated: true, fallback: false })
+}
+
+# Hidden helper: configure the active ChatGPT project for this pw profile.
+export def "pp set-project" [
+    project?: string  # g-p-... or ChatGPT project/conversation URL
+]: nothing -> record {
+    let source = if ($project | is-not-empty) {
+        $project
+    } else {
+        let current_url = (try { pw url } catch { "" })
+        if ($current_url | is-empty) {
+            error make {
+                msg: "No project reference provided and current URL is unavailable. Pass g-p-... or a project URL."
+            }
+        }
+        $current_url
+    }
+
+    let project_id = (parse-project-id $source)
+    let urls = (project-urls $project_id)
+    let profile = (active-profile)
+    let config = (profile-config-show $profile)
+    let defaults = ($config | get -o defaults | default {})
+    let updated = ($config | upsert defaults ($defaults | upsert baseUrl $urls.project))
+
+    profile-config-set $profile $updated | ignore
+
+    {
+        saved: true
+        profile: $profile
+        project_id: $project_id
+        project_url: $urls.project
+    }
+}
 
 # Show active workspace/profile isolation bindings.
 export def "pp isolate" []: nothing -> record {
     let workspace = ((pwd | path expand) | into string)
-    let profile = ($env.PW_PROFILE? | default ($env.PW_NAMESPACE? | default "default"))
+    let profile = (active-profile)
     let parsed = (pw session status --profile $profile)
 
     {
@@ -78,7 +277,7 @@ def last-driver-message []: nothing -> string {
 export def "pp set-model" [
     mode: string  # "auto", "instant", or "thinking"
 ]: nothing -> record {
-    ensure-tab
+    ensure-project-tab --navigate | ignore
     let mode_lower = ($mode | str downcase)
     let search_text = match $mode_lower {
         "auto" => "Decides how long"
@@ -129,7 +328,7 @@ def has-thinking-pill []: nothing -> bool {
 
 # Refresh page (use when Navigator UI gets stuck)
 export def "pp refresh" []: nothing -> record {
-    ensure-tab
+    ensure-project-tab --navigate | ignore
     pw eval "location.reload()"
     sleep 3sec
     { refreshed: true }
@@ -139,11 +338,16 @@ export def "pp refresh" []: nothing -> record {
 export def "pp new" [
     --model (-m): string  # Model to set (auto, instant, thinking). Defaults to thinking.
 ]: nothing -> record {
+    let project = (configured-project)
     ensure-tab
-    # Navigate to base URL first, then to temporary chat to force fresh state
-    pw nav $BASE_URL | ignore
-    sleep 500ms
-    pw nav $BASE_URL | ignore
+    if ($project | is-not-empty) {
+        pw nav $project.project_url | ignore
+    } else {
+        # Legacy fallback when no project is configured.
+        pw nav $BASE_URL | ignore
+        sleep 500ms
+        pw nav $BASE_URL | ignore
+    }
     pw wait-for "#prompt-textarea"
     sleep 500ms
     let mode = if ($model | is-empty) { $DEFAULT_MODEL } else { $model }
@@ -247,7 +451,7 @@ export def "pp paste" [
     --send (-s)  # Also send after pasting
     --clear (-c) # Clear existing content first
 ]: string -> record {
-    ensure-tab
+    ensure-project-tab --navigate | ignore
     let text = $in
     let result = if $clear { insert-text $text --clear } else { insert-text $text }
 
@@ -658,7 +862,7 @@ export def "pp attach" [
 ]: [string -> record, nothing -> record] {
     let pipeline_input = $in
 
-    ensure-tab
+    ensure-project-tab --navigate | ignore
     let attachments = (collect-attachments $files $pipeline_input $name)
     let result = (paste-attachments $attachments)
 
@@ -707,10 +911,17 @@ export def "pp send" [
         error make { msg: "No message provided (use positional arg, --file, or stdin)" }
     }
     if not $new {
-        ensure-tab
+        ensure-project-tab --navigate | ignore
     }
     if $new {
-        pw nav $BASE_URL
+        let project = (configured-project)
+        ensure-tab
+        if ($project | is-not-empty) {
+            pw nav $project.project_url | ignore
+        } else {
+            # Legacy fallback when no project is configured.
+            pw nav $BASE_URL | ignore
+        }
         pw wait-for "#prompt-textarea"
         sleep 500ms
         # Set default model for new chats (unless overridden)
@@ -811,7 +1022,7 @@ def clean-response-text [text: string]: nothing -> string {
 export def "pp wait" [
     --timeout (-t): int = 1200000  # Timeout in ms (default: 20 minutes for thinking model)
 ]: nothing -> any {
-    ensure-tab
+    ensure-project-tab | ignore
     let start = (date now)
     let initial_count = (message-count)
     let timeout_dur = ($timeout | into duration --unit ms)
@@ -845,7 +1056,7 @@ export def "pp wait" [
 
 # Get the last response from the Navigator
 export def "pp get-response" []: nothing -> any {
-    ensure-tab
+    ensure-project-tab | ignore
     let js = "(() => {
         const messages = document.querySelectorAll(\"[data-message-author-role='assistant']\");
         if (messages.length === 0) return null;
@@ -862,7 +1073,7 @@ export def "pp history" [
     --json (-j)           # Output as JSON (structured data)
     --raw (-r)            # Output raw records (for nushell piping)
 ]: nothing -> any {
-    ensure-tab
+    ensure-project-tab | ignore
     let js = "(() => {
         const els = document.querySelectorAll('[data-message-author-role]');
         return Array.from(els).map((el, i) => ({
@@ -900,7 +1111,7 @@ export def "pp download" [
     --index (-i): int     # Which download link to use (0-indexed, default: last)
     --list (-l)           # List available download links instead of downloading
 ]: nothing -> any {
-    ensure-tab
+    ensure-project-tab | ignore
 
     # Get access token
     let token_js = "(() => {
