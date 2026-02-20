@@ -1,11 +1,11 @@
 ---
 name: pw-pair-programming
-description: driver-to-navigator collaboration using pp (send messages, attach files, download artifacts) on pw protocol-first wrappers.
+description: driver-to-navigator collaboration using pp (send messages, attach files, download artifacts) on pw protocol wrappers.
 ---
 
 # pw-pair-programming
 
-interact with the navigator using the pp.nu nushell script. uses pw protocol-first wrappers (pw exec) behind the scenes.
+interact with the navigator using the pp.nu nushell script. uses pw protocol wrappers (pw exec) behind the scenes.
 
 * the driver (you) must collaborate with the navigator in back-and-forth loops.
 * the driver writes code and runs tools; the navigator steers design.
@@ -39,7 +39,7 @@ From a global skills directory (most basic usage):
 `pp refresh` reload UI
 `pp download` download artifacts
 
-## entry formats
+## <entries> formats
 
 * full file: `src/main.rs` or `file:src/main.rs`
 * line slice: `slice:path:start:end[:label]`
@@ -53,3 +53,5 @@ From a global skills directory (most basic usage):
 * `pp send` and `pp brief` (without `--wait`) return compact send metadata by default; use `pp send --echo-message` only when you need the full text echoed back.
 * always set a long timeout on your bash command when `--wait`ing (10+ minutes) - navigator needs to think and prep
 * ask about good commit breakpoints, committing progress is encouraged, but no upstream PRs/pushes
+* always show your actual working files (entries), be honest and transparent, don't just summarize and pretend all is perfect
+* if getting stuck, complexity rising, tests failing for unclear reason, SHOW TO NAVIGATOR AND GET ADVICE
