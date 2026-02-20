@@ -18,10 +18,10 @@ export def "pp isolate" []: nothing -> record {
     }
 }
 
-# Set model mode via dropdown (Auto, Instant, Thinking)
+# Set model mode via dropdown (Auto, Instant, Thinking, Pro)
 # Uses single eval with polling since dropdowns close between pw commands
 export def "pp set-model" [
-    mode: string  # "auto", "instant", or "thinking"
+    mode: string  # "auto", "instant", "thinking", or "pro"
 ]: nothing -> record {
     ensure-project-tab --navigate | ignore
     let mode_lower = ($mode | str downcase)
@@ -29,37 +29,105 @@ export def "pp set-model" [
         "auto" => "Decides how long"
         "instant" => "Answers right away"
         "thinking" => "Thinks longer"
-        _ => { error make { msg: $"Unknown mode: ($mode). Use auto, instant, or thinking." } }
+        "pro" => "Research-grade intelligence"
+        _ => { error make { msg: $"Unknown mode: ($mode). Use auto, instant, thinking, or pro." } }
     }
 
-    let js = "(async function() {
-        const btn = document.querySelector(\"button[aria-label^='Model selector']\");
-        if (!btn) return { error: \"Model selector not found\" };
-        btn.click();
-
-        for (let i = 0; i < 50; i++) {
-            await new Promise(r => setTimeout(r, 10));
-            const menu = document.querySelector(\"[role='menu']\");
-            if (menu) {
-                var items = menu.querySelectorAll(\"*\");
-                for (var item of items) {
-                    if (item.textContent.includes(\"" + $search_text + "\")) {
-                        item.click();
-                        return { success: true, mode: \"" + $mode_lower + "\" };
-                    }
-                }
-                return { error: \"Mode option not found in menu\" };
-            }
-        }
-        return { error: \"Menu did not open\" };
+    let items_js = "(() => {
+        const menu = document.querySelector('[role=\"menu\"]');
+        if (!menu) return [];
+        const normalize = (s) => (s || '').split('\\n').map(x => x.trim()).filter(Boolean).join(' ');
+        return Array.from(menu.querySelectorAll('[role=\"menuitem\"]'))
+            .filter(item => {
+                const rect = item.getBoundingClientRect();
+                return rect.width > 2 && rect.height > 2;
+            })
+            .map(item => ({
+                text: normalize(item.textContent || ''),
+                testid: item.getAttribute('data-testid') || null
+            }));
     })()"
 
-    let result = (pw eval $js).data.result
-    if ($result | get -o error | is-not-empty) {
-        error make { msg: ($result.error) }
+    mut items = []
+    mut open_attempts = 0
+    for _ in 1..4 {
+        $open_attempts = $open_attempts + 1
+        pw click "[data-testid=\"model-switcher-dropdown-button\"]" | ignore
+
+        for _ in 1..20 {
+            $items = ((pw eval $items_js).data.result | default [])
+            if (($items | length) > 0) { break }
+            sleep 50ms
+        }
+
+        if (($items | length) > 0) { break }
+        sleep 100ms
     }
+    if (($items | length) == 0) {
+        error make { msg: $"Model menu did not open after ($open_attempts) attempts" }
+    }
+
+    let by_testid = match $mode_lower {
+        "auto" => {
+            $items
+            | where { |item|
+                let tid = ($item.testid | default "")
+                ($tid | str starts-with "model-switcher-")
+                and not ($tid | str ends-with "-instant")
+                and not ($tid | str ends-with "-thinking")
+                and not ($tid | str ends-with "-pro")
+            }
+            | first
+        }
+        "instant" => { $items | where { |item| (($item.testid | default "") | str ends-with "-instant") } | first }
+        "thinking" => { $items | where { |item| (($item.testid | default "") | str ends-with "-thinking") } | first }
+        "pro" => { $items | where { |item| (($item.testid | default "") | str ends-with "-pro") } | first }
+        _ => null
+    }
+
+    let target = if ($by_testid | is-not-empty) {
+        $by_testid
+    } else {
+        $items | where { |item| (($item.text | default "") | str contains $search_text) } | first
+    }
+
+    if ($target | is-empty) {
+        error make {
+            msg: $"Mode option not found in menu for mode '($mode_lower)'. Options: ($items | to json)"
+        }
+    }
+
+    let target_testid = ($target.testid | default "")
+    if ($target_testid | is-not-empty) {
+        pw click $"[data-testid=\"($target_testid)\"]" | ignore
+    } else {
+        let search_text_json = ($search_text | to json)
+        let click_by_text_js = "(() => {
+            const menu = document.querySelector('[role=\"menu\"]');
+            if (!menu) return { error: 'model menu not open' };
+            const rows = Array.from(menu.querySelectorAll('[role=\"menuitem\"]'))
+                .filter(item => {
+                    const rect = item.getBoundingClientRect();
+                    return rect.width > 2 && rect.height > 2;
+                });
+            const target = rows.find(item => (item.textContent || '').includes(" + $search_text_json + "));
+            if (!target) return { error: 'mode option not found by text' };
+            target.click();
+            return { ok: true };
+        })()"
+        let click_result = (pw eval $click_by_text_js).data.result
+        if ($click_result | get -o error | is-not-empty) {
+            error make { msg: ($click_result.error) }
+        }
+    }
+
     sleep 300ms
-    { success: true, mode: $mode_lower, current: (get-current-model) }
+    {
+        success: true
+        mode: $mode_lower
+        selected_testid: (if ($target_testid | is-empty) { null } else { $target_testid })
+        current: (get-current-model)
+    }
 }
 
 # Refresh page (use when Navigator UI gets stuck)
@@ -72,7 +140,7 @@ export def "pp refresh" []: nothing -> record {
 
 # Start a new temporary chat with the Navigator
 export def "pp new" [
-    --model (-m): string  # Model to set (auto, instant, thinking). Defaults to thinking.
+    --model (-m): string  # Model to set (auto, instant, thinking, pro). Defaults to thinking.
 ]: nothing -> record {
     let project = (configured-project)
     ensure-tab

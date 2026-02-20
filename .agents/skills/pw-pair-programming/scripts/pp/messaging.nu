@@ -223,7 +223,7 @@ def get-response-inner-text []: nothing -> string {
 # Send a message to the Navigator
 export def "pp send" [
     message?: string       # Message to send (or use --file or stdin)
-    --model (-m): string   # Set model before sending (auto, instant, thinking)
+    --model (-m): string   # Set model before sending (auto, instant, thinking, pro)
     --new (-n)             # Start new temporary chat
     --file (-f): path      # Read message from file (avoids shell escaping)
     --force                # Send even if last message matches (bypass dedup)

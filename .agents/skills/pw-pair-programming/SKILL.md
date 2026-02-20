@@ -32,7 +32,7 @@ From a global skills directory (most basic usage):
 `pp attach` attach files/text/images (binary-safe; infers common MIME types)
 `pp paste` paste inline text
 `pp new` start fresh conversation
-`pp set-model` set mode (`auto` | `instant` | `thinking`)
+`pp set-model` set mode (`auto` | `instant` | `thinking` | `pro`)
 `pp wait` wait for response
 `pp get-response` fetch latest response
 `pp history` transcript

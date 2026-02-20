@@ -183,12 +183,25 @@ export def is-generating []: nothing -> bool {
         const thinking = document.querySelector('.result-thinking');
         if (thinking) return true;
 
-        const answerNow = Array.from(document.querySelectorAll('span'))
+        const answerNow = Array.from(document.querySelectorAll('span, button'))
             .some(el => (el.textContent || '').trim() === 'Answer now');
         if (answerNow) return true;
 
-        const stopBtn = document.querySelector('button[aria-label=\"Stop streaming\"]');
-        if (stopBtn) return true;
+        const stopByAriaOrText = Array.from(document.querySelectorAll('button'))
+            .some(el => {
+                const aria = (el.getAttribute('aria-label') || '').trim().toLowerCase();
+                const text = (el.textContent || '').trim().toLowerCase();
+                return (
+                    aria.includes('stop streaming')
+                    || aria.includes('stop generating')
+                    || aria == 'stop'
+                    || text == 'stop'
+                );
+            });
+        if (stopByAriaOrText) return true;
+
+        const stopByTestId = document.querySelector('[data-testid*=\"stop\"]');
+        if (stopByTestId) return true;
 
         return false;
     })()"
